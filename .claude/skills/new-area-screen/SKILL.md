@@ -24,7 +24,7 @@ Obiettivo: sostituire il `PlaceholderScreen` di una delle 4 aree
 3. Usa dati mock coerenti con `DashboardMockData` (`lib/models/
    dashboard_area_summary.dart`) finché Drift non è collegato — non inventare uno
    shape di dati diverso da quello già usato altrove per la stessa area.
-4. Delega l'implementazione vera e propria all'agent `flutter-ui-builder` (Task/Agent
+4. Delega l'implementazione vera e propria all'agent `flutter-dev` (Task/Agent
    tool), passandogli: quale area, quale contenuto secondo il punto 2, e il vincolo di
    riusare i design token esistenti.
 5. Dopo l'implementazione, esegui la skill `flutter-check` per verificare che il
