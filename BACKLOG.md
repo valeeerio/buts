@@ -67,22 +67,18 @@ Legenda skill: skill di Claude Code da invocare per quel task (vedi
 7. **Flusso apertura/chiusura mese** — suddivisione manuale netto tra le 4 aree,
    deve leggere il netto da `ultimaBustaPagaProvider` (niente doppio inserimento),
    scrive su `mesiBudgetRepositoryProvider`
-   - Skill: `new-area-screen` o `flutter-ui-builder` a seconda della complessità, `flutter-check`
+   - Skill: `monthly-budget-flow` (nuova, task cross-sezione Buste Paga↔Budget),
+     poi `flutter-check`
 8. **AI locale on-device per estrazione dati busta paga** — fase successiva, no dipendenze cloud
    - Nessuna skill dedicata ancora — da valutare in fase di progettazione
-9. **Restyling visivo ispirato a shadcn/ui** (richiesto dall'utente il 2026-07-28,
-   redesign profondo, applicato a tutta l'app incluso il già costruito — Dashboard,
-   Buste Paga). shadcn/ui è una libreria React/web: qui va inteso come nuova
-   direzione visiva (palette più neutra/desaturata, bordi sottili, gerarchia
-   tipografica più marcata) da tradurre in widget Cupertino nativi, non come
-   dipendenza da installare — Flutter/iOS-nativo resta lo stack, cambia solo il
-   design system. **Prerequisito**: revisione della sezione "Stile visivo" di
-   CLAUDE.md (oggi vincolata a estetica Apple/Cupertino nativa, dichiarata "non
-   negoziabile senza conferma esplicita" — l'utente l'ha data per questo punto, va
-   formalizzata nel documento prima di toccare i widget). Da pianificare con
-   `/plan` dato l'impatto: nuova palette in `app_colors.dart`, possibile revisione
-   di `AppRadius`/`AppSpacing`, poi propagazione a tutti gli screen/widget esistenti.
-   - Nessuna skill dedicata ancora — richiede prima l'aggiornamento di CLAUDE.md
+
+## Decisioni archiviate (non da rimettere in discussione senza motivo nuovo)
+
+- **Restyling ispirato a shadcn/ui — declinato (2026-07-28)**. Valutato con una
+  demo comparativa diretta (bottone Apple/Cupertino con materiali/vibrancy +
+  colore dinamico + fisica a molla, vs bottone shadcn/ui con superfici piatte e
+  bordi). L'utente ha confermato di restare sullo stile Apple/Cupertino nativo
+  già in CLAUDE.md — nessuna azione richiesta, stack e design system invariati.
 
 ## Manutenzione ricorrente (da fare periodicamente, non una tantum)
 

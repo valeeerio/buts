@@ -42,3 +42,24 @@ Convenzioni tecniche:
 Se un requisito di business non è chiaro dal contesto disponibile (es. come trattare
 mesi passati modificati retroattivamente), chiedi prima di scegliere uno schema
 arbitrario che sarebbe costoso migrare in seguito.
+
+## Pattern già in uso nel progetto — segui a meno di ragione esplicita per deviare
+
+Esistono già due implementazioni reali (`BustePagaTable`/
+`lib/providers/buste_paga_provider.dart`, le 4 tabelle Budget/
+`lib/providers/aree_budget_provider.dart`) con convenzioni consistenti: il prossimo
+lavoro Drift (es. CategoriaSpesa/Transazione per il Conto Principale) deve seguirle,
+non ridiscuterle da zero.
+
+- Nomi tabella con suffisso `...Table` (`BustePagaTable`, `AreaTable`,
+  `MovimentoAreaTable`, ecc.).
+- Repository con un metodo di scrittura unico per ogni vincolo di business (es.
+  `AreeBudgetRepository.aggiungiMovimento`), mai scritture dirette sparse nella UI.
+- Provider `StateNotifier<List<T>>` che si inizializza leggendo da Drift e aggiorna
+  lo stato locale ad ogni scrittura — mai `StreamProvider` in questo progetto, per
+  coerenza con quanto già stabilito.
+- Totali/importi derivabili (somma voci ricorrenti attive, importo Conto Principale,
+  ecc.) sempre come funzione/provider calcolato a runtime, mai colonna denormalizzata
+  — vincolo già rispettato due volte, va mantenuto.
+- Seed iniziale "una tantum se la tabella è vuota" (`seedAreeSeVuoto` /
+  `BustaPagaMockData` in `buste_paga_provider.dart`), mai ripetuto ad ogni avvio.

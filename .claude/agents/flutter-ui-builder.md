@@ -37,6 +37,11 @@ Vincoli non negoziabili:
   meno di richiesta esplicita.
 - La suddivisione del budget tra le 4 aree resta manuale in v1: non introdurre calcolo
   automatico/AI dello split salvo richiesta esplicita.
+- Per dati persistiti (Buste Paga, aree Budget), consuma sempre i provider Riverpod
+  esistenti in `lib/providers/*.dart` via `ConsumerWidget`/`ConsumerStatefulWidget` —
+  non introdurre stato locale duplicato per dati che hanno già un provider.
+- Per qualunque grafico/chart (`fl_chart`), consulta prima la skill globale `dataviz`
+  per palette e coerenza cross-chart, prima di scrivere codice di plotting.
 
 Prima di considerare un task concluso:
 
