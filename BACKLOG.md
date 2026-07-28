@@ -80,12 +80,34 @@ in pausa (sezione "In pausa" più sotto, non cancellati).
 3. **AI locale on-device per estrazione dati busta paga** — solo estrazione
    campi da documento (precompilazione form editabile, mai salvataggio senza
    conferma utente), non insight statistici. Nessuna chiamata cloud, nessun
-   costo ricorrente, aumento di peso app (500MB–2GB) accettato. Libreria di
-   binding LLM locale **da ricercare all'implementazione** (piano di progetto
-   §8 la segnala come decisione aperta, panorama in rapida evoluzione). Il
-   testo estratto dal PDF (già disponibile da `pdf_import_service.dart`) è
-   pronto per essere passato al modello locale.
-   - Nessuna skill dedicata ancora — primo passo sarà una ricerca mirata
+   costo ricorrente, aumento di peso app (500MB–2GB) accettato. Il testo
+   estratto dal PDF (già disponibile da `pdf_import_service.dart`) è pronto
+   per essere passato al modello locale.
+
+   **Decisione tecnica presa (2026-07-28)**, dopo ricerca mirata: libreria
+   `llama_cpp_dart` (FFI su llama.cpp, xcframework iOS precompilato via CI,
+   inferenza in isolate dedicato). Scartate le alternative:
+   - **Apple Foundation Models** (nativo, zero peso extra, output tipizzato
+     via `@Generable`) — non praticabile: richiede hardware Apple
+     Intelligence (iPhone 15 Pro+/16+, A17 Pro o superiore), device di
+     sviluppo/uso è un iPhone 14 Pro, non compatibile.
+   - **fllama** — meno maturo, problemi Metal/SIMD segnalati su alcuni
+     device, preferito `llama_cpp_dart` per lo xcframework precompilato.
+   - **Google MediaPipe LLM Inference** — dichiarata da Google in
+     maintenance-only su iOS, sconsigliata per nuovo sviluppo.
+
+   Modello candidato: uno tra Llama 3.2 1B/3B, Gemma 2/3 2B, Phi-3.5-mini,
+   Qwen2.5 1.5B/3B, quantizzazione GGUF Q4_K_M — scelta finale e verifica
+   licenza da fare in fase di implementazione (Llama 3.2 ha restrizioni EU
+   solo sui modelli multimodali, non sui 1B/3B testuali; Gemma/Qwen2.5
+   licenze permissive per uso locale). Output vincolato via grammatica GBNF
+   di llama.cpp (JSON Schema→GBNF nativo) per evitare JSON malformato.
+
+   **Rischi aperti da verificare in fase di implementazione**: qualità
+   reale di estrazione JSON su testo di busta paga italiana non garantita a
+   priori, richiede un giro di validazione empirica con più modelli/prompt
+   prima di fissare la scelta finale.
+   - Nessuna skill dedicata ancora — da creare quando si affronta l'implementazione
 
 ## In pausa — riprendere dopo Buste Paga (non cancellati)
 
