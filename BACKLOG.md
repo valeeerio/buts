@@ -29,12 +29,16 @@ Legenda skill: skill di Claude Code da invocare per quel task (vedi
       (`busta_paga_form_screen.dart`), dettaglio (`busta_paga_detail_screen.dart`)
 - [x] Collegamento dati Buste Paga → Budget: `ultimaBustaPagaProvider` letto in
       `dashboard_screen.dart` (netto visibile sotto il sottotitolo mese)
+- [x] Persistenza Drift (2026-07-28): `lib/data/database.dart` (`AppDatabase`,
+      tabella `BustePagaTable`, `TrattenuteConverter` JSON per la mappa trattenute,
+      `schemaVersion = 1`). `busteRepositoryProvider`/`ultimaBustaPagaProvider`
+      invariati nella firma pubblica, ora backed da SQLite invece che in-memory;
+      seed una tantum da `BustaPagaMockData` solo se la tabella è vuota.
 
 ## Da fare — in ordine di priorità
 
-1. **Persistenza Drift (SQLite)** — sostituire lo stato in-memory di
-   `busteRepositoryProvider`/`BustaPagaMockData` con tabelle reali; poi estendere
-   alle 4 aree budget (movimenti, voci ricorrenti, mesi)
+1. **Estendere Drift alle 4 aree budget** (movimenti, voci ricorrenti, mesi) —
+   stesso pattern di `lib/data/database.dart`, prima tabella Buste Paga come riferimento
    - Skill: `drift-migration` (agent dedicato: `drift-schema-architect`)
 2. **Upload PDF/foto busta paga** (`fileOrigine`, oggi sempre `null`) + statistiche
    e grafici dedicati (ferie/ROL/permessi residui nel tempo, ore straordinario)
