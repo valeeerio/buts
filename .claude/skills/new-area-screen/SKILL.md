@@ -33,4 +33,5 @@ Obiettivo: sostituire il `PlaceholderScreen` di una delle 4 aree
    modificati per controllare l'aderenza allo stile prima di consegnare.
 
 Non introdurre navigazione aggiuntiva nella tab bar: la schermata resta raggiunta come
-oggi, tramite tap sulla `AreaSummaryCard` corrispondente in Dashboard.
+oggi, tramite tap sulla `AreaSummaryCard` corrispondente nella Dashboard della sezione
+Budget (non nella sezione Buste Paga, di pari livello ma separata).
