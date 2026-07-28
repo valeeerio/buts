@@ -9,9 +9,11 @@ motivo) e cosa manca ancora.
 App mobile Flutter (iOS come target primario, look-and-feel Cupertino/iOS nativo),
 uso personale locale — nessun backend cloud nella v1, nessun account, dati sul device.
 
-Gestisce: budget mensile diviso in 4 aree, spese quotidiane, voci ricorrenti
-(abbonamenti + costi fissi unificati), e un modulo separato per l'archivio e
-l'analisi delle buste paga.
+**Funzione primaria: tracciare i dati della busta paga** (netto, lordo, straordinari,
+ferie maturate/godute/residue, ROL, permessi, ore lavorate). È la sezione che si apre
+per prima all'avvio dell'app. La gestione di budget mensile diviso in 4 aree, spese
+quotidiane e voci ricorrenti (abbonamenti + costi fissi unificati) è una sezione
+separata di **pari livello**, non più la home — vedi "Navigazione" sotto.
 
 ## Le 4 aree di budget (concetto centrale dell'app)
 
@@ -39,22 +41,44 @@ manualmente lo stipendio netto ogni mese.
 Questa suddivisione è **manuale** in v1 — niente calcolo automatico AI dello split
 (può arrivare in futuro, non ora).
 
-**Area Buste Paga**: separata concettualmente dalle 4 aree di budget. Non è nella
-tab bar principale — si apre da un ingresso secondario (icona nell'header della
-Dashboard, vedi `dashboard_screen.dart` → `onOpenBustePaga`). Contiene archivio
-buste paga, estrazione dati (in futuro via AI locale on-device, vedi sotto), e
-statistiche su ferie/ROL/permessi/ore.
+**Sezione Buste Paga**: funzione primaria dell'app, sezione di apertura predefinita.
+Contiene archivio buste paga (`lib/screens/buste_paga/buste_paga_section_screen.dart`),
+form di inserimento manuale con tutti i campi (`busta_paga_form_screen.dart`),
+dettaglio (`busta_paga_detail_screen.dart`). Estrazione dati via AI locale on-device
+resta una fase futura (vedi sotto), in v1 l'inserimento è solo manuale. Il netto
+dell'ultima busta paga (`ultimaBustaPagaProvider`, `lib/providers/buste_paga_provider.dart`)
+alimenta la suddivisione mensile del budget nella sezione Budget — niente doppio
+inserimento manuale del netto (vedi `dashboard_screen.dart`).
 
 ## Navigazione
 
-Tab bar inferiore stile Instagram/WhatsApp, **Dashboard al centro**, ordine fisso
-(vedi `lib/navigation/app_tab.dart`):
+L'app ha **2 sezioni principali di pari livello**, navigabili sia con swipe
+orizzontale sul contenuto sia con la freccia nell'header globale persistente
+(`lib/widgets/app_section_header.dart`, stato in `app_section_provider.dart`,
+scaffold radice `lib/navigation/app_root_scaffold.dart`):
 
 ```
-Impegni Fissi — Risparmio Principale — [ Dashboard ] — Conto Principale — Piccolo Risparmio
+[ Buste Paga ]  ⇄  [ Budget ]
+   (default)
 ```
 
-Buste Paga non è una tab: è raggiunta come push da dentro la Dashboard.
+- **Buste Paga**: sezione di apertura predefinita, contenuto proprio (vedi sopra),
+  nessuna tab bar interna.
+- **Budget**: contiene l'attuale gestione a 4 aree con la sua tab bar inferiore
+  stile Instagram/WhatsApp, **Dashboard al centro**, ordine fisso (vedi
+  `lib/navigation/app_tab.dart`, contenuto in `lib/navigation/root_scaffold.dart`):
+
+  ```
+  Impegni Fissi — Risparmio Principale — [ Dashboard ] — Conto Principale — Piccolo Risparmio
+  ```
+
+  Questa tab bar a 5 destinazioni resta valida **solo dentro** la sezione Budget,
+  non è la navigazione radice dell'app.
+
+**Stato Riverpod**: `ProviderScope` è alla radice (`main.dart`). In uso per lo stato
+di sezione attiva (`activeSectionProvider`) e per i dati Buste Paga in-memory
+(`busteRepositoryProvider`, `ultimaBustaPagaProvider`) — persistenza Drift reale
+non ancora collegata, vedi "Cosa manca".
 
 ## Stile visivo — non negoziabile senza conferma esplicita dell'utente
 
@@ -79,9 +103,11 @@ leggero, superfici pulite, no pill/capsule).
 Ordine dall'alto (vedi `lib/screens/dashboard/dashboard_screen.dart`):
 
 1. Header: saluto con contesto temporale ("Buongiorno"/"Buonasera" + nome,
-   in base all'ora — logica già in `_greeting`), sotto il mese corrente. Il saluto
-   è l'elemento con più enfasi, non il saldo totale. A destra dell'header, l'icona
-   di ingresso secondario a Buste Paga.
+   in base all'ora — logica già in `_greeting`), sotto il mese corrente, sotto
+   ancora il netto dell'ultima busta paga quando disponibile (collegamento dati
+   verso la sezione Buste Paga). Il saluto è l'elemento con più enfasi, non il
+   saldo totale. Nessuna icona di navigazione qui: Buste Paga si raggiunge da
+   swipe/header globale, non da dentro la Dashboard.
 2. `DonutSummary`: donut chart con ripartizione % delle 4 aree + totale al centro,
    legenda a fianco.
 3. `InsightCard`: singola card di osservazione automatica (due varianti:
@@ -99,18 +125,23 @@ Dati mock attuali in `lib/models/dashboard_area_summary.dart` →
 
 ## Cosa manca (prossimi passi, in ordine di priorità suggerito)
 
-1. Dettaglio delle 4 aree (oggi solo `PlaceholderScreen`): lista transazioni/
-   movimenti per Conto Principale, storico versamenti per i risparmi (con azione
-   di prelievo + nota obbligatoria), lista voci ricorrenti con scadenze in evidenza
-   per Impegni Fissi.
-2. Schermata Area Buste Paga: archivio, upload, statistiche ferie/ROL/permessi/ore.
-3. Persistenza dati: Drift (SQLite) già in `pubspec.yaml`, schema da definire
-   secondo il modello dati nel piano di progetto (vedi file
-   `piano_progetto_finanze_personali.md` nella cartella superiore del repo, se
-   presente, per il modello dati completo).
-4. Flusso di apertura/chiusura mese e suddivisione manuale del budget.
+1. Persistenza dati: Drift (SQLite) già in `pubspec.yaml` ma non ancora collegato —
+   sostituire lo stato in-memory (`BustaPagaMockData`, `busteRepositoryProvider`) con
+   tabelle reali, schema secondo il modello dati nel piano di progetto (vedi file
+   `piano_progetto_finanze_personali.md` nella cartella superiore del repo).
+2. Upload PDF/foto busta paga nel form (`fileOrigine`, oggi sempre `null`) e
+   statistiche/grafici dedicati (andamento ferie/ROL/permessi residui, ore
+   straordinario per mese).
+3. Dettaglio delle 4 aree della sezione Budget (oggi solo `PlaceholderScreen`): lista
+   transazioni/movimenti per Conto Principale, storico versamenti per i risparmi
+   (con azione di prelievo + nota obbligatoria), lista voci ricorrenti con scadenze
+   in evidenza per Impegni Fissi.
+4. Flusso di apertura/chiusura mese e suddivisione manuale del budget nella sezione
+   Budget — deve leggere il netto da `ultimaBustaPagaProvider`, non richiederlo di
+   nuovo manualmente.
 5. AI locale on-device per estrazione dati busta paga (fase successiva, nessuna
-   dipendenza cloud/API a pagamento prevista).
+   dipendenza cloud/API a pagamento prevista, sostituisce progressivamente
+   l'inserimento manuale del form).
 
 ## Convenzioni di codice
 

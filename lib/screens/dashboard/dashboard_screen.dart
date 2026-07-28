@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../models/dashboard_area_summary.dart';
+import '../../providers/buste_paga_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
@@ -11,16 +13,19 @@ import '../../widgets/insight_card.dart';
 /// Schermata Dashboard: saluto → riepilogo a donut → insight automatico →
 /// le 4 card delle aree di budget. Non contiene la tab bar: quella vive
 /// nello scaffold radice (root_scaffold.dart), la Dashboard è solo il contenuto.
-class DashboardScreen extends StatelessWidget {
+///
+/// Il netto dell'ultima busta paga (sezione Buste Paga, di pari livello)
+/// alimenta qui la suddivisione mensile del budget — vedi
+/// ultimaBustaPagaProvider in lib/providers/buste_paga_provider.dart. Nessun
+/// doppio inserimento manuale del netto.
+class DashboardScreen extends ConsumerWidget {
   final String userName;
   final void Function(DashboardAreaSummary area) onOpenArea;
-  final VoidCallback onOpenBustePaga;
 
   const DashboardScreen({
     super.key,
     required this.userName,
     required this.onOpenArea,
-    required this.onOpenBustePaga,
   });
 
   String get _greeting {
@@ -36,9 +41,10 @@ class DashboardScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final areas = DashboardMockData.areas;
     final total = DashboardMockData.totalAmount;
+    final ultimaBustaPaga = ref.watch(ultimaBustaPagaProvider);
 
     return Container(
       color: CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
@@ -54,51 +60,35 @@ class DashboardScreen extends StatelessWidget {
                 AppSpacing.sm,
               ),
               sliver: SliverToBoxAdapter(
-                child: Row(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _greeting,
-                            style: AppTextStyles.greeting.copyWith(
-                              color: CupertinoDynamicColor.resolve(
-                                  AppColors.labelPrimary, context),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _monthLabel,
-                            style: AppTextStyles.subtitle.copyWith(
-                              color: CupertinoDynamicColor.resolve(
-                                  AppColors.labelSecondary, context),
-                            ),
-                          ),
-                        ],
+                    Text(
+                      _greeting,
+                      style: AppTextStyles.greeting.copyWith(
+                        color: CupertinoDynamicColor.resolve(
+                            AppColors.labelPrimary, context),
                       ),
                     ),
-                    // Ingresso secondario all'Area Buste Paga (non è nella tab bar).
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: onOpenBustePaga,
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: CupertinoDynamicColor.resolve(
-                              AppColors.surface, context),
-                          borderRadius: BorderRadius.circular(AppRadius.medium),
-                        ),
-                        child: Icon(
-                          CupertinoIcons.doc_text_fill,
-                          size: 18,
+                    const SizedBox(height: 4),
+                    Text(
+                      _monthLabel,
+                      style: AppTextStyles.subtitle.copyWith(
+                        color: CupertinoDynamicColor.resolve(
+                            AppColors.labelSecondary, context),
+                      ),
+                    ),
+                    if (ultimaBustaPaga != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Netto disponibile da Buste Paga: '
+                        '€ ${ultimaBustaPaga.netto.toStringAsFixed(2)}',
+                        style: AppTextStyles.subtitle.copyWith(
                           color: CupertinoDynamicColor.resolve(
                               AppColors.labelSecondary, context),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),

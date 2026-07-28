@@ -1,7 +1,11 @@
 import 'package:flutter/cupertino.dart';
-import 'navigation/root_scaffold.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'navigation/app_root_scaffold.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('it_IT');
   runApp(const ButsApp());
 }
 
@@ -10,14 +14,16 @@ class ButsApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const CupertinoApp(
-      title: 'Buts',
-      debugShowCheckedModeBanner: false,
-      localizationsDelegates: [
-        DefaultCupertinoLocalizations.delegate,
-      ],
-      home: CupertinoPageScaffold(
-        child: RootScaffold(),
+    return const ProviderScope(
+      child: CupertinoApp(
+        title: 'Buts',
+        debugShowCheckedModeBanner: false,
+        localizationsDelegates: [
+          DefaultCupertinoLocalizations.delegate,
+        ],
+        home: CupertinoPageScaffold(
+          child: AppRootScaffold(),
+        ),
       ),
     );
   }

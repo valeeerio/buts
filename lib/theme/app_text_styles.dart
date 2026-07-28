@@ -1,5 +1,4 @@
 import 'package:flutter/cupertino.dart';
-import 'app_colors.dart';
 
 /// Gerarchia tipografica system-style (SF Pro / system font).
 /// Font family lasciata vuota: su iOS Flutter usa già .SF UI Text/.SF UI Display
@@ -18,6 +17,14 @@ class AppTextStyles {
   static const subtitle = TextStyle(
     fontSize: 15,
     fontWeight: FontWeight.w400,
+  );
+
+  /// Titolo di sezione (es. "Archivio buste paga"): un gradino sotto
+  /// `greeting`, usato per intestazioni di contenuto interne a una sezione.
+  static const sectionTitle = TextStyle(
+    fontSize: 22,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0.2,
   );
 
   static const cardAmountLarge = TextStyle(
