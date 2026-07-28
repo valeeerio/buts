@@ -42,13 +42,27 @@ Questa suddivisione è **manuale** in v1 — niente calcolo automatico AI dello 
 (può arrivare in futuro, non ora).
 
 **Sezione Buste Paga**: funzione primaria dell'app, sezione di apertura predefinita.
-Contiene archivio buste paga (`lib/screens/buste_paga/buste_paga_section_screen.dart`),
-form di inserimento manuale con tutti i campi (`busta_paga_form_screen.dart`),
-dettaglio (`busta_paga_detail_screen.dart`). Estrazione dati via AI locale on-device
-resta una fase futura (vedi sotto), in v1 l'inserimento è solo manuale. Il netto
-dell'ultima busta paga (`ultimaBustaPagaProvider`, `lib/providers/buste_paga_provider.dart`)
-alimenta la suddivisione mensile del budget nella sezione Budget — niente doppio
-inserimento manuale del netto (vedi `dashboard_screen.dart`).
+`buste_paga_section_screen.dart` è il contenitore di primo livello: header con CTA
+"+" e sotto-navigazione interna a tab (`CupertinoSlidingSegmentedControl`) —
+**Archivio** (`buste_paga_archivio_view.dart`, hero ultima busta paga + elenco) e
+**Statistiche** (`buste_paga_statistiche_screen.dart`, grafici `fl_chart`: andamento
+netto/lordo, ferie/ROL/permessi residui, straordinario per mese — richiede almeno 2
+buste paga in archivio, altrimenti empty state). Questa sotto-navigazione è interna
+alla sezione, non va confusa con la navigazione radice a 2 sezioni (`AppSectionHeader`
+resta invariato). Form di inserimento manuale con tutti i campi
+(`busta_paga_form_screen.dart`), dettaglio (`busta_paga_detail_screen.dart`).
+Estrazione dati via AI locale on-device resta una fase futura (vedi sotto), in v1
+l'inserimento è solo manuale. Il netto dell'ultima busta paga
+(`ultimaBustaPagaProvider`, `lib/providers/buste_paga_provider.dart`) alimenta la
+suddivisione mensile del budget nella sezione Budget — niente doppio inserimento
+manuale del netto (vedi `dashboard_screen.dart`).
+
+Componenti di stile riutilizzabili introdotti per questa sezione (validi ovunque
+serva più "materialità" Apple, non solo qui): `lib/widgets/material_surface.dart`
+(superficie traslucida/sfocata via `BackdropFilter`, usata sulla hero card) e
+`lib/widgets/spring_button.dart` (pressione con rimbalzo a molla, usato sui CTA
+principali di questa sezione). Restano dentro i design token esistenti — nessun
+nuovo colore o corner radius introdotto.
 
 ## Navigazione
 

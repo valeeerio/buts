@@ -44,33 +44,64 @@ Legenda skill: skill di Claude Code da invocare per quel task (vedi
       Dashboard** (`DashboardMockData` invariato): rimandato al task "dettaglio aree",
       dove andrà deciso come derivare sparkline/variazione % dai movimenti grezzi.
 
-## Da fare — in ordine di priorità
+## Focus attuale (dal 2026-07-28): solo Buste Paga
 
-1. **Upload PDF/foto busta paga** (`fileOrigine`, oggi sempre `null`) + statistiche
-   e grafici dedicati (ferie/ROL/permessi residui nel tempo, ore straordinario)
-   - Skill: `flutter-ui-builder` (agent), `design-audit`, `flutter-check`
-2. **Dettaglio Conto Principale** — lista movimenti/spese, aggiunta spesa; collega
+Sviluppo concentrato esclusivamente sulla sezione Buste Paga, branch
+`feature/buste-paga`. Tre fasi, **in quest'ordine**: struttura/stile → import
+PDF → AI locale per l'estrazione. Gli item relativi alla sezione Budget sono
+in pausa (sezione "In pausa" più sotto, non cancellati).
+
+- [x] **Fase 1 — Struttura e stile sezione Buste Paga** (2026-07-28): sotto-
+      navigazione a tab (`CupertinoSlidingSegmentedControl`) Archivio/
+      Statistiche in `buste_paga_section_screen.dart`; Archivio estratto in
+      `buste_paga_archivio_view.dart`; nuova `buste_paga_statistiche_screen.dart`
+      con 3 grafici `fl_chart` (netto/lordo, ferie/ROL/permessi residui,
+      straordinario per mese) da `busteRepositoryProvider`, empty state se
+      < 2 buste paga. Nuovi componenti riutilizzabili `lib/widgets/
+      material_surface.dart` (blur/vibrancy, applicato alla hero card) e
+      `lib/widgets/spring_button.dart` (pressione a molla, applicato al CTA
+      "+" e al bottone "Salva" del form). `flutter analyze`/`flutter test`
+      puliti, verificato su simulatore iOS.
+
+2. **Import PDF busta paga** — solo PDF testuali in v1 (no OCR per scansioni,
+   no foto/camera), file copiato in application documents directory, popola
+   `fileOrigine` (già esistente nel modello, oggi sempre `null`). Apertura
+   file via condivisione di sistema, nessun visualizzatore PDF in-app.
+   Dipendenze da aggiungere: `file_picker` + un package di estrazione testo
+   PDF (da confermare con l'utente all'implementazione: `syncfusion_flutter_pdf`
+   proposto dal piano di progetto, verificarne la licenza community per uso
+   personale, vs alternative più leggere).
+   - Skill: `flutter-ui-builder`, poi `flutter-check`, `design-consistency-reviewer`
+3. **AI locale on-device per estrazione dati busta paga** — solo estrazione
+   campi da documento (precompilazione form editabile, mai salvataggio senza
+   conferma utente), non insight statistici. Nessuna chiamata cloud, nessun
+   costo ricorrente, aumento di peso app (500MB–2GB) accettato. Libreria di
+   binding LLM locale **da ricercare all'implementazione** (piano di progetto
+   §8 la segnala come decisione aperta, panorama in rapida evoluzione).
+   - Nessuna skill dedicata ancora — primo passo sarà una ricerca mirata
+
+## In pausa — riprendere dopo Buste Paga (non cancellati)
+
+4. **Dettaglio Conto Principale** — lista movimenti/spese, aggiunta spesa; collega
    `aree_budget_provider.dart` invece dei soli dati mock
    - Skill: `new-area-screen`, poi `design-audit` a fine lavoro, `flutter-check` prima di consegnare
-3. **Dettaglio Risparmio Principale** — storico versamenti + prelievo con nota obbligatoria
+5. **Dettaglio Risparmio Principale** — storico versamenti + prelievo con nota obbligatoria
    (vincolo già applicato in `AreeBudgetRepository.aggiungiMovimento`)
    - Skill: `new-area-screen`, `design-audit`, `flutter-check`
-4. **Dettaglio Piccolo Risparmio** — stessa logica del Risparmio Principale, fondo separato
+6. **Dettaglio Piccolo Risparmio** — stessa logica del Risparmio Principale, fondo separato
    - Skill: `new-area-screen`, `design-audit`, `flutter-check`
-5. **Dettaglio Impegni Fissi** — lista voci ricorrenti (abbonamenti + costi fissi) con scadenze;
+7. **Dettaglio Impegni Fissi** — lista voci ricorrenti (abbonamenti + costi fissi) con scadenze;
    collega `vociRicorrentiRepositoryProvider`/`totaleImpegniFissiProvider`
    - Skill: `new-area-screen`, `design-audit`, `flutter-check`
-6. **Collegare Dashboard ai dati reali delle 4 aree** — sostituire `DashboardMockData`
+8. **Collegare Dashboard ai dati reali delle 4 aree** — sostituire `DashboardMockData`
    con `aree_budget_provider.dart`, decidendo come derivare sparkline/variazione %
    dai movimenti grezzi (rimandato esplicitamente dal task schema Drift)
    - Skill: `flutter-check`
-7. **Flusso apertura/chiusura mese** — suddivisione manuale netto tra le 4 aree,
+9. **Flusso apertura/chiusura mese** — suddivisione manuale netto tra le 4 aree,
    deve leggere il netto da `ultimaBustaPagaProvider` (niente doppio inserimento),
    scrive su `mesiBudgetRepositoryProvider`
-   - Skill: `monthly-budget-flow` (nuova, task cross-sezione Buste Paga↔Budget),
+   - Skill: `monthly-budget-flow` (task cross-sezione Buste Paga↔Budget),
      poi `flutter-check`
-8. **AI locale on-device per estrazione dati busta paga** — fase successiva, no dipendenze cloud
-   - Nessuna skill dedicata ancora — da valutare in fase di progettazione
 
 ## Decisioni archiviate (non da rimettere in discussione senza motivo nuovo)
 

@@ -6,6 +6,7 @@ import '../../providers/buste_paga_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
+import '../../widgets/spring_button.dart';
 
 /// Form di inserimento/modifica manuale di una busta paga. Se [existing] è
 /// presente, precompila i campi e salva con `update`; altrimenti crea un
@@ -235,10 +236,15 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
           CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
       navigationBar: CupertinoNavigationBar(
         middle: Text(_isEditing ? 'Modifica busta paga' : 'Nuova busta paga'),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
+        trailing: SpringButton(
           onPressed: _save,
-          child: const Text('Salva'),
+          child: Text(
+            'Salva',
+            style: TextStyle(
+              color: CupertinoTheme.of(context).primaryColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ),
       child: SafeArea(
