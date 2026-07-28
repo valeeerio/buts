@@ -34,28 +34,55 @@ Legenda skill: skill di Claude Code da invocare per quel task (vedi
       `schemaVersion = 1`). `busteRepositoryProvider`/`ultimaBustaPagaProvider`
       invariati nella firma pubblica, ora backed da SQLite invece che in-memory;
       seed una tantum da `BustaPagaMockData` solo se la tabella è vuota.
+- [x] Schema Drift 4 aree Budget (2026-07-28, branch `feature/drift-budget-areas`):
+      `AreaTable`, `MovimentoAreaTable`, `VoceRicorrenteTable`, `MeseBudgetTable` in
+      `lib/data/database.dart` (`schemaVersion = 2`, migrazione non distruttiva da
+      v1). Nota obbligatoria sui prelievi da Risparmio Principale/Piccolo Risparmio
+      applicata a livello di repository (`AreeBudgetRepository.aggiungiMovimento`),
+      totale Impegni Fissi e importo Conto Principale calcolati (non colonne). Provider
+      Riverpod in `lib/providers/aree_budget_provider.dart`. **Non collegato alla
+      Dashboard** (`DashboardMockData` invariato): rimandato al task "dettaglio aree",
+      dove andrà deciso come derivare sparkline/variazione % dai movimenti grezzi.
 
 ## Da fare — in ordine di priorità
 
-1. **Estendere Drift alle 4 aree budget** (movimenti, voci ricorrenti, mesi) —
-   stesso pattern di `lib/data/database.dart`, prima tabella Buste Paga come riferimento
-   - Skill: `drift-migration` (agent dedicato: `drift-schema-architect`)
-2. **Upload PDF/foto busta paga** (`fileOrigine`, oggi sempre `null`) + statistiche
+1. **Upload PDF/foto busta paga** (`fileOrigine`, oggi sempre `null`) + statistiche
    e grafici dedicati (ferie/ROL/permessi residui nel tempo, ore straordinario)
    - Skill: `flutter-ui-builder` (agent), `design-audit`, `flutter-check`
-3. **Dettaglio Conto Principale** — lista movimenti/spese, aggiunta spesa
+2. **Dettaglio Conto Principale** — lista movimenti/spese, aggiunta spesa; collega
+   `aree_budget_provider.dart` invece dei soli dati mock
    - Skill: `new-area-screen`, poi `design-audit` a fine lavoro, `flutter-check` prima di consegnare
-4. **Dettaglio Risparmio Principale** — storico versamenti + prelievo con nota obbligatoria
+3. **Dettaglio Risparmio Principale** — storico versamenti + prelievo con nota obbligatoria
+   (vincolo già applicato in `AreeBudgetRepository.aggiungiMovimento`)
    - Skill: `new-area-screen`, `design-audit`, `flutter-check`
-5. **Dettaglio Piccolo Risparmio** — stessa logica del Risparmio Principale, fondo separato
+4. **Dettaglio Piccolo Risparmio** — stessa logica del Risparmio Principale, fondo separato
    - Skill: `new-area-screen`, `design-audit`, `flutter-check`
-6. **Dettaglio Impegni Fissi** — lista voci ricorrenti (abbonamenti + costi fissi) con scadenze
+5. **Dettaglio Impegni Fissi** — lista voci ricorrenti (abbonamenti + costi fissi) con scadenze;
+   collega `vociRicorrentiRepositoryProvider`/`totaleImpegniFissiProvider`
    - Skill: `new-area-screen`, `design-audit`, `flutter-check`
+6. **Collegare Dashboard ai dati reali delle 4 aree** — sostituire `DashboardMockData`
+   con `aree_budget_provider.dart`, decidendo come derivare sparkline/variazione %
+   dai movimenti grezzi (rimandato esplicitamente dal task schema Drift)
+   - Skill: `flutter-check`
 7. **Flusso apertura/chiusura mese** — suddivisione manuale netto tra le 4 aree,
-   deve leggere il netto da `ultimaBustaPagaProvider` (niente doppio inserimento)
+   deve leggere il netto da `ultimaBustaPagaProvider` (niente doppio inserimento),
+   scrive su `mesiBudgetRepositoryProvider`
    - Skill: `new-area-screen` o `flutter-ui-builder` a seconda della complessità, `flutter-check`
 8. **AI locale on-device per estrazione dati busta paga** — fase successiva, no dipendenze cloud
    - Nessuna skill dedicata ancora — da valutare in fase di progettazione
+9. **Restyling visivo ispirato a shadcn/ui** (richiesto dall'utente il 2026-07-28,
+   redesign profondo, applicato a tutta l'app incluso il già costruito — Dashboard,
+   Buste Paga). shadcn/ui è una libreria React/web: qui va inteso come nuova
+   direzione visiva (palette più neutra/desaturata, bordi sottili, gerarchia
+   tipografica più marcata) da tradurre in widget Cupertino nativi, non come
+   dipendenza da installare — Flutter/iOS-nativo resta lo stack, cambia solo il
+   design system. **Prerequisito**: revisione della sezione "Stile visivo" di
+   CLAUDE.md (oggi vincolata a estetica Apple/Cupertino nativa, dichiarata "non
+   negoziabile senza conferma esplicita" — l'utente l'ha data per questo punto, va
+   formalizzata nel documento prima di toccare i widget). Da pianificare con
+   `/plan` dato l'impatto: nuova palette in `app_colors.dart`, possibile revisione
+   di `AppRadius`/`AppSpacing`, poi propagazione a tutti gli screen/widget esistenti.
+   - Nessuna skill dedicata ancora — richiede prima l'aggiornamento di CLAUDE.md
 
 ## Manutenzione ricorrente (da fare periodicamente, non una tantum)
 
