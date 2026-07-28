@@ -63,21 +63,28 @@ in pausa (sezione "In pausa" più sotto, non cancellati).
       "+" e al bottone "Salva" del form). `flutter analyze`/`flutter test`
       puliti, verificato su simulatore iOS.
 
-2. **Import PDF busta paga** — solo PDF testuali in v1 (no OCR per scansioni,
-   no foto/camera), file copiato in application documents directory, popola
-   `fileOrigine` (già esistente nel modello, oggi sempre `null`). Apertura
-   file via condivisione di sistema, nessun visualizzatore PDF in-app.
-   Dipendenze da aggiungere: `file_picker` + un package di estrazione testo
-   PDF (da confermare con l'utente all'implementazione: `syncfusion_flutter_pdf`
-   proposto dal piano di progetto, verificarne la licenza community per uso
-   personale, vs alternative più leggere).
-   - Skill: `flutter-ui-builder`, poi `flutter-check`, `design-consistency-reviewer`
+- [x] **Fase 2 — Import PDF busta paga** (2026-07-28): `lib/services/
+      pdf_import_service.dart` — selezione con `file_selector` (non
+      `file_picker`: tirava dentro l'intera libreria DKImagePickerController/
+      SDWebImage/TOCropViewController via SPM, inutile per un semplice
+      selettore PDF — sostituito durante l'implementazione), validazione
+      testo estraibile via `syncfusion_flutter_pdf` (PDF scansionati →
+      errore chiaro, niente OCR), copia in `buste_paga_pdf/` nella
+      application documents directory. Form: sezione "Documento"
+      (allega/rimuovi, popola `fileOrigine`). Dettaglio: riga file con
+      apertura via `share_plus` (foglio di condivisione di sistema, nessun
+      visualizzatore PDF in-app). `flutter analyze`/`flutter test` puliti,
+      verificato su simulatore iOS (incluso il primo build con le nuove
+      dipendenze native).
+
 3. **AI locale on-device per estrazione dati busta paga** — solo estrazione
    campi da documento (precompilazione form editabile, mai salvataggio senza
    conferma utente), non insight statistici. Nessuna chiamata cloud, nessun
    costo ricorrente, aumento di peso app (500MB–2GB) accettato. Libreria di
    binding LLM locale **da ricercare all'implementazione** (piano di progetto
-   §8 la segnala come decisione aperta, panorama in rapida evoluzione).
+   §8 la segnala come decisione aperta, panorama in rapida evoluzione). Il
+   testo estratto dal PDF (già disponibile da `pdf_import_service.dart`) è
+   pronto per essere passato al modello locale.
    - Nessuna skill dedicata ancora — primo passo sarà una ricerca mirata
 
 ## In pausa — riprendere dopo Buste Paga (non cancellati)

@@ -51,8 +51,14 @@ buste paga in archivio, altrimenti empty state). Questa sotto-navigazione è int
 alla sezione, non va confusa con la navigazione radice a 2 sezioni (`AppSectionHeader`
 resta invariato). Form di inserimento manuale con tutti i campi
 (`busta_paga_form_screen.dart`), dettaglio (`busta_paga_detail_screen.dart`).
-Estrazione dati via AI locale on-device resta una fase futura (vedi sotto), in v1
-l'inserimento è solo manuale. Il netto dell'ultima busta paga
+Import PDF: sezione "Documento" nel form, solo PDF con testo selezionabile (niente
+OCR per scansioni/foto in v1 — `lib/services/pdf_import_service.dart`, validazione
+via `syncfusion_flutter_pdf`, selezione con `file_selector`). Il file viene copiato
+in `buste_paga_pdf/` nella application documents directory (non solo il path
+originale); nel dettaglio si apre via foglio di condivisione di sistema
+(`share_plus`), nessun visualizzatore PDF in-app. Estrazione automatica dei campi
+via AI locale on-device resta una fase futura (vedi sotto), in v1 l'inserimento è
+solo manuale. Il netto dell'ultima busta paga
 (`ultimaBustaPagaProvider`, `lib/providers/buste_paga_provider.dart`) alimenta la
 suddivisione mensile del budget nella sezione Budget — niente doppio inserimento
 manuale del netto (vedi `dashboard_screen.dart`).

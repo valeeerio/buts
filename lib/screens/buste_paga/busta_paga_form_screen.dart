@@ -1,8 +1,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
 import '../../models/busta_paga.dart';
 import '../../providers/buste_paga_provider.dart';
+import '../../services/pdf_import_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
@@ -57,12 +59,17 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
 
   late List<_TrattenutaRow> _trattenute;
 
+  final _pdfImportService = const PdfImportService();
+  String? _fileOrigine;
+  bool _importingPdf = false;
+
   bool get _isEditing => widget.existing != null;
 
   @override
   void initState() {
     super.initState();
     final existing = widget.existing;
+    _fileOrigine = existing?.fileOrigine;
     _periodo = existing?.periodo ?? DateTime(DateTime.now().year, DateTime.now().month);
 
     _lordoController =
@@ -174,6 +181,52 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     );
   }
 
+  Future<void> _pickPdf() async {
+    setState(() => _importingPdf = true);
+    final result = await _pdfImportService.pickAndImport();
+    if (!mounted) return;
+    setState(() => _importingPdf = false);
+
+    switch (result.status) {
+      case PdfImportStatus.success:
+        setState(() => _fileOrigine = result.filePath);
+      case PdfImportStatus.cancelled:
+        break;
+      case PdfImportStatus.noExtractableText:
+        _showImportError(
+          'PDF non supportato',
+          'Questo PDF sembra una scansione o un\'immagine, senza testo '
+              'selezionabile. In questa versione sono supportati solo PDF '
+              'testuali generati da un software paghe.',
+        );
+      case PdfImportStatus.error:
+        _showImportError(
+          'Import non riuscito',
+          result.errorMessage ?? 'Si è verificato un errore imprevisto.',
+        );
+    }
+  }
+
+  void _removePdf() {
+    setState(() => _fileOrigine = null);
+  }
+
+  void _showImportError(String title, String message) {
+    showCupertinoDialog<void>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('OK'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _addTrattenuta() {
     setState(() => _trattenute.add(_TrattenutaRow()));
   }
@@ -200,7 +253,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
       id: widget.existing?.id ??
           'bp-${DateTime.now().millisecondsSinceEpoch}',
       periodo: _periodo,
-      fileOrigine: widget.existing?.fileOrigine,
+      fileOrigine: _fileOrigine,
       lordo: _parse(_lordoController),
       netto: _parse(_nettoController),
       trattenute: trattenute,
@@ -273,6 +326,12 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                     ),
                   ),
                 ],
+              ),
+              CupertinoFormSection.insetGrouped(
+                header: const Text('Documento'),
+                footer: const Text(
+                    'Solo PDF con testo selezionabile (no scansioni/foto) in questa versione.'),
+                children: [_documentoRow(accent, labelSecondary)],
               ),
               CupertinoFormSection.insetGrouped(
                 header: const Text('Importi'),
@@ -350,6 +409,62 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _documentoRow(Color accent, Color labelSecondary) {
+    if (_importingPdf) {
+      return const CupertinoFormRow(
+        prefix: Text('PDF'),
+        child: CupertinoActivityIndicator(),
+      );
+    }
+
+    if (_fileOrigine == null) {
+      return CupertinoFormRow(
+        prefix: const Text('PDF'),
+        child: GestureDetector(
+          onTap: _pickPdf,
+          behavior: HitTestBehavior.opaque,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(CupertinoIcons.paperclip, size: 16, color: accent),
+              const SizedBox(width: AppSpacing.xs),
+              Text('Allega PDF', style: TextStyle(color: accent)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return CupertinoFormRow(
+      prefix: const Text('PDF'),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              p.basename(_fileOrigine!),
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: TextStyle(color: labelSecondary),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          CupertinoButton(
+            padding: EdgeInsets.zero,
+            minimumSize: Size.zero,
+            onPressed: _removePdf,
+            child: Icon(
+              CupertinoIcons.xmark_circle_fill,
+              size: 18,
+              color: CupertinoDynamicColor.resolve(
+                  AppColors.systemRed, context),
+            ),
+          ),
+        ],
       ),
     );
   }
