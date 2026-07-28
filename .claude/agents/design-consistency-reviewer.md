@@ -22,12 +22,17 @@ con `CLAUDE.md` nella root del progetto come fonte di verità:
 5. **Forme**: corner radius fuori dal range 8–12px definito in `AppRadius`, o uso di
    forme a pillola/capsula, vanno segnalati.
 6. **Struttura Dashboard**: se il diff tocca `lib/screens/dashboard/
-   dashboard_screen.dart`, verifica che l'ordine dei blocchi (header → DonutSummary →
-   InsightCard → 4 AreaSummaryCard) non sia stato alterato senza che l'utente lo abbia
-   esplicitamente richiesto.
-7. **Tab bar e navigazione**: Buste Paga non deve mai comparire come tab in
-   `lib/navigation/app_tab.dart` — deve restare raggiungibile solo come push dalla
-   Dashboard.
+   dashboard_screen.dart` (contenuto della sezione Budget), verifica che l'ordine dei
+   blocchi (header → DonutSummary → InsightCard → 4 AreaSummaryCard) non sia stato
+   alterato senza che l'utente lo abbia esplicitamente richiesto. Se il diff tocca
+   `lib/widgets/app_section_header.dart` (l'header globale delle 2 sezioni), applica
+   lo stesso criterio: nessuna modifica strutturale non richiesta esplicitamente.
+7. **Tab bar e navigazione**: la tab bar a 5 destinazioni in
+   `lib/navigation/app_tab.dart` riguarda solo le 4 aree della sezione Budget — Buste
+   Paga non vi appartiene perché è una sezione di primo livello a sé (navigabile via
+   swipe/header globale, vedi `app_root_scaffold.dart`/`app_section.dart`), non perché
+   sia raggiunta con un push. Segnala se compare in `app_tab.dart` o se la navigazione
+   a 2 sezioni viene alterata senza richiesta esplicita.
 8. **Token duplicati**: se un widget definisce spaziature o stili di testo che
    esistono già in `app_spacing.dart` / `app_text_styles.dart`, segnalalo come
    duplicazione da rimuovere.

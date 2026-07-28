@@ -7,9 +7,26 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 
+import '../models/area_type.dart';
 import '../models/busta_paga.dart';
 
 part 'database.g.dart';
+
+/// Tipo di movimento registrato su un'area di budget.
+///
+/// - `versamento`: accantonamento manuale verso Risparmio Principale o
+///   Piccolo Risparmio.
+/// - `prelievo`: uscita da Risparmio Principale o Piccolo Risparmio verso il
+///   Conto Principale. Richiede sempre una nota/motivo (vincolo di business,
+///   vedi [MovimentoAreaTable.nota] e `AreeBudgetRepository.aggiungiMovimento`).
+/// - `spesa`: uscita di spesa quotidiana dal Conto Principale.
+/// - `assegnazioneMensile`: quota assegnata a un'area in sede di suddivisione
+///   manuale del netto mensile (vedi [MeseBudgetTable]).
+enum TipoMovimentoArea { versamento, prelievo, spesa, assegnazioneMensile }
+
+/// Cadenza di una voce ricorrente (abbonamento/costo fisso) dell'area
+/// Impegni Fissi.
+enum FrequenzaVoceRicorrente { mensile, annuale, altro }
 
 /// Serializza/deserializza la mappa `trattenute` (nome trattenuta -> importo)
 /// come JSON in una singola colonna testo.
@@ -81,6 +98,84 @@ class BustePagaTable extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Le 4 aree di budget fisse dell'app (vedi CLAUDE.md e [AreaType]). Il
+/// `tipo` è la chiave concettuale stabile (una riga per valore di
+/// [AreaType]); `nome` è invece modificabile dall'utente in futuro senza
+/// alterare il comportamento dell'area, che resta legato a `tipo`.
+class AreaTable extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get nome => text()();
+
+  /// Mappa 1:1 su [AreaType]. Una sola riga per valore atteso (seed al primo
+  /// avvio, vedi `AreeBudgetRepository`), applicativamente univoca anche se
+  /// non è imposto un vincolo UNIQUE esplicito qui: aggiungerlo forzerebbe a
+  /// gestire conflitti di seed idempotente lato SQL invece che lato
+  /// repository, dove il controllo "seed solo se la tabella è vuota" è già
+  /// sufficiente e più semplice da leggere.
+  IntColumn get tipo => intEnum<AreaType>()();
+}
+
+/// Movimento su un'area di budget: versamento/prelievo verso i risparmi,
+/// spesa dal Conto Principale, o assegnazione mensile in sede di
+/// suddivisione del netto (vedi [MeseBudgetTable]).
+///
+/// Vincolo di business (non solo di UI): un [TipoMovimentoArea.prelievo] da
+/// Risparmio Principale o Piccolo Risparmio richiede sempre una nota/motivo
+/// non vuota (CLAUDE.md, sezione "Le 4 aree di budget"). Drift non permette
+/// un CHECK SQL condizionale pulito che dipenda dal `tipo` di un'altra
+/// tabella (l'`AreaType` associato va risolto via join su [AreaTable]), per
+/// cui la colonna resta `nullable()` a livello di schema e il vincolo è
+/// applicato imperativamente in `AreeBudgetRepository.aggiungiMovimento`
+/// (unico punto di scrittura usato dai provider), non lasciato alla sola UI.
+class MovimentoAreaTable extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get areaId => integer().references(AreaTable, #id)();
+  RealColumn get importo => real()();
+  DateTimeColumn get data => dateTime()();
+  IntColumn get tipo => intEnum<TipoMovimentoArea>()();
+
+  /// Obbligatoria solo per i prelievi dai risparmi: vedi commento di classe.
+  TextColumn get nota => text().nullable()();
+}
+
+/// Voce ricorrente (abbonamento o costo fisso, unificati) dell'area Impegni
+/// Fissi. Il totale mensile dell'area NON va mai persistito: è sempre la
+/// somma delle voci con `attivo = true`, calcolata a runtime (vedi
+/// `AreeBudgetRepository.totaleImpegniFissi`) per evitare disallineamenti
+/// col reale stato delle voci (CLAUDE.md, sezione "Impegni Fissi").
+class VoceRicorrenteTable extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// FK verso l'area Impegni Fissi. Concettualmente è sempre la stessa area,
+  /// ma il FK è mantenuto per coerenza relazionale (e per non escludere,
+  /// senza una decisione esplicita, che in futuro possano esistere più
+  /// aree/varianti).
+  IntColumn get areaId => integer().references(AreaTable, #id)();
+  TextColumn get nome => text()();
+  RealColumn get importo => real()();
+  IntColumn get frequenza => intEnum<FrequenzaVoceRicorrente>()();
+  DateTimeColumn get prossimaScadenza => dateTime()();
+  BoolColumn get attivo => boolean().withDefault(const Constant(true))();
+}
+
+/// Un mese/periodo di budget con la suddivisione manuale del netto tra le
+/// aree. `totaleImpegniFissi` e `importoContoPrincipale` NON sono colonne:
+/// sono sempre calcolabili (il primo come somma delle voci ricorrenti
+/// attive, il secondo per sottrazione) e vanno letti tramite
+/// `AreeBudgetRepository`/`MesiBudgetNotifier`, mai persistiti, per lo
+/// stesso motivo di [VoceRicorrenteTable] (evitare disallineamento).
+class MeseBudgetTable extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// Convenzione: primo giorno del mese (es. 2026-07-01).
+  DateTimeColumn get mese => dateTime()();
+  RealColumn get nettoRicevuto => real().withDefault(const Constant(0))();
+  RealColumn get importoRisparmioPrincipale =>
+      real().withDefault(const Constant(0))();
+  RealColumn get importoPiccoloRisparmio =>
+      real().withDefault(const Constant(0))();
+}
+
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
@@ -96,7 +191,13 @@ LazyDatabase _openConnection() {
   });
 }
 
-@DriftDatabase(tables: [BustePagaTable])
+@DriftDatabase(tables: [
+  BustePagaTable,
+  AreaTable,
+  MovimentoAreaTable,
+  VoceRicorrenteTable,
+  MeseBudgetTable,
+])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
@@ -105,7 +206,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.connection);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -113,9 +214,16 @@ class AppDatabase extends _$AppDatabase {
           await m.createAll();
         },
         onUpgrade: (Migrator m, int from, int to) async {
-          // Nessuna migrazione ancora necessaria: schemaVersion è alla prima
-          // versione. Le migrazioni future vanno aggiunte qui in modo
-          // esplicito ed incrementale (mai reset distruttivo del DB).
+          // v1 -> v2: introduzione delle 4 aree di budget (Area,
+          // MovimentoArea, VoceRicorrente, MeseBudget). Chi arriva da uno
+          // schema v1 ha già `BustePagaTable`, che resta invariata: qui
+          // creiamo solo le tabelle nuove, mai un reset distruttivo del DB.
+          if (from < 2) {
+            await m.createTable(areaTable);
+            await m.createTable(movimentoAreaTable);
+            await m.createTable(voceRicorrenteTable);
+            await m.createTable(meseBudgetTable);
+          }
         },
       );
 }

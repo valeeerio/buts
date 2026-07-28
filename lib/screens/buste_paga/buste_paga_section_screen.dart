@@ -1,21 +1,34 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/busta_paga.dart';
-import '../../providers/buste_paga_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
-import '../../widgets/busta_paga_list_item.dart';
-import '../../widgets/busta_paga_summary_hero.dart';
+import '../../widgets/spring_button.dart';
 import 'busta_paga_detail_screen.dart';
 import 'busta_paga_form_screen.dart';
+import 'buste_paga_archivio_view.dart';
+import 'buste_paga_statistiche_screen.dart';
+
+/// Sotto-navigazione interna alla sezione Buste Paga (non va confusa con la
+/// navigazione radice a 2 sezioni, invariata — vedi `AppSectionHeader`).
+enum _BustePagaTab { archivio, statistiche }
 
 /// Contenitore di primo livello della sezione Buste Paga (pagina 0 del
-/// PageView radice). Card in evidenza sull'ultima busta paga + archivio
-/// completo ordinato per periodo decrescente. Il titolo di sezione è già
-/// mostrato dall'header globale (`AppSectionHeader`), qui non va duplicato.
-class BustePagaSectionScreen extends ConsumerWidget {
+/// PageView radice). Header "Archivio buste paga" + CTA, sotto-navigazione
+/// Archivio/Statistiche. Il titolo di sezione è già mostrato dall'header
+/// globale (`AppSectionHeader`), qui non va duplicato.
+class BustePagaSectionScreen extends ConsumerStatefulWidget {
   const BustePagaSectionScreen({super.key});
+
+  @override
+  ConsumerState<BustePagaSectionScreen> createState() =>
+      _BustePagaSectionScreenState();
+}
+
+class _BustePagaSectionScreenState
+    extends ConsumerState<BustePagaSectionScreen> {
+  _BustePagaTab _tab = _BustePagaTab.archivio;
 
   void _openForm(BuildContext context, {BustaPaga? existing}) {
     Navigator.of(context).push(
@@ -34,111 +47,82 @@ class BustePagaSectionScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final buste = ref.watch(busteRepositoryProvider);
-    final ultima = ref.watch(ultimaBustaPagaProvider);
-    final sorted = [...buste]..sort((a, b) => b.periodo.compareTo(a.periodo));
-
+  Widget build(BuildContext context) {
     return Container(
       color: CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
       child: SafeArea(
         top: false,
-        child: CustomScrollView(
-          slivers: [
-            SliverPadding(
+        child: Column(
+          children: [
+            Padding(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.screenHorizontal,
                 AppSpacing.lg,
                 AppSpacing.screenHorizontal,
                 AppSpacing.sm,
               ),
-              sliver: SliverToBoxAdapter(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Archivio buste paga',
-                        style: AppTextStyles.sectionTitle.copyWith(
-                          color: CupertinoDynamicColor.resolve(
-                              AppColors.labelPrimary, context),
-                        ),
-                      ),
-                    ),
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: () => _openForm(context),
-                      child: Icon(
-                        CupertinoIcons.add_circled_solid,
-                        size: 30,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Archivio buste paga',
+                      style: AppTextStyles.sectionTitle.copyWith(
                         color: CupertinoDynamicColor.resolve(
-                            AppColors.bustePaga, context),
+                            AppColors.labelPrimary, context),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  SpringButton(
+                    onPressed: () => _openForm(context),
+                    child: Icon(
+                      CupertinoIcons.add_circled_solid,
+                      size: 30,
+                      color: CupertinoDynamicColor.resolve(
+                          AppColors.bustePaga, context),
+                    ),
+                  ),
+                ],
               ),
             ),
-            if (ultima != null) ...[
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.screenHorizontal,
-                ),
-                sliver: SliverToBoxAdapter(
-                  child: BustaPagaSummaryHero(
-                    bustaPaga: ultima,
-                    onTap: () => _openDetail(context, ultima),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.screenHorizontal,
+              ),
+              child: CupertinoSlidingSegmentedControl<_BustePagaTab>(
+                groupValue: _tab,
+                backgroundColor: CupertinoDynamicColor.resolve(
+                    AppColors.backgroundPrimary, context),
+                thumbColor: CupertinoDynamicColor.resolve(
+                    AppColors.surface, context),
+                children: {
+                  _BustePagaTab.archivio: _SegmentLabel(
+                    label: 'Archivio',
+                    selected: _tab == _BustePagaTab.archivio,
                   ),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.lg)),
-            ],
-            if (sorted.isEmpty)
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.screenHorizontal,
-                ),
-                sliver: SliverToBoxAdapter(
-                  child: _EmptyState(onAdd: () => _openForm(context)),
-                ),
-              )
-            else ...[
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.screenHorizontal,
-                  0,
-                  AppSpacing.screenHorizontal,
-                  AppSpacing.xs,
-                ),
-                sliver: SliverToBoxAdapter(
-                  child: Text(
-                    'Tutte le buste paga',
-                    style: AppTextStyles.cardLabel.copyWith(
-                      color: CupertinoDynamicColor.resolve(
-                          AppColors.labelSecondary, context),
-                    ),
+                  _BustePagaTab.statistiche: _SegmentLabel(
+                    label: 'Statistiche',
+                    selected: _tab == _BustePagaTab.statistiche,
                   ),
-                ),
+                },
+                onValueChanged: (value) {
+                  if (value == null) return;
+                  setState(() => _tab = value);
+                },
               ),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.screenHorizontal,
-                ),
-                sliver: SliverList.separated(
-                  itemCount: sorted.length,
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(height: AppSpacing.sm),
-                  itemBuilder: (context, index) {
-                    final bustaPaga = sorted[index];
-                    return BustaPagaListItem(
-                      bustaPaga: bustaPaga,
-                      onTap: () => _openDetail(context, bustaPaga),
-                    );
-                  },
-                ),
-              ),
-            ],
-            const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Expanded(
+              child: switch (_tab) {
+                _BustePagaTab.archivio => BustePagaArchivioView(
+                    onOpenDetail: (bustaPaga) =>
+                        _openDetail(context, bustaPaga),
+                    onAdd: () => _openForm(context),
+                  ),
+                _BustePagaTab.statistiche =>
+                  const BustePagaStatisticheScreen(),
+              },
+            ),
           ],
         ),
       ),
@@ -146,52 +130,26 @@ class BustePagaSectionScreen extends ConsumerWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  final VoidCallback onAdd;
+class _SegmentLabel extends StatelessWidget {
+  final String label;
+  final bool selected;
 
-  const _EmptyState({required this.onAdd});
+  const _SegmentLabel({required this.label, required this.selected});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: CupertinoDynamicColor.resolve(AppColors.surface, context),
-        borderRadius: BorderRadius.circular(AppRadius.card),
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
       ),
-      child: Column(
-        children: [
-          Icon(
-            CupertinoIcons.doc_text_search,
-            size: 32,
-            color: CupertinoDynamicColor.resolve(AppColors.labelSecondary, context),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Nessuna busta paga in archivio',
-            style: AppTextStyles.subtitle.copyWith(
-              fontWeight: FontWeight.w600,
-              color: CupertinoDynamicColor.resolve(
-                  AppColors.labelPrimary, context),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Aggiungi la tua prima busta paga per iniziare l\'archivio.',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.cardLabel.copyWith(
-              color: CupertinoDynamicColor.resolve(
-                  AppColors.labelSecondary, context),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          CupertinoButton.filled(
-            borderRadius: BorderRadius.circular(AppRadius.medium),
-            onPressed: onAdd,
-            child: const Text('Aggiungi busta paga'),
-          ),
-        ],
+      child: Text(
+        label,
+        style: AppTextStyles.subtitle.copyWith(
+          fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+          color: CupertinoDynamicColor.resolve(
+              AppColors.labelPrimary, context),
+        ),
       ),
     );
   }

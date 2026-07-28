@@ -1,5 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
+import 'package:share_plus/share_plus.dart';
 import '../../models/busta_paga.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
@@ -51,8 +53,6 @@ class BustaPagaDetailScreen extends StatelessWidget {
               header: const Text('Periodo'),
               children: [
                 _readOnlyRow('Mese', _periodoLabel),
-                if (bustaPaga.fileOrigine != null)
-                  _readOnlyRow('File origine', bustaPaga.fileOrigine!),
                 _readOnlyRow(
                   'Stato verifica',
                   bustaPaga.statoVerifica == StatoVerificaBustaPaga.confermato
@@ -61,6 +61,11 @@ class BustaPagaDetailScreen extends StatelessWidget {
                 ),
               ],
             ),
+            if (bustaPaga.fileOrigine != null)
+              CupertinoFormSection.insetGrouped(
+                header: const Text('Documento'),
+                children: [_documentoRow(context, bustaPaga.fileOrigine!)],
+              ),
             CupertinoFormSection.insetGrouped(
               header: const Text('Importi'),
               children: [
@@ -104,6 +109,35 @@ class BustaPagaDetailScreen extends StatelessWidget {
                           _readOnlyRow(e.key, '€ ${_formatNumber(e.value)}'))
                       .toList(),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _documentoRow(BuildContext context, String filePath) {
+    final accent = CupertinoDynamicColor.resolve(AppColors.bustePaga, context);
+    return CupertinoFormRow(
+      prefix: const Text('PDF'),
+      child: GestureDetector(
+        onTap: () => Share.shareXFiles([XFile(filePath)]),
+        behavior: HitTestBehavior.opaque,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                p.basename(filePath),
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.end,
+                style: TextStyle(
+                  color: CupertinoDynamicColor.resolve(
+                      AppColors.labelSecondary, context),
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.xs),
+            Icon(CupertinoIcons.square_arrow_up, size: 16, color: accent),
           ],
         ),
       ),
