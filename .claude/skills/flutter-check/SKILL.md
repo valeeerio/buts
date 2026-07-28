@@ -5,7 +5,7 @@ description: Verifica rapida di sanità del progetto Buts prima di considerare c
 
 # flutter-check
 
-Esegui questi passi nella root del progetto (`/Users/valeriomortella/Documents/Sviluppo/Buts/app`):
+Esegui questi passi nella root del progetto (`/Users/valeriomortella/Sviluppo/Buts/app`):
 
 1. **Analisi statica**:
    ```
