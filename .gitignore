@@ -24,3 +24,6 @@ ios/Runner.xcworkspace/xcshareddata/swiftpm/
 
 # macOS
 .DS_Store
+
+# Modelli LLM locali (estrazione AI busta paga) — mai committati, troppo pesanti
+*.gguf

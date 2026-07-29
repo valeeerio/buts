@@ -14,12 +14,22 @@ enum PdfImportStatus { success, cancelled, noExtractableText, error }
 class PdfImportResult {
   final PdfImportStatus status;
   final String? filePath;
+  final String? extractedText;
   final String? errorMessage;
 
-  const PdfImportResult._(this.status, {this.filePath, this.errorMessage});
+  const PdfImportResult._(
+    this.status, {
+    this.filePath,
+    this.extractedText,
+    this.errorMessage,
+  });
 
-  const PdfImportResult.success(String filePath)
-      : this._(PdfImportStatus.success, filePath: filePath);
+  const PdfImportResult.success(String filePath, {String? extractedText})
+      : this._(
+          PdfImportStatus.success,
+          filePath: filePath,
+          extractedText: extractedText,
+        );
 
   const PdfImportResult.cancelled() : this._(PdfImportStatus.cancelled);
 
@@ -54,24 +64,24 @@ class PdfImportService {
     try {
       final bytes = await picked.readAsBytes();
 
-      if (!_hasExtractableText(bytes)) {
+      final text = _extractText(bytes);
+      // Soglia minima per distinguere un PDF testuale da uno scansionato
+      // (che a volte espone comunque qualche carattere spurio di metadata).
+      if (text == null || text.trim().length <= 20) {
         return const PdfImportResult.noExtractableText();
       }
 
       final targetPath = await _copyToAppDocuments(picked.name, bytes);
-      return PdfImportResult.success(targetPath);
+      return PdfImportResult.success(targetPath, extractedText: text);
     } catch (e) {
       return PdfImportResult.error(e.toString());
     }
   }
 
-  bool _hasExtractableText(List<int> bytes) {
+  String? _extractText(List<int> bytes) {
     final document = PdfDocument(inputBytes: bytes);
     try {
-      final text = PdfTextExtractor(document).extractText();
-      // Soglia minima per distinguere un PDF testuale da uno scansionato
-      // (che a volte espone comunque qualche carattere spurio di metadata).
-      return text.trim().length > 20;
+      return PdfTextExtractor(document).extractText();
     } finally {
       document.dispose();
     }
