@@ -10,14 +10,12 @@ import 'busta_paga_form_screen.dart';
 import 'buste_paga_archivio_view.dart';
 import 'buste_paga_statistiche_screen.dart';
 
-/// Sotto-navigazione interna alla sezione Buste Paga (non va confusa con la
-/// navigazione radice a 2 sezioni, invariata — vedi `AppSectionHeader`).
+/// Sotto-navigazione interna alla sezione Buste Paga (unica sezione
+/// dell'app, non c'è una navigazione radice).
 enum _BustePagaTab { archivio, statistiche }
 
-/// Contenitore di primo livello della sezione Buste Paga (pagina 0 del
-/// PageView radice). Header "Archivio buste paga" + CTA, sotto-navigazione
-/// Archivio/Statistiche. Il titolo di sezione è già mostrato dall'header
-/// globale (`AppSectionHeader`), qui non va duplicato.
+/// Schermata radice dell'app: header "Archivio buste paga" + CTA,
+/// sotto-navigazione Archivio/Statistiche.
 class BustePagaSectionScreen extends ConsumerStatefulWidget {
   const BustePagaSectionScreen({super.key});
 
@@ -51,7 +49,6 @@ class _BustePagaSectionScreenState
     return Container(
       color: CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
       child: SafeArea(
-        top: false,
         child: Column(
           children: [
             Padding(

@@ -19,8 +19,7 @@ file, non sull'estetica dei widget.
      nel progetto per lo stesso tipo di contenuto (es. `*_screen.dart`,
      `*_provider.dart`, `*_service.dart`, tabelle Drift in `lib/data/`).
    - **Duplicazioni**: logica o modelli ripetuti tra più file della cartella invece
-     di essere centralizzati (es. colore/etichetta di un'area ridefiniti invece di
-     usare `AreaType`).
+     di essere centralizzati in un unico punto (es. design token, enum condivisi).
    - **File fuori posto**: contenuto che appartiene concettualmente a un'altra
      cartella secondo la struttura del progetto (`lib/screens/`, `lib/widgets/`,
      `lib/models/`, `lib/providers/`, `lib/data/`, `lib/services/`).

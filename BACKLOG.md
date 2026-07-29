@@ -109,29 +109,6 @@ in pausa (sezione "In pausa" più sotto, non cancellati).
    prima di fissare la scelta finale.
    - Nessuna skill dedicata ancora — da creare quando si affronta l'implementazione
 
-## In pausa — riprendere dopo Buste Paga (non cancellati)
-
-4. **Dettaglio Conto Principale** — lista movimenti/spese, aggiunta spesa; collega
-   `aree_budget_provider.dart` invece dei soli dati mock
-   - Skill: `new-area-screen`, poi `design-audit` a fine lavoro, `flutter-check` prima di consegnare
-5. **Dettaglio Risparmio Principale** — storico versamenti + prelievo con nota obbligatoria
-   (vincolo già applicato in `AreeBudgetRepository.aggiungiMovimento`)
-   - Skill: `new-area-screen`, `design-audit`, `flutter-check`
-6. **Dettaglio Piccolo Risparmio** — stessa logica del Risparmio Principale, fondo separato
-   - Skill: `new-area-screen`, `design-audit`, `flutter-check`
-7. **Dettaglio Impegni Fissi** — lista voci ricorrenti (abbonamenti + costi fissi) con scadenze;
-   collega `vociRicorrentiRepositoryProvider`/`totaleImpegniFissiProvider`
-   - Skill: `new-area-screen`, `design-audit`, `flutter-check`
-8. **Collegare Dashboard ai dati reali delle 4 aree** — sostituire `DashboardMockData`
-   con `aree_budget_provider.dart`, decidendo come derivare sparkline/variazione %
-   dai movimenti grezzi (rimandato esplicitamente dal task schema Drift)
-   - Skill: `flutter-check`
-9. **Flusso apertura/chiusura mese** — suddivisione manuale netto tra le 4 aree,
-   deve leggere il netto da `ultimaBustaPagaProvider` (niente doppio inserimento),
-   scrive su `mesiBudgetRepositoryProvider`
-   - Skill: `monthly-budget-flow` (task cross-sezione Buste Paga↔Budget),
-     poi `flutter-check`
-
 ## Decisioni archiviate (non da rimettere in discussione senza motivo nuovo)
 
 - **Restyling ispirato a shadcn/ui — declinato (2026-07-28)**. Valutato con una
@@ -139,6 +116,17 @@ in pausa (sezione "In pausa" più sotto, non cancellati).
   colore dinamico + fisica a molla, vs bottone shadcn/ui con superfici piatte e
   bordi). L'utente ha confermato di restare sullo stile Apple/Cupertino nativo
   già in CLAUDE.md — nessuna azione richiesta, stack e design system invariati.
+- **Pivot di prodotto: sezione Budget eliminata (2026-07-29)**. L'utente ha deciso
+  di concentrare l'app esclusivamente su Buste Paga, la funzione che gli serve di
+  più — niente più gestione delle 4 aree di budget. Rimossi interamente codice
+  (schermate, provider, `AreaType`, navigazione a 2 sezioni, tab bar a 5
+  destinazioni, Dashboard) e schema dati (tabelle Drift `AreaTable`,
+  `MovimentoAreaTable`, `VoceRicorrenteTable`, `MeseBudgetTable`, drop via
+  migrazione `schemaVersion` v2→v3, non distruttiva su `BustePagaTable`). I task
+  4-9 precedentemente "in pausa" (dettaglio delle 4 aree, collegamento Dashboard,
+  flusso apertura/chiusura mese) sono stati rimossi dal backlog, non verranno
+  ripresi. Le skill `new-area-screen` e `monthly-budget-flow`, specifiche di
+  quel lavoro, sono state eliminate dal repo.
 
 ## Manutenzione ricorrente (da fare periodicamente, non una tantum)
 

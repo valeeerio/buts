@@ -1,6 +1,6 @@
 ---
 name: design-audit
-description: Scansiona lib/ del progetto Buts per violazioni delle regole di stile fissate in CLAUDE.md (colori hardcoded, emoji, AreaType duplicato, struttura Dashboard/tab bar alterata). Usa dopo una serie di modifiche UI o prima di una consegna, per un controllo di coerenza mirato — non è un code review generico di bug.
+description: Scansiona lib/ del progetto Buts per violazioni delle regole di stile fissate in CLAUDE.md (colori hardcoded, emoji, corner radius non conformi). Usa dopo una serie di modifiche UI o prima di una consegna, per un controllo di coerenza mirato — non è un code review generico di bug.
 ---
 
 # design-audit
@@ -17,18 +17,13 @@ Invoca l'agent `design-consistency-reviewer` (tool Agent, subagent_type
 L'agent deve controllare, con riferimento a `CLAUDE.md`:
 
 1. Colori hardcoded invece dei token in `lib/theme/app_colors.dart`.
-2. Colore/etichetta delle aree duplicati invece di usare `AreaType`
-   (`lib/models/area_type.dart`).
-3. Uso di `CupertinoDynamicColor.resolve(context)` per il supporto light/dark.
-4. Icone: solo `CupertinoIcons`, nessuna emoji nei componenti di produzione.
-5. Corner radius fuori dal range 8–12px di `AppRadius`, o forme a pillola/capsula.
-6. Ordine dei blocchi della Dashboard (sezione Budget) non alterato senza richiesta
-   esplicita; stesso criterio per l'header globale di sezione
-   (`lib/widgets/app_section_header.dart`) se toccato.
-7. La tab bar a 5 destinazioni (`lib/navigation/app_tab.dart`) riguarda solo le 4 aree
-   Budget: Buste Paga non deve comparirvi, essendo una sezione di primo livello a sé
-   (navigazione a 2 sezioni via swipe/header globale, non un push).
-8. Spaziature/stili di testo duplicati invece di riusare `app_spacing.dart` /
+2. Uso di `CupertinoDynamicColor.resolve(context)` per il supporto light/dark.
+3. Icone: solo `CupertinoIcons`, nessuna emoji nei componenti di produzione.
+4. Corner radius fuori dal range 8–12px di `AppRadius`, o forme a pillola/capsula.
+5. Struttura a sezione singola non alterata senza richiesta esplicita: l'app è
+   rootata su `BustePagaSectionScreen` (`lib/main.dart`), nessuna navigazione
+   radice a più sezioni o tab bar inferiore reintrodotta senza conferma.
+6. Spaziature/stili di testo duplicati invece di riusare `app_spacing.dart` /
    `app_text_styles.dart`.
 
 Presenta il risultato dell'agent così com'è (lista di problemi concreti file:riga, o

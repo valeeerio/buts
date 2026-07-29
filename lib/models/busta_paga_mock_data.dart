@@ -1,8 +1,7 @@
 import 'busta_paga.dart';
 
-/// Dati mock per la sezione Buste Paga — stesso ruolo di
-/// DashboardMockData: da sostituire con dati reali persistiti quando si
-/// collega Drift (skill drift-migration).
+/// Dati mock di seed per la sezione Buste Paga, usati solo se l'archivio
+/// Drift è ancora vuoto al primo avvio (vedi `buste_paga_provider.dart`).
 class BustaPagaMockData {
   BustaPagaMockData._();
 

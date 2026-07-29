@@ -1,7 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'navigation/app_root_scaffold.dart';
+import 'screens/buste_paga/buste_paga_section_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -9,6 +9,8 @@ void main() async {
   runApp(const ButsApp());
 }
 
+/// L'app è a sezione singola: Buste Paga è la root, nessuna sotto-navigazione
+/// radice (vedi CLAUDE.md).
 class ButsApp extends StatelessWidget {
   const ButsApp({super.key});
 
@@ -22,7 +24,7 @@ class ButsApp extends StatelessWidget {
           DefaultCupertinoLocalizations.delegate,
         ],
         home: CupertinoPageScaffold(
-          child: AppRootScaffold(),
+          child: BustePagaSectionScreen(),
         ),
       ),
     );

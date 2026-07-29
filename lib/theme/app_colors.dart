@@ -1,8 +1,6 @@
 import 'package:flutter/cupertino.dart';
 
 /// Colori semantici stile Apple (system colors), con varianti Light/Dark.
-/// Ogni area di budget è mappata a un colore di sistema fisso, così
-/// il colore resta riconoscibile in tutta l'app (dashboard, tab bar, dettagli).
 class AppColors {
   AppColors._();
 
@@ -61,14 +59,7 @@ class AppColors {
     darkColor: Color(0x99545458),
   );
 
-  // --- Mappatura colore per area di budget ---
-  // Da usare ovunque un'area vada identificata: card dashboard, tab bar, dettaglio.
-  static const contoPrincipale = systemGreen;
-  static const risparmioPrincipale = systemBlue;
-  static const piccoloRisparmio = systemPurple;
-  static const impegniFissi = systemOrange;
-
-  /// Colore neutro per la voce Buste Paga in tab bar/menu (non è un'area di budget).
+  /// Colore neutro di accento per la sezione Buste Paga (icone, CTA).
   static const bustePaga = CupertinoDynamicColor.withBrightness(
     color: Color(0x803C3C43),
     darkColor: Color(0x80EBEBF5),

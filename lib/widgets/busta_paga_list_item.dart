@@ -6,8 +6,7 @@ import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
 
 /// Riga compatta per l'archivio buste paga: periodo, netto in evidenza,
-/// badge di stato verifica e chevron. Stile ispirato ad `AreaSummaryCard`
-/// ma senza sparkline/variazione %, non applicabili a una busta paga.
+/// badge di stato verifica e chevron.
 class BustaPagaListItem extends StatelessWidget {
   final BustaPaga bustaPaga;
   final VoidCallback onTap;

@@ -75,7 +75,7 @@ final busteRepositoryProvider =
 );
 
 /// Busta paga più recente per periodo — unico punto di lettura del netto
-/// per il collegamento dati verso la sezione Budget (vedi dashboard_screen.dart).
+/// dell'ultimo periodo disponibile.
 final ultimaBustaPagaProvider = Provider<BustaPaga?>((ref) {
   final buste = ref.watch(busteRepositoryProvider);
   if (buste.isEmpty) return null;

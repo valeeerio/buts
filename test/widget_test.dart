@@ -4,7 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:buts/main.dart';
 
 void main() {
-  testWidgets('ButsApp avvia senza errori e mostra la Dashboard', (
+  testWidgets('ButsApp avvia senza errori e mostra l\'archivio Buste Paga', (
     WidgetTester tester,
   ) async {
     await initializeDateFormatting('it_IT');
