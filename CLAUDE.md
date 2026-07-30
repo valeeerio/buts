@@ -127,9 +127,16 @@ sul pilota Archivio Buste Paga ed estesa a tutta l'app.
 
 ## Cosa manca (prossimi passi, in ordine di priorità suggerito)
 
-1. AI locale on-device per estrazione dati busta paga (fase successiva, nessuna
-   dipendenza cloud/API a pagamento prevista, sostituisce/affianca il parser
-   regex oggi usato per precompilare il form dopo l'import PDF).
+1. Redesign Archivio (pagina principale).
+2. Redesign pagina dettaglio busta paga.
+3. Separazione nella sidebar inferiore tra il "+" e le due sezioni
+   (Archivio/Statistiche) — vedi `BACKLOG.md`.
+
+**Nota**: l'estrazione dati via AI locale on-device (`llama_cpp_dart`), valutata
+in una fase precedente, è stata **abbandonata (2026-07-30)** — vedi "Decisioni
+archiviate" in `BACKLOG.md`. Il parser regex
+(`lib/services/busta_paga_regex_parser.dart`) resta l'unico meccanismo di
+precompilazione dati da PDF, nessun piano di sostituirlo.
 
 ## Convenzioni di codice
 
