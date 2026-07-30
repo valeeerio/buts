@@ -32,24 +32,6 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
     final buste = ref.watch(busteRepositoryProvider);
     final sorted = [...buste]..sort((a, b) => a.periodo.compareTo(b.periodo));
 
-    if (sorted.length < 2) {
-      return CustomScrollView(
-        slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.screenHorizontal,
-              AppSpacing.lg,
-              AppSpacing.screenHorizontal,
-              0,
-            ),
-            sliver: SliverToBoxAdapter(
-              child: _EmptyStatistiche(),
-            ),
-          ),
-        ],
-      );
-    }
-
     return CustomScrollView(
       slivers: [
         SliverPadding(
@@ -112,42 +94,32 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
   }
 }
 
-class _EmptyStatistiche extends StatelessWidget {
+/// Messaggio mostrato al posto del grafico quando non ci sono buste paga
+/// da rappresentare (archivio vuoto).
+class _NoDataMessage extends StatelessWidget {
+  const _NoDataMessage();
+
   @override
   Widget build(BuildContext context) {
-    return LiquidGlassSurface(
-      radius: AppRadius.glass,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: SizedBox(
-        width: double.infinity,
-        child: Column(
-          children: [
-            Icon(
-              CupertinoIcons.chart_bar_alt_fill,
-              size: 32,
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            CupertinoIcons.chart_bar_alt_fill,
+            size: 28,
+            color: CupertinoDynamicColor.resolve(
+                AppColors.labelSecondary, context),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Non ci sono dati',
+            style: AppTextStyles.cardLabel.copyWith(
               color: CupertinoDynamicColor.resolve(
                   AppColors.labelSecondary, context),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Dati insufficienti',
-              style: AppTextStyles.subtitle.copyWith(
-                fontWeight: FontWeight.w600,
-                color: CupertinoDynamicColor.resolve(
-                    AppColors.labelPrimary, context),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Servono almeno 2 buste paga per vedere l\'andamento nel tempo.',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.cardLabel.copyWith(
-                color: CupertinoDynamicColor.resolve(
-                    AppColors.labelSecondary, context),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -259,6 +231,8 @@ class _NettoLordoChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (buste.isEmpty) return const _NoDataMessage();
+
     final nettoColor = CupertinoDynamicColor.resolve(
         BustePagaStatisticheScreen._nettoColor, context);
     final lordoColor = CupertinoDynamicColor.resolve(
@@ -340,6 +314,8 @@ class _FerieRolPermessiChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (buste.isEmpty) return const _NoDataMessage();
+
     final ferieColor = CupertinoDynamicColor.resolve(
         BustePagaStatisticheScreen._ferieColor, context);
     final rolColor = CupertinoDynamicColor.resolve(
@@ -423,6 +399,8 @@ class _StraordinarioChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (buste.isEmpty) return const _NoDataMessage();
+
     final barColor = CupertinoDynamicColor.resolve(
         BustePagaStatisticheScreen._straordinarioColor, context);
     final gridColor =

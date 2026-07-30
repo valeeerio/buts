@@ -143,6 +143,15 @@ class _SpecularBorderPainter extends CustomPainter {
     required this.shadowEdge,
   });
 
+  /// Senza questo override, `RenderCustomPaint.hitTestSelf` ricade sul
+  /// default `_painter!.hitTest(position) ?? true` — cioè un `CustomPainter`
+  /// che non implementa `hitTest()` reclama qualunque tocco sull'intera area
+  /// (qui `Positioned.fill`), impedendo a `Stack` di testare il ramo
+  /// sottostante con il contenuto reale (bottoni, righe, sotto-navigazione).
+  /// Questo bordo è puramente decorativo: non deve mai intercettare i tocchi.
+  @override
+  bool? hitTest(Offset position) => false;
+
   @override
   void paint(Canvas canvas, Size size) {
     final path = clipper.getClip(size);

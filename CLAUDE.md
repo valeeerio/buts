@@ -15,23 +15,43 @@ sono altre sezioni: l'app si apre direttamente sull'archivio Buste Paga, che è 
 schermata radice.
 
 **Sezione Buste Paga**: `buste_paga_section_screen.dart` è il contenitore radice
-dell'app: header con CTA "+" e sotto-navigazione interna a tab
-(`CupertinoSlidingSegmentedControl`) — **Archivio**
-(`buste_paga_archivio_view.dart`, hero ultima busta paga + elenco) e **Statistiche**
+dell'app: barra di benvenuto in cima (saluto dinamico in base all'ora del giorno,
+`greetingFor()`, + data corrente) e sotto-navigazione **Archivio**
+(`buste_paga_archivio_view.dart`, hero ultima busta paga + elenco) / **Statistiche**
 (`buste_paga_statistiche_screen.dart`, grafici `fl_chart`: andamento netto/lordo,
-ferie/ROL/permessi residui, straordinario per mese — richiede almeno 2 buste paga
-in archivio, altrimenti empty state). Questa sotto-navigazione è interna alla
-schermata radice, non c'è una navigazione radice a più sezioni sopra di essa.
-Form di inserimento manuale con tutti i campi (`busta_paga_form_screen.dart`),
-dettaglio (`busta_paga_detail_screen.dart`).
-Import PDF: sezione "Documento" nel form, solo PDF con testo selezionabile (niente
-OCR per scansioni/foto in v1 — `lib/services/pdf_import_service.dart`, validazione
-via `syncfusion_flutter_pdf`, selezione con `file_selector`). Il file viene copiato
-in `buste_paga_pdf/` nella application documents directory (non solo il path
-originale); nel dettaglio si apre via foglio di condivisione di sistema
-(`share_plus`), nessun visualizzatore PDF in-app. Estrazione automatica dei campi
-via AI locale on-device resta una fase futura (vedi sotto), in v1 l'inserimento è
-solo manuale.
+ferie/ROL/permessi residui, straordinario per mese — mostrati sempre, anche con 0
+o 1 busta paga: ogni grafico senza dati sufficienti mostra il messaggio "Non ci
+sono dati" al posto di bloccare l'intera pagina). La sotto-navigazione non è più
+un tab in alto ma una **sidecar flottante ancorata in basso** (`LiquidGlassSurface`,
+widget privato `_BustePagaSidecar`), che incorpora anche il bottone "+" come terzo
+elemento accanto ai due segmenti Archivio/Statistiche. Nessuna navigazione radice
+a più sezioni sopra di essa.
+
+**Solo import PDF, niente inserimento manuale**: il bottone "+" nella sidecar
+avvia direttamente `PdfImportService.pickAndImport()` (`lib/services/
+pdf_import_service.dart`, solo PDF con testo selezionabile, niente OCR per
+scansioni/foto in v1, validazione via `syncfusion_flutter_pdf`, selezione con
+`file_selector`, file copiato in `buste_paga_pdf/` nella application documents
+directory). Se il file non ha testo estraibile, o il parser regex
+(`lib/services/busta_paga_regex_parser.dart`, mirato al layout del software paghe
+"JOB") non riconosce i dati principali (netto e periodo entrambi assenti), viene
+mostrato un alert bloccante e **il form non si apre** — non esiste più un modo di
+aprire il form vuoto per un inserimento libero da zero. Il form
+(`busta_paga_form_screen.dart`) si apre solo in due casi: precompilato dai dati
+estratti da un import riuscito (costruttore `.daImport`, con banner di conferma
+esplicita "dati estratti automaticamente, verifica prima di salvare" finché
+`_valoriDaConferma == true`) oppure in modifica di una busta paga esistente
+(`existing`, dal dettaglio) — in entrambi i casi i campi restano editabili prima
+del salvataggio. Estrazione automatica via AI locale on-device resta una fase
+futura (vedi sotto), oggi la precompilazione è solo tramite parser regex.
+
+**Dettaglio busta paga** (`busta_paga_detail_screen.dart`): hero card in cima
+(mese, badge di stato Confermato/Da confermare, netto in evidenza massima), sotto
+una riga di mini-card per ROL residui e ore lavorate, poi le sezioni dettagliate
+esistenti (Documento, Importi, Ferie, ROL, Permessi e ore, Trattenute) — "Netto"
+non è ripetuto nella sezione Importi per evitare il doppione con la hero.
+Nel dettaglio il PDF si apre via foglio di condivisione di sistema (`share_plus`),
+nessun visualizzatore PDF in-app.
 
 Componenti di stile riutilizzabili dell'app (Liquid Glass, vedi sezione "Stile
 visivo" sotto): `lib/widgets/liquid_glass_surface.dart` (superficie in vetro
@@ -47,9 +67,9 @@ usata da form e dettaglio busta paga.
 ## Navigazione
 
 L'app è **a sezione singola**: `BustePagaSectionScreen` è la root dell'app
-(`lib/main.dart`), nessuno swipe/header di navigazione radice, nessuna tab bar
-inferiore. L'unica sotto-navigazione è quella interna già descritta sopra
-(Archivio/Statistiche).
+(`lib/main.dart`), nessuno swipe/header di navigazione radice. L'unica
+sotto-navigazione è la sidecar flottante in basso già descritta sopra
+(Archivio/Statistiche + "+"), non una tab bar Cupertino/Material standard.
 
 **Stato Riverpod**: `ProviderScope` è alla radice (`main.dart`). In uso per i dati
 Buste Paga, persistiti su Drift (`busteRepositoryProvider`, `ultimaBustaPagaProvider`
@@ -76,7 +96,14 @@ sul pilota Archivio Buste Paga ed estesa a tutta l'app.
   esplicito attorno al `BackdropFilter` (oltre al clip di `PhysicalShape`) — su
   device reale con Impeller, un `BackdropFilter` senza un clip layer diretto come
   antenato può sbiancare il resto dello schermo. Non rimuovere quel `ClipPath` se
-  si tocca il widget.
+  si tocca il widget. **Altra nota implementativa (bug corretto il 2026-07-30)**:
+  il bordo decorativo (`_SpecularBorderPainter`, un `CustomPaint` interno) deve
+  avere `hitTest(Offset position) => false` esplicito — senza quell'override, il
+  default di `RenderCustomPaint.hitTestSelf` è `true`, e quel `CustomPaint`
+  (in cima allo `Stack` interno, quindi il primo testato) intercetta ogni tocco
+  sull'intera superficie prima che raggiunga il contenuto reale sottostante
+  (bottoni, righe, sotto-navigazione). Se si riscrive `LiquidGlassSurface`,
+  mantenere quell'override.
 - **Colori**: colori semantici Apple — vedi `lib/theme/app_colors.dart`. systemRed
   riservato ad alert e variazioni sfavorevoli. La palette del vetro (`glassFill`,
   `glassHighlight`, `glassShadowEdge`) resta volutamente sobria/neutra: il colore è
@@ -100,12 +127,9 @@ sul pilota Archivio Buste Paga ed estesa a tutta l'app.
 
 ## Cosa manca (prossimi passi, in ordine di priorità suggerito)
 
-1. Upload PDF/foto busta paga nel form (`fileOrigine`, oggi sempre `null`) e
-   statistiche/grafici dedicati (andamento ferie/ROL/permessi residui, ore
-   straordinario per mese).
-2. AI locale on-device per estrazione dati busta paga (fase successiva, nessuna
-   dipendenza cloud/API a pagamento prevista, sostituisce progressivamente
-   l'inserimento manuale del form).
+1. AI locale on-device per estrazione dati busta paga (fase successiva, nessuna
+   dipendenza cloud/API a pagamento prevista, sostituisce/affianca il parser
+   regex oggi usato per precompilare il form dopo l'import PDF).
 
 ## Convenzioni di codice
 

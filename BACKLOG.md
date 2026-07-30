@@ -77,6 +77,32 @@ in pausa (sezione "In pausa" più sotto, non cancellati).
       verificato su simulatore iOS (incluso il primo build con le nuove
       dipendenze native).
 
+- [x] **Redesign navigazione/import + fix bug critici (2026-07-30)**:
+      sotto-navigazione Archivio/Statistiche spostata da tab in alto a
+      sidecar flottante in basso (`LiquidGlassSurface`), con il bottone "+"
+      incorporato come terzo elemento al posto della CTA nell'header.
+      Rimosso l'inserimento manuale: l'unico modo per aggiungere una busta
+      paga è il bottone "+" che avvia subito l'import PDF — se il file non
+      ha testo estraibile o il parser regex non riconosce i dati principali
+      (netto/periodo), alert bloccante e form non aperto. Il form si apre
+      solo precompilato da un import riuscito o in modifica di una busta
+      paga esistente, mai più vuoto per inserimento libero; aggiunto banner
+      di conferma esplicita quando i valori vengono da un'estrazione
+      automatica. Dettaglio busta paga ridisegnato con hero card (mese,
+      badge stato, netto in evidenza) + mini-card ROL residui/ore lavorate.
+      Aggiunta barra di benvenuto dinamica (saluto in base all'ora + data
+      corrente) in cima alla sezione. **Due bug corretti**: (1) ordinamento
+      nelle Statistiche che confrontava un elemento con se stesso invece che
+      con l'altro, rendendo l'ordine cronologico dei grafici un no-op; (2)
+      bug strutturale in `LiquidGlassSurface` (bordo decorativo `CustomPaint`
+      senza `hitTest()` override, intercettava ogni tocco sull'intera
+      superficie) che rendeva **intoccabile qualunque bottone/riga/tab**
+      dentro una superficie in vetro — presente da quando introdotto lo
+      stile Liquid Glass. Rimossa anche la soglia minima di 2 buste paga per
+      vedere le Statistiche: la pagina mostra sempre i 3 grafici, con
+      messaggio "Non ci sono dati" per i grafici senza dati sufficienti.
+      `flutter analyze`/`flutter test` puliti.
+
 3. **AI locale on-device per estrazione dati busta paga** — solo estrazione
    campi da documento (precompilazione form editabile, mai salvataggio senza
    conferma utente), non insight statistici. Nessuna chiamata cloud, nessun

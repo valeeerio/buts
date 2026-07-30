@@ -5,20 +5,41 @@ import 'package:path/path.dart' as p;
 import '../../models/busta_paga.dart';
 import '../../providers/buste_paga_provider.dart';
 import '../../services/busta_paga_regex_parser.dart';
-import '../../services/pdf_import_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/glass_form_section.dart';
 import '../../widgets/liquid_glass_button.dart';
+import '../../widgets/liquid_glass_surface.dart';
 
-/// Form di inserimento/modifica manuale di una busta paga. Se [existing] è
-/// presente, precompila i campi e salva con `update`; altrimenti crea un
-/// nuovo `BustaPaga` e salva con `add`.
+/// Form di revisione/modifica di una busta paga. Il form si apre in due
+/// modalità soltanto:
+/// - modifica di una busta paga esistente ([existing] non nullo, dal
+///   dettaglio);
+/// - revisione di un nuovo import PDF già processato a monte
+///   ([estratti] non nullo, con [fileOrigine] il path del PDF già copiato):
+///   i campi sono precompilati dal parser regex e restano editabili prima
+///   della conferma esplicita (pulsante Salva).
+///
+/// Non esiste più una modalità "vuota" per inserimento manuale libero: il
+/// PDF viene sempre scelto e processato prima di arrivare qui (vedi
+/// `buste_paga_section_screen.dart` / CLAUDE.md).
 class BustaPagaFormScreen extends ConsumerStatefulWidget {
   final BustaPaga? existing;
+  final String? fileOrigine;
+  final BustaPagaEstratti? estratti;
 
-  const BustaPagaFormScreen({super.key, this.existing});
+  const BustaPagaFormScreen({
+    super.key,
+    this.existing,
+  })  : fileOrigine = null,
+        estratti = null;
+
+  const BustaPagaFormScreen.daImport({
+    super.key,
+    required String this.fileOrigine,
+    required BustaPagaEstratti this.estratti,
+  }) : existing = null;
 
   @override
   ConsumerState<BustaPagaFormScreen> createState() =>
@@ -61,11 +82,8 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
 
   late List<_TrattenutaRow> _trattenute;
 
-  final _pdfImportService = const PdfImportService();
-  final _regexParser = const BustaPagaRegexParser();
   String? _fileOrigine;
-  String? _extractedText;
-  bool _importingPdf = false;
+  List<String> _warnings = const [];
 
   /// True quando i campi sono stati popolati dall'estrazione automatica e
   /// non ancora confermati esplicitamente (salvataggio) dall'utente.
@@ -77,43 +95,63 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   void initState() {
     super.initState();
     final existing = widget.existing;
-    _fileOrigine = existing?.fileOrigine;
-    _valoriDaConferma =
-        existing?.statoVerifica == StatoVerificaBustaPaga.daConfermare;
-    _periodo = existing?.periodo ?? DateTime(DateTime.now().year, DateTime.now().month);
+    final estratti = widget.estratti;
 
-    _lordoController =
-        TextEditingController(text: _formatNumber(existing?.lordo));
-    _nettoController =
-        TextEditingController(text: _formatNumber(existing?.netto));
-    _straordinariController =
-        TextEditingController(text: _formatNumber(existing?.straordinari));
+    _fileOrigine = existing?.fileOrigine ?? widget.fileOrigine;
+    _valoriDaConferma = existing != null
+        ? existing.statoVerifica == StatoVerificaBustaPaga.daConfermare
+        : estratti != null;
+    _warnings = estratti?.warnings ?? const [];
 
-    _ferieMaturateController =
-        TextEditingController(text: _formatNumber(existing?.ferieMaturate));
-    _ferieGoduteController =
-        TextEditingController(text: _formatNumber(existing?.ferieGodute));
-    _ferieResidueController =
-        TextEditingController(text: _formatNumber(existing?.ferieResidue));
+    _periodo = existing?.periodo ??
+        _periodoFromEstratti(estratti?.periodo) ??
+        DateTime(DateTime.now().year, DateTime.now().month);
 
-    _rolMaturatiController =
-        TextEditingController(text: _formatNumber(existing?.rolMaturati));
-    _rolGodutiController =
-        TextEditingController(text: _formatNumber(existing?.rolGoduti));
-    _rolResiduiController =
-        TextEditingController(text: _formatNumber(existing?.rolResidui));
+    _lordoController = TextEditingController(
+        text: _formatNumber(existing?.lordo ?? estratti?.lordo));
+    _nettoController = TextEditingController(
+        text: _formatNumber(existing?.netto ?? estratti?.netto));
+    _straordinariController = TextEditingController(
+        text: _formatNumber(existing?.straordinari ?? estratti?.straordinari));
 
-    _permessiGodutiController =
-        TextEditingController(text: _formatNumber(existing?.permessiGoduti));
-    _oreLavorateController =
-        TextEditingController(text: _formatNumber(existing?.oreLavorate));
+    _ferieMaturateController = TextEditingController(
+        text:
+            _formatNumber(existing?.ferieMaturate ?? estratti?.ferieMaturate));
+    _ferieGoduteController = TextEditingController(
+        text: _formatNumber(existing?.ferieGodute ?? estratti?.ferieGodute));
+    _ferieResidueController = TextEditingController(
+        text: _formatNumber(existing?.ferieResidue ?? estratti?.ferieResidue));
 
-    _trattenute = existing == null || existing.trattenute.isEmpty
+    _rolMaturatiController = TextEditingController(
+        text: _formatNumber(existing?.rolMaturati ?? estratti?.rolMaturati));
+    _rolGodutiController = TextEditingController(
+        text: _formatNumber(existing?.rolGoduti ?? estratti?.rolGoduti));
+    _rolResiduiController = TextEditingController(
+        text: _formatNumber(existing?.rolResidui ?? estratti?.rolResidui));
+
+    _permessiGodutiController = TextEditingController(
+        text:
+            _formatNumber(existing?.permessiGoduti ?? estratti?.permessiGoduti));
+    _oreLavorateController = TextEditingController(
+        text: _formatNumber(existing?.oreLavorate ?? estratti?.oreLavorate));
+
+    final trattenuteIniziali =
+        existing?.trattenute ?? estratti?.trattenute ?? const {};
+    _trattenute = trattenuteIniziali.isEmpty
         ? [_TrattenutaRow()]
-        : existing.trattenute.entries
+        : trattenuteIniziali.entries
             .map((e) => _TrattenutaRow(
                 chiave: e.key, importo: e.value.toStringAsFixed(2)))
             .toList();
+  }
+
+  static DateTime? _periodoFromEstratti(String? periodo) {
+    if (periodo == null) return null;
+    final parti = periodo.split('-');
+    final anno = int.tryParse(parti.elementAtOrNull(0) ?? '');
+    final mese = int.tryParse(parti.elementAtOrNull(1) ?? '');
+    if (anno == null || mese == null) return null;
+    return DateTime(anno, mese);
   }
 
   static String _formatNumber(double? value) {
@@ -188,134 +226,6 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
           ),
         );
       },
-    );
-  }
-
-  Future<void> _pickPdf() async {
-    setState(() => _importingPdf = true);
-    final result = await _pdfImportService.pickAndImport();
-    if (!mounted) return;
-    setState(() => _importingPdf = false);
-
-    switch (result.status) {
-      case PdfImportStatus.success:
-        setState(() {
-          _fileOrigine = result.filePath;
-          _extractedText = result.extractedText;
-        });
-      case PdfImportStatus.cancelled:
-        break;
-      case PdfImportStatus.noExtractableText:
-        _showImportError(
-          'PDF non supportato',
-          'Questo PDF sembra una scansione o un\'immagine, senza testo '
-              'selezionabile. In questa versione sono supportati solo PDF '
-              'testuali generati da un software paghe.',
-        );
-      case PdfImportStatus.error:
-        _showImportError(
-          'Import non riuscito',
-          result.errorMessage ?? 'Si è verificato un errore imprevisto.',
-        );
-    }
-  }
-
-  void _removePdf() {
-    setState(() {
-      _fileOrigine = null;
-      _extractedText = null;
-    });
-  }
-
-  /// Popola il form con i dati estratti dal testo del PDF (parser regex
-  /// mirato al layout "JOB", vedi `busta_paga_regex_parser.dart`). I campi
-  /// restano comunque editabili prima del salvataggio — l'estrazione non
-  /// salva mai automaticamente, vedi CLAUDE.md.
-  void _estraiDati() {
-    final testo = _extractedText;
-    if (testo == null) return;
-
-    final risultato = _regexParser.parse(testo);
-    setState(() {
-      if (risultato.periodo != null) {
-        final parti = risultato.periodo!.split('-');
-        final anno = int.tryParse(parti.elementAtOrNull(0) ?? '');
-        final mese = int.tryParse(parti.elementAtOrNull(1) ?? '');
-        if (anno != null && mese != null) _periodo = DateTime(anno, mese);
-      }
-      if (risultato.lordo != null) {
-        _lordoController.text = _formatNumber(risultato.lordo);
-      }
-      if (risultato.netto != null) {
-        _nettoController.text = _formatNumber(risultato.netto);
-      }
-      _straordinariController.text = _formatNumber(risultato.straordinari);
-      _ferieMaturateController.text = _formatNumber(risultato.ferieMaturate);
-      _ferieGoduteController.text = _formatNumber(risultato.ferieGodute);
-      _ferieResidueController.text = _formatNumber(risultato.ferieResidue);
-      _rolMaturatiController.text = _formatNumber(risultato.rolMaturati);
-      _rolGodutiController.text = _formatNumber(risultato.rolGoduti);
-      _rolResiduiController.text = _formatNumber(risultato.rolResidui);
-      _permessiGodutiController.text =
-          _formatNumber(risultato.permessiGoduti);
-      if (risultato.oreLavorate != null) {
-        _oreLavorateController.text = _formatNumber(risultato.oreLavorate);
-      }
-
-      if (risultato.trattenute.isNotEmpty) {
-        for (final row in _trattenute) {
-          row.dispose();
-        }
-        _trattenute = risultato.trattenute.entries
-            .map((e) => _TrattenutaRow(
-                chiave: e.key, importo: e.value.toStringAsFixed(2)))
-            .toList();
-      }
-
-      _valoriDaConferma = true;
-    });
-
-    if (risultato.warnings.isNotEmpty) {
-      _showExtractionWarnings(risultato.warnings);
-    }
-  }
-
-  void _showExtractionWarnings(List<String> warnings) {
-    showCupertinoDialog<void>(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Verifica i dati estratti'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: AppSpacing.xs),
-          child: Text(
-            'Alcuni campi potrebbero non essere accurati, ricontrollali prima di salvare:\n\n'
-            '${warnings.map((w) => '• $w').join('\n')}',
-            textAlign: TextAlign.left,
-          ),
-        ),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('Ho capito'),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showImportError(String title, String message) {
-    showCupertinoDialog<void>(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('OK'),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
     );
   }
 
@@ -410,6 +320,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
               AppSpacing.xl,
             ),
             children: [
+              if (_valoriDaConferma) _ConfermaBanner(warnings: _warnings),
               GlassFormSection(
                 header: 'Periodo',
                 children: [
@@ -431,15 +342,11 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                   ),
                 ],
               ),
-              GlassFormSection(
-                header: 'Documento',
-                footer:
-                    'Solo PDF con testo selezionabile (no scansioni/foto) in questa versione.',
-                children: [
-                  _documentoRow(accent, labelSecondary),
-                  if (_extractedText != null) _estraiDatiButton(accent),
-                ],
-              ),
+              if (_fileOrigine != null)
+                GlassFormSection(
+                  header: 'Documento',
+                  children: [_documentoRow(labelSecondary)],
+                ),
               GlassFormSection(
                 header: 'Importi',
                 children: [
@@ -520,74 +427,17 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     );
   }
 
-  Widget _documentoRow(Color accent, Color labelSecondary) {
-    if (_importingPdf) {
-      return const CupertinoFormRow(
-        prefix: Text('PDF'),
-        child: CupertinoActivityIndicator(),
-      );
-    }
-
-    if (_fileOrigine == null) {
-      return CupertinoFormRow(
-        prefix: const Text('PDF'),
-        child: GestureDetector(
-          onTap: _pickPdf,
-          behavior: HitTestBehavior.opaque,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(CupertinoIcons.paperclip, size: 16, color: accent),
-              const SizedBox(width: AppSpacing.xs),
-              Text('Allega PDF', style: TextStyle(color: accent)),
-            ],
-          ),
-        ),
-      );
-    }
-
+  /// Riga di sola visualizzazione del PDF già associato alla busta paga: il
+  /// file è già stato scelto e processato prima di arrivare al form, qui
+  /// non ci sono azioni di allega/rimuovi (vedi CLAUDE.md).
+  Widget _documentoRow(Color labelSecondary) {
     return CupertinoFormRow(
       prefix: const Text('PDF'),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(
-              p.basename(_fileOrigine!),
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.end,
-              style: TextStyle(color: labelSecondary),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            minimumSize: Size.zero,
-            onPressed: _removePdf,
-            child: Icon(
-              CupertinoIcons.xmark_circle_fill,
-              size: 18,
-              color: CupertinoDynamicColor.resolve(
-                  AppColors.systemRed, context),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _estraiDatiButton(Color accent) {
-    return CupertinoButton(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-      onPressed: _estraiDati,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(CupertinoIcons.wand_stars, color: accent, size: 18),
-          const SizedBox(width: AppSpacing.xs),
-          Text('Estrai dati dal PDF',
-              style: AppTextStyles.subtitle.copyWith(color: accent)),
-        ],
+      child: Text(
+        p.basename(_fileOrigine!),
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.end,
+        style: TextStyle(color: labelSecondary),
       ),
     );
   }
@@ -659,6 +509,72 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Banner di conferma esplicita per i dati estratti automaticamente da un
+/// nuovo import PDF: visibile finché `_valoriDaConferma == true`, incorpora
+/// gli eventuali warning del parser regex. Il pulsante "Salva" nella nav
+/// bar resta il meccanismo di conferma vera e propria (vedi `_save`).
+class _ConfermaBanner extends StatelessWidget {
+  final List<String> warnings;
+
+  const _ConfermaBanner({required this.warnings});
+
+  @override
+  Widget build(BuildContext context) {
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.systemOrange, context);
+    final labelPrimary =
+        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+      child: LiquidGlassSurface(
+        radius: AppRadius.glass,
+        tint: accent,
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(CupertinoIcons.wand_stars, size: 18, color: accent),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    'Dati estratti automaticamente',
+                    style: AppTextStyles.subtitle.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: labelPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Verifica e correggi i campi se necessario: si confermano '
+              'salvando con "Salva".',
+              style: AppTextStyles.cardLabel.copyWith(color: labelPrimary),
+            ),
+            if (warnings.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.sm),
+              for (final warning in warnings)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Text(
+                    '• $warning',
+                    style: AppTextStyles.cardLabel.copyWith(
+                      color: labelPrimary,
+                    ),
+                  ),
+                ),
+            ],
+          ],
+        ),
       ),
     );
   }

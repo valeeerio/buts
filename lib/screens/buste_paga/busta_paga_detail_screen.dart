@@ -5,7 +5,9 @@ import 'package:share_plus/share_plus.dart';
 import '../../models/busta_paga.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
+import '../../theme/app_text_styles.dart';
 import '../../widgets/glass_form_section.dart';
+import '../../widgets/liquid_glass_surface.dart';
 import 'busta_paga_form_screen.dart';
 
 /// Vista di sola lettura di tutti i campi di una busta paga, con lo stesso
@@ -55,6 +57,26 @@ class BustaPagaDetailScreen extends StatelessWidget {
             AppSpacing.xl,
           ),
           children: [
+            _HeroCard(bustaPaga: bustaPaga, periodoLabel: _periodoLabel),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: _MiniCard(
+                    label: 'ROL residui',
+                    value: _formatNumber(bustaPaga.rolResidui),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: _MiniCard(
+                    label: 'Ore a disposizione',
+                    value: _formatNumber(bustaPaga.oreLavorate),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
             GlassFormSection(
               header: 'Periodo',
               children: [
@@ -76,7 +98,6 @@ class BustaPagaDetailScreen extends StatelessWidget {
               header: 'Importi',
               children: [
                 _readOnlyRow('Lordo', '€ ${_formatNumber(bustaPaga.lordo)}'),
-                _readOnlyRow('Netto', '€ ${_formatNumber(bustaPaga.netto)}'),
                 _readOnlyRow('Straordinari',
                     '€ ${_formatNumber(bustaPaga.straordinari)}'),
               ],
@@ -162,6 +183,121 @@ class BustaPagaDetailScreen extends StatelessWidget {
                 AppColors.labelPrimary, context),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Hero card in cima al dettaglio: mese, badge di stato e netto in massima
+/// evidenza — colpo d'occhio prima delle sezioni di dettaglio sotto.
+class _HeroCard extends StatelessWidget {
+  final BustaPaga bustaPaga;
+  final String periodoLabel;
+
+  const _HeroCard({required this.bustaPaga, required this.periodoLabel});
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = CupertinoDynamicColor.resolve(AppColors.bustePaga, context);
+    final labelPrimary =
+        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
+    final labelSecondary =
+        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+    final isConfermato =
+        bustaPaga.statoVerifica == StatoVerificaBustaPaga.confermato;
+    final badgeColor = CupertinoDynamicColor.resolve(
+      isConfermato ? AppColors.systemGreen : AppColors.systemOrange,
+      context,
+    );
+
+    return LiquidGlassSurface(
+      radius: AppRadius.glass,
+      tint: accent,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  periodoLabel,
+                  style: AppTextStyles.sectionTitle.copyWith(
+                    color: labelPrimary,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(AppRadius.small),
+                ),
+                child: Text(
+                  isConfermato ? 'Confermato' : 'Da confermare',
+                  style: AppTextStyles.changeBadge.copyWith(color: badgeColor),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Netto',
+            style: AppTextStyles.cardLabel.copyWith(color: labelSecondary),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '€ ${BustaPagaDetailScreen._formatNumber(bustaPaga.netto)}',
+            style: AppTextStyles.cardAmountLarge.copyWith(
+              fontSize: 34,
+              color: labelPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Mini-card di sintesi (ROL residui, ore a disposizione) sotto la hero.
+class _MiniCard extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _MiniCard({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final labelPrimary =
+        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
+    final labelSecondary =
+        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+
+    return LiquidGlassSurface(
+      radius: AppRadius.glassSmall,
+      blurSigma: 22,
+      elevation: 4,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm + 4,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: AppTextStyles.cardLabel.copyWith(color: labelSecondary),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: AppTextStyles.cardAmount.copyWith(color: labelPrimary),
+          ),
+        ],
       ),
     );
   }
