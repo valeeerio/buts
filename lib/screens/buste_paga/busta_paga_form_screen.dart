@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import '../../models/busta_paga.dart';
 import '../../providers/buste_paga_provider.dart';
+import '../../services/busta_paga_regex_parser.dart';
 import '../../services/pdf_import_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
@@ -61,8 +62,14 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   late List<_TrattenutaRow> _trattenute;
 
   final _pdfImportService = const PdfImportService();
+  final _regexParser = const BustaPagaRegexParser();
   String? _fileOrigine;
+  String? _extractedText;
   bool _importingPdf = false;
+
+  /// True quando i campi sono stati popolati dall'estrazione automatica e
+  /// non ancora confermati esplicitamente (salvataggio) dall'utente.
+  bool _valoriDaConferma = false;
 
   bool get _isEditing => widget.existing != null;
 
@@ -71,6 +78,8 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     super.initState();
     final existing = widget.existing;
     _fileOrigine = existing?.fileOrigine;
+    _valoriDaConferma =
+        existing?.statoVerifica == StatoVerificaBustaPaga.daConfermare;
     _periodo = existing?.periodo ?? DateTime(DateTime.now().year, DateTime.now().month);
 
     _lordoController =
@@ -190,7 +199,10 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
 
     switch (result.status) {
       case PdfImportStatus.success:
-        setState(() => _fileOrigine = result.filePath);
+        setState(() {
+          _fileOrigine = result.filePath;
+          _extractedText = result.extractedText;
+        });
       case PdfImportStatus.cancelled:
         break;
       case PdfImportStatus.noExtractableText:
@@ -209,7 +221,86 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   }
 
   void _removePdf() {
-    setState(() => _fileOrigine = null);
+    setState(() {
+      _fileOrigine = null;
+      _extractedText = null;
+    });
+  }
+
+  /// Popola il form con i dati estratti dal testo del PDF (parser regex
+  /// mirato al layout "JOB", vedi `busta_paga_regex_parser.dart`). I campi
+  /// restano comunque editabili prima del salvataggio — l'estrazione non
+  /// salva mai automaticamente, vedi CLAUDE.md.
+  void _estraiDati() {
+    final testo = _extractedText;
+    if (testo == null) return;
+
+    final risultato = _regexParser.parse(testo);
+    setState(() {
+      if (risultato.periodo != null) {
+        final parti = risultato.periodo!.split('-');
+        final anno = int.tryParse(parti.elementAtOrNull(0) ?? '');
+        final mese = int.tryParse(parti.elementAtOrNull(1) ?? '');
+        if (anno != null && mese != null) _periodo = DateTime(anno, mese);
+      }
+      if (risultato.lordo != null) {
+        _lordoController.text = _formatNumber(risultato.lordo);
+      }
+      if (risultato.netto != null) {
+        _nettoController.text = _formatNumber(risultato.netto);
+      }
+      _straordinariController.text = _formatNumber(risultato.straordinari);
+      _ferieMaturateController.text = _formatNumber(risultato.ferieMaturate);
+      _ferieGoduteController.text = _formatNumber(risultato.ferieGodute);
+      _ferieResidueController.text = _formatNumber(risultato.ferieResidue);
+      _rolMaturatiController.text = _formatNumber(risultato.rolMaturati);
+      _rolGodutiController.text = _formatNumber(risultato.rolGoduti);
+      _rolResiduiController.text = _formatNumber(risultato.rolResidui);
+      _permessiGodutiController.text =
+          _formatNumber(risultato.permessiGoduti);
+      if (risultato.oreLavorate != null) {
+        _oreLavorateController.text = _formatNumber(risultato.oreLavorate);
+      }
+
+      if (risultato.trattenute.isNotEmpty) {
+        for (final row in _trattenute) {
+          row.dispose();
+        }
+        _trattenute = risultato.trattenute.entries
+            .map((e) => _TrattenutaRow(
+                chiave: e.key, importo: e.value.toStringAsFixed(2)))
+            .toList();
+      }
+
+      _valoriDaConferma = true;
+    });
+
+    if (risultato.warnings.isNotEmpty) {
+      _showExtractionWarnings(risultato.warnings);
+    }
+  }
+
+  void _showExtractionWarnings(List<String> warnings) {
+    showCupertinoDialog<void>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Verifica i dati estratti'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: AppSpacing.xs),
+          child: Text(
+            'Alcuni campi potrebbero non essere accurati, ricontrollali prima di salvare:\n\n'
+            '${warnings.map((w) => '• $w').join('\n')}',
+            textAlign: TextAlign.left,
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('Ho capito'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showImportError(String title, String message) {
@@ -267,8 +358,9 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
       rolResidui: _parse(_rolResiduiController),
       permessiGoduti: _parse(_permessiGodutiController),
       oreLavorate: _parse(_oreLavorateController),
-      statoVerifica:
-          widget.existing?.statoVerifica ?? StatoVerificaBustaPaga.confermato,
+      statoVerifica: _valoriDaConferma
+          ? StatoVerificaBustaPaga.daConfermare
+          : StatoVerificaBustaPaga.confermato,
     );
 
     if (_isEditing) {
@@ -343,7 +435,10 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                 header: 'Documento',
                 footer:
                     'Solo PDF con testo selezionabile (no scansioni/foto) in questa versione.',
-                children: [_documentoRow(accent, labelSecondary)],
+                children: [
+                  _documentoRow(accent, labelSecondary),
+                  if (_extractedText != null) _estraiDatiButton(accent),
+                ],
               ),
               GlassFormSection(
                 header: 'Importi',
@@ -476,6 +571,22 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                   AppColors.systemRed, context),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _estraiDatiButton(Color accent) {
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      onPressed: _estraiDati,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(CupertinoIcons.wand_stars, color: accent, size: 18),
+          const SizedBox(width: AppSpacing.xs),
+          Text('Estrai dati dal PDF',
+              style: AppTextStyles.subtitle.copyWith(color: accent)),
         ],
       ),
     );
