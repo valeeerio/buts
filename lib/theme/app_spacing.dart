@@ -22,7 +22,8 @@ class AppRadius {
   static const double small = 8;
   static const double medium = 10;
   static const double large = 12;
-  static const double card = 16; // usato per card più grandi (es. donut summary)
+  static const double card =
+      16; // usato per card più grandi (es. donut summary)
 
   // --- Liquid Glass ---
   // Curve più generose e "continue" (vedi `lib/widgets/squircle_clipper.dart`)

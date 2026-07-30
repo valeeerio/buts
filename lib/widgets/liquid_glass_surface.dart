@@ -1,4 +1,6 @@
-import 'dart:ui';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/cupertino.dart';
 
@@ -93,24 +95,41 @@ class LiquidGlassSurface extends StatelessWidget {
           children: [
             BackdropFilter(
               filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-              child: Container(
-                padding: padding,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      baseFill,
-                      baseFill.withValues(
-                        alpha: (baseFill.a - (isDark ? 0.05 : 0.08)).clamp(
-                          0.0,
-                          1.0,
-                        ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final aspect = constraints.hasBoundedWidth &&
+                          constraints.hasBoundedHeight &&
+                          constraints.maxHeight > 0
+                      ? constraints.maxWidth / constraints.maxHeight
+                      : 1.0;
+                  // L'angolo percepito del riflesso deve restare
+                  // ~diagonale indipendentemente da quanto la superficie
+                  // sia larga/bassa o stretta/alta: si comprime la
+                  // componente dominante dell'Alignment invece di
+                  // lasciarla stirare fino a diventare orizzontale o
+                  // verticale.
+                  final begin = aspect >= 1
+                      ? Alignment(-1 / aspect.clamp(1.0, 6.0), -1.0)
+                      : Alignment(-1.0, -(1 / aspect).clamp(1.0, 6.0));
+                  final end = Alignment(-begin.x, -begin.y);
+                  return Container(
+                    padding: padding,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: begin,
+                        end: end,
+                        colors: [
+                          baseFill,
+                          baseFill.withValues(
+                            alpha: (baseFill.a - (isDark ? 0.05 : 0.08))
+                                .clamp(0.0, 1.0),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-                child: child,
+                    ),
+                    child: child,
+                  );
+                },
               ),
             ),
             Positioned.fill(
@@ -152,22 +171,37 @@ class _SpecularBorderPainter extends CustomPainter {
   @override
   bool? hitTest(Offset position) => false;
 
+  /// Angolo fisso (in gradi, misurato dall'orizzontale) dell'asse del
+  /// riflesso di luce: costante indipendentemente dall'aspect ratio della
+  /// superficie, così il gradiente non si stira mai verso l'orizzontale
+  /// (forme larghe e basse) o verso il verticale (forme strette e alte).
+  static const double _lightAngleDeg = 35.0;
+
   @override
   void paint(Canvas canvas, Size size) {
     final path = clipper.getClip(size);
+
+    const rad = _lightAngleDeg * math.pi / 180;
+    final dir = Offset(math.cos(rad), math.sin(rad));
+    final center = Offset(size.width / 2, size.height / 2);
+    final halfDiag =
+        math.sqrt(size.width * size.width + size.height * size.height) / 2;
+    final begin = center - dir * halfDiag;
+    final end = center + dir * halfDiag;
+
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.1
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
+      ..shader = ui.Gradient.linear(
+        begin,
+        end,
+        [
           highlight,
           highlight.withValues(alpha: highlight.a * 0.3),
           shadowEdge,
         ],
-        stops: const [0.0, 0.45, 1.0],
-      ).createShader(Offset.zero & size);
+        const [0.0, 0.45, 1.0],
+      );
     canvas.drawPath(path, paint);
   }
 

@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -8,6 +9,7 @@ import '../../providers/buste_paga_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
+import '../../widgets/liquid_glass_button.dart';
 import '../../widgets/liquid_glass_surface.dart';
 
 /// Contenuto della tab "Statistiche" della sezione Buste Paga: andamento
@@ -34,6 +36,25 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
 
     return CustomScrollView(
       slivers: [
+        if (kDebugMode)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screenHorizontal,
+              AppSpacing.lg,
+              AppSpacing.screenHorizontal,
+              0,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: _DebugTools(
+                onSeed: () => ref
+                    .read(busteRepositoryProvider.notifier)
+                    .seedDebugData(),
+                onClear: () => ref
+                    .read(busteRepositoryProvider.notifier)
+                    .clearDebugData(),
+              ),
+            ),
+          ),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.screenHorizontal,
@@ -96,6 +117,91 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
 
 /// Messaggio mostrato al posto del grafico quando non ci sono buste paga
 /// da rappresentare (archivio vuoto).
+/// Debug-only (`kDebugMode`): inserisce/rigenera o elimina i dati di prova
+/// nell'archivio reale, per test manuali rapidi senza dover importare PDF
+/// veri. Mai visibile in una build di release. "Elimina" tocca solo le
+/// buste paga di test (id `dbg-`), mai i dati reali importati.
+class _DebugTools extends StatelessWidget {
+  final VoidCallback onSeed;
+  final VoidCallback onClear;
+
+  const _DebugTools({required this.onSeed, required this.onClear});
+
+  @override
+  Widget build(BuildContext context) {
+    final seedAccent =
+        CupertinoDynamicColor.resolve(AppColors.systemOrange, context);
+    final clearAccent =
+        CupertinoDynamicColor.resolve(AppColors.systemRed, context);
+    return Row(
+      children: [
+        Expanded(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: LiquidGlassButton(
+              onPressed: onSeed,
+              tint: seedAccent,
+              child: _DebugButtonLabel(
+                icon: CupertinoIcons.hammer,
+                label: 'Aggiungi dati di prova',
+                color: seedAccent,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: LiquidGlassButton(
+              onPressed: onClear,
+              tint: clearAccent,
+              child: _DebugButtonLabel(
+                icon: CupertinoIcons.trash,
+                label: 'Elimina dati di prova',
+                color: clearAccent,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DebugButtonLabel extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _DebugButtonLabel({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: AppSpacing.xs),
+        Flexible(
+          child: Text(
+            label,
+            style: AppTextStyles.cardLabel.copyWith(
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _NoDataMessage extends StatelessWidget {
   const _NoDataMessage();
 

@@ -1,14 +1,14 @@
 import 'package:flutter/cupertino.dart';
-import 'package:intl/intl.dart';
 import '../models/busta_paga.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
+import '../utils/busta_paga_formatting.dart';
 import 'liquid_glass_surface.dart';
 import 'spring_button.dart';
 
-/// Card in evidenza per l'ultima busta paga in archivio: periodo formattato
-/// e netto ben visibile. Tap-only, apre il dettaglio.
+/// Card in evidenza per l'ultima busta paga in archivio: mese e netto a
+/// sinistra, residui di Ferie/ROL/Ore a destra. Tap-only, apre il dettaglio.
 ///
 /// Usa `LiquidGlassSurface`, vedi `liquid_glass_surface.dart` per i dettagli
 /// del materiale approssimato.
@@ -22,19 +22,16 @@ class BustaPagaSummaryHero extends StatelessWidget {
     required this.onTap,
   });
 
-  String get _periodoLabel {
-    final formatted =
-        DateFormat('MMMM yyyy', 'it_IT').format(bustaPaga.periodo);
-    return formatted[0].toUpperCase() + formatted.substring(1);
-  }
-
   @override
   Widget build(BuildContext context) {
     final labelPrimary =
         CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-    final labelSecondary =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
-    final accent = CupertinoDynamicColor.resolve(AppColors.bustePaga, context);
+    final isConfermato =
+        bustaPaga.statoVerifica == StatoVerificaBustaPaga.confermato;
+    final statoColor = CupertinoDynamicColor.resolve(
+      isConfermato ? AppColors.systemGreen : AppColors.systemRed,
+      context,
+    );
 
     return SpringButton(
       onPressed: onTap,
@@ -47,27 +44,86 @@ class BustaPagaSummaryHero extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(CupertinoIcons.doc_text, size: 18, color: accent),
-                  const SizedBox(width: AppSpacing.xs),
+                  Container(
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.only(right: AppSpacing.sm),
+                    decoration: BoxDecoration(
+                      color: statoColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      meseLabel(bustaPaga),
+                      style: AppTextStyles.subtitle.copyWith(
+                        color: labelPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
                   Text(
-                    'Ultima busta paga',
-                    style: AppTextStyles.cardLabel.copyWith(
-                      color: labelSecondary,
+                    'Ferie',
+                    style: AppTextStyles.subtitle.copyWith(
+                      color: labelPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Text(
+                    'ROL',
+                    style: AppTextStyles.subtitle.copyWith(
+                      color: labelPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Text(
+                    'Ore',
+                    style: AppTextStyles.subtitle.copyWith(
+                      color: labelPrimary,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: AppSpacing.sm),
-              Text(
-                _periodoLabel,
-                style: AppTextStyles.subtitle.copyWith(
-                  color: labelSecondary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '€ ${bustaPaga.netto.toStringAsFixed(2)}',
-                style: AppTextStyles.greeting.copyWith(color: labelPrimary),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Expanded(
+                    child: Text(
+                      '€ ${bustaPaga.netto.toStringAsFixed(2)}',
+                      style: AppTextStyles.greeting.copyWith(
+                        color: labelPrimary,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(
+                    formatNumber(bustaPaga.ferieResidue),
+                    style: AppTextStyles.cardAmount.copyWith(
+                      color: labelPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Text(
+                    formatNumber(bustaPaga.rolResidui),
+                    style: AppTextStyles.cardAmount.copyWith(
+                      color: labelPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Text(
+                    formatNumber(bustaPaga.oreLavorate),
+                    style: AppTextStyles.cardAmount.copyWith(
+                      color: labelPrimary,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

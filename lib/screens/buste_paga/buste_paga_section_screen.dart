@@ -49,6 +49,26 @@ class _BustePagaSectionScreenState
   final _pdfImportService = const PdfImportService();
   final _regexParser = const BustaPagaRegexParser();
   bool _importingPdf = false;
+  bool _searchActive = false;
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _changeTab(_BustePagaTab tab) {
+    setState(() {
+      _tab = tab;
+      if (tab != _BustePagaTab.archivio) _closeSearch();
+    });
+  }
+
+  void _closeSearch() {
+    _searchActive = false;
+    _searchController.clear();
+  }
 
   void _openDetail(BuildContext context, BustaPaga bustaPaga) {
     Navigator.of(context).push(
@@ -114,6 +134,50 @@ class _BustePagaSectionScreenState
     );
   }
 
+  /// Sostituisce il titolo "Archivio buste paga" con un campo di ricerca
+  /// minimale (nessun bordo/riempimento) quando la lente è attiva: icona
+  /// lente come prefix (tappabile per chiudere), campo borderless, tasto
+  /// "Annulla" per chiudere in alternativa.
+  Widget _buildSearchField(Color labelPrimary, Color labelSecondary) {
+    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    return Row(
+      children: [
+        CupertinoButton(
+          padding: EdgeInsets.zero,
+          minimumSize: const Size(44, 44),
+          onPressed: () => setState(_closeSearch),
+          child: Icon(
+            CupertinoIcons.search,
+            size: 20,
+            color: accent,
+          ),
+        ),
+        Expanded(
+          child: CupertinoTextField.borderless(
+            controller: _searchController,
+            autofocus: true,
+            padding: EdgeInsets.zero,
+            placeholder: 'Cerca per mese o anno',
+            placeholderStyle: AppTextStyles.subtitle.copyWith(
+              color: labelSecondary,
+            ),
+            style: AppTextStyles.subtitle.copyWith(color: labelPrimary),
+            onChanged: (_) => setState(() {}),
+          ),
+        ),
+        CupertinoButton(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+          minimumSize: const Size(0, 44),
+          onPressed: () => setState(_closeSearch),
+          child: Text(
+            'Annulla',
+            style: AppTextStyles.subtitle.copyWith(color: accent),
+          ),
+        ),
+      ],
+    );
+  }
+
   void _showImportError(String title, String message) {
     showCupertinoDialog<void>(
       context: context,
@@ -146,71 +210,123 @@ class _BustePagaSectionScreenState
       color: CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
       child: Stack(
         children: [
-          SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.screenHorizontal,
-                    AppSpacing.lg,
-                    AppSpacing.screenHorizontal,
-                    0,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        greetingFor(now),
-                        style: AppTextStyles.greeting.copyWith(
-                          color: labelPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        dataLabel,
-                        style: AppTextStyles.subtitle.copyWith(
-                          color: labelSecondary,
-                        ),
-                      ),
+          Column(
+            children: [
+              // Fascia di benvenuto: gradiente dedicato (blu elettrico in
+              // cima che sfuma in trasparenza) per separarla visivamente dal
+              // resto dell'app, sempre fissa sopra il contenuto scrollabile
+              // (fuori da Expanded/CustomScrollView).
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    // Stop espliciti: il blu resta pieno più a lungo (fino al
+                    // 50% dell'altezza) prima di iniziare a sfumare in
+                    // trasparenza, per un colore più marcato/presente.
+                    stops: const [0.0, 0.5, 1.0],
+                    colors: [
+                      CupertinoDynamicColor.resolve(
+                          AppColors.systemBlue, context),
+                      CupertinoDynamicColor.resolve(
+                          AppColors.systemBlue, context),
+                      CupertinoDynamicColor.resolve(
+                              AppColors.systemBlue, context)
+                          .withValues(alpha: 0),
                     ],
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.screenHorizontal,
-                    AppSpacing.md,
-                    AppSpacing.screenHorizontal,
-                    AppSpacing.sm,
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.screenHorizontal,
+                      AppSpacing.lg,
+                      AppSpacing.screenHorizontal,
+                      AppSpacing.lg,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          greetingFor(now),
+                          style: AppTextStyles.greeting.copyWith(
+                            color: labelPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          dataLabel,
+                          style: AppTextStyles.subtitle.copyWith(
+                            color: labelSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Archivio buste paga',
-                      style: AppTextStyles.sectionTitle.copyWith(
-                        color: labelPrimary,
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.screenHorizontal,
+                        AppSpacing.md,
+                        AppSpacing.screenHorizontal,
+                        AppSpacing.sm,
+                      ),
+                      child: _searchActive
+                          ? _buildSearchField(labelPrimary, labelSecondary)
+                          : Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Archivio buste paga',
+                                    style: AppTextStyles.sectionTitle.copyWith(
+                                      color: labelPrimary,
+                                    ),
+                                  ),
+                                ),
+                                if (_tab == _BustePagaTab.archivio)
+                                  CupertinoButton(
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: const Size(44, 44),
+                                    onPressed: () =>
+                                        setState(() => _searchActive = true),
+                                    child: Icon(
+                                      CupertinoIcons.search,
+                                      size: 22,
+                                      color: CupertinoDynamicColor.resolve(
+                                          AppColors.systemBlue, context),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(
+                          bottom: _sidecarReservedHeight,
+                        ),
+                        child: switch (_tab) {
+                          _BustePagaTab.archivio => BustePagaArchivioView(
+                              onOpenDetail: (bustaPaga) =>
+                                  _openDetail(context, bustaPaga),
+                              onAdd: () => _startImport(),
+                              searchActive: _searchActive,
+                              query: _searchController.text,
+                            ),
+                          _BustePagaTab.statistiche =>
+                            const BustePagaStatisticheScreen(),
+                        },
                       ),
                     ),
-                  ),
+                  ],
                 ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(
-                      bottom: _sidecarReservedHeight,
-                    ),
-                    child: switch (_tab) {
-                      _BustePagaTab.archivio => BustePagaArchivioView(
-                          onOpenDetail: (bustaPaga) =>
-                              _openDetail(context, bustaPaga),
-                          onAdd: () => _startImport(),
-                        ),
-                      _BustePagaTab.statistiche =>
-                        const BustePagaStatisticheScreen(),
-                    },
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
           Positioned(
             left: AppSpacing.screenHorizontal,
@@ -222,7 +338,7 @@ class _BustePagaSectionScreenState
                 padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                 child: _BustePagaSidecar(
                   tab: _tab,
-                  onTabChanged: (value) => setState(() => _tab = value),
+                  onTabChanged: _changeTab,
                   onAdd: _importingPdf ? null : () => _startImport(),
                   importing: _importingPdf,
                 ),
@@ -252,53 +368,89 @@ class _BustePagaSidecar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.bustePaga, context);
+    // Stesso colore della fascia di benvenuto in alto, usato per il "+" e
+    // per l'effetto "illuminato" del segmento attivo.
+    final plusAccent = CupertinoDynamicColor.resolve(
+        AppColors.systemBlue, context);
 
-    return LiquidGlassSurface(
-      radius: AppRadius.glass,
-      blurSigma: 26,
-      elevation: 10,
-      padding: const EdgeInsets.all(AppSpacing.xs),
-      child: Row(
-        children: [
-          Expanded(
-            child: _SegmentButton(
-              icon: CupertinoIcons.archivebox,
-              label: 'Archivio',
-              selected: tab == _BustePagaTab.archivio,
-              onTap: () => onTabChanged(_BustePagaTab.archivio),
-            ),
-          ),
-          Expanded(
-            child: _SegmentButton(
-              icon: CupertinoIcons.chart_bar_alt_fill,
-              label: 'Statistiche',
-              selected: tab == _BustePagaTab.statistiche,
-              onTap: () => onTabChanged(_BustePagaTab.statistiche),
-            ),
-          ),
-          SpringButton(
-            onPressed: onAdd ?? () {},
-            child: Container(
-              width: 48,
-              height: 48,
-              margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xs / 2),
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.16),
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: importing
-                  ? CupertinoActivityIndicator(color: accent)
-                  : Icon(
-                      CupertinoIcons.add,
-                      size: 24,
-                      color: accent,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: LiquidGlassSurface(
+            radius: AppRadius.glass,
+            blurSigma: 26,
+            elevation: 10,
+            padding: const EdgeInsets.all(AppSpacing.xs),
+            child: Stack(
+              children: [
+                AnimatedAlign(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOutCubic,
+                  alignment: tab == _BustePagaTab.archivio
+                      ? Alignment.centerLeft
+                      : Alignment.centerRight,
+                  child: FractionallySizedBox(
+                    widthFactor: 0.5,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs / 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: plusAccent.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(
+                          AppRadius.glassSmall,
+                        ),
+                      ),
                     ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SegmentButton(
+                        icon: CupertinoIcons.archivebox,
+                        label: 'Archivio',
+                        selected: tab == _BustePagaTab.archivio,
+                        onTap: () => onTabChanged(_BustePagaTab.archivio),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: _SegmentButton(
+                        icon: CupertinoIcons.chart_bar_alt_fill,
+                        label: 'Statistiche',
+                        selected: tab == _BustePagaTab.statistiche,
+                        onTap: () => onTabChanged(_BustePagaTab.statistiche),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        SpringButton(
+          onPressed: onAdd ?? () {},
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: plusAccent.withValues(alpha: 0.16),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: importing
+                ? CupertinoActivityIndicator(color: plusAccent)
+                : Icon(
+                    CupertinoIcons.add,
+                    size: 24,
+                    color: plusAccent,
+                  ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -318,7 +470,7 @@ class _SegmentButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.bustePaga, context);
+    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
     final labelSecondary =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
     final color = selected ? accent : labelSecondary;
@@ -331,14 +483,23 @@ class _SegmentButton extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 20, color: color),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Icon(icon, key: ValueKey(color), size: 20, color: color),
+            ),
             const SizedBox(height: 2),
-            Text(
-              label,
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
               style: (selected
                       ? AppTextStyles.tabLabelActive
                       : AppTextStyles.tabLabel)
                   .copyWith(color: color),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),

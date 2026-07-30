@@ -6,6 +6,7 @@ import '../../models/busta_paga.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
+import '../../utils/busta_paga_formatting.dart';
 import '../../widgets/glass_form_section.dart';
 import '../../widgets/liquid_glass_surface.dart';
 import 'busta_paga_form_screen.dart';
@@ -21,12 +22,6 @@ class BustaPagaDetailScreen extends StatelessWidget {
   String get _periodoLabel {
     final formatted = DateFormat('MMMM yyyy', 'it_IT').format(bustaPaga.periodo);
     return formatted[0].toUpperCase() + formatted.substring(1);
-  }
-
-  static String _formatNumber(double value) {
-    return value == value.roundToDouble()
-        ? value.toStringAsFixed(0)
-        : value.toStringAsFixed(2);
   }
 
   @override
@@ -64,14 +59,14 @@ class BustaPagaDetailScreen extends StatelessWidget {
                 Expanded(
                   child: _MiniCard(
                     label: 'ROL residui',
-                    value: _formatNumber(bustaPaga.rolResidui),
+                    value: formatNumber(bustaPaga.rolResidui),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: _MiniCard(
                     label: 'Ore a disposizione',
-                    value: _formatNumber(bustaPaga.oreLavorate),
+                    value: formatNumber(bustaPaga.oreLavorate),
                   ),
                 ),
               ],
@@ -97,34 +92,34 @@ class BustaPagaDetailScreen extends StatelessWidget {
             GlassFormSection(
               header: 'Importi',
               children: [
-                _readOnlyRow('Lordo', '€ ${_formatNumber(bustaPaga.lordo)}'),
+                _readOnlyRow('Lordo', '€ ${formatNumber(bustaPaga.lordo)}'),
                 _readOnlyRow('Straordinari',
-                    '€ ${_formatNumber(bustaPaga.straordinari)}'),
+                    '€ ${formatNumber(bustaPaga.straordinari)}'),
               ],
             ),
             GlassFormSection(
               header: 'Ferie',
               children: [
-                _readOnlyRow('Maturate', _formatNumber(bustaPaga.ferieMaturate)),
-                _readOnlyRow('Godute', _formatNumber(bustaPaga.ferieGodute)),
-                _readOnlyRow('Residue', _formatNumber(bustaPaga.ferieResidue)),
+                _readOnlyRow('Maturate', formatNumber(bustaPaga.ferieMaturate)),
+                _readOnlyRow('Godute', formatNumber(bustaPaga.ferieGodute)),
+                _readOnlyRow('Residue', formatNumber(bustaPaga.ferieResidue)),
               ],
             ),
             GlassFormSection(
               header: 'ROL',
               children: [
-                _readOnlyRow('Maturati', _formatNumber(bustaPaga.rolMaturati)),
-                _readOnlyRow('Goduti', _formatNumber(bustaPaga.rolGoduti)),
-                _readOnlyRow('Residui', _formatNumber(bustaPaga.rolResidui)),
+                _readOnlyRow('Maturati', formatNumber(bustaPaga.rolMaturati)),
+                _readOnlyRow('Goduti', formatNumber(bustaPaga.rolGoduti)),
+                _readOnlyRow('Residui', formatNumber(bustaPaga.rolResidui)),
               ],
             ),
             GlassFormSection(
               header: 'Permessi e ore',
               children: [
                 _readOnlyRow(
-                    'Permessi goduti', _formatNumber(bustaPaga.permessiGoduti)),
+                    'Permessi goduti', formatNumber(bustaPaga.permessiGoduti)),
                 _readOnlyRow(
-                    'Ore lavorate', _formatNumber(bustaPaga.oreLavorate)),
+                    'Ore lavorate', formatNumber(bustaPaga.oreLavorate)),
               ],
             ),
             GlassFormSection(
@@ -133,7 +128,7 @@ class BustaPagaDetailScreen extends StatelessWidget {
                   ? [_readOnlyRow('Nessuna trattenuta', '—')]
                   : bustaPaga.trattenute.entries
                       .map((e) =>
-                          _readOnlyRow(e.key, '€ ${_formatNumber(e.value)}'))
+                          _readOnlyRow(e.key, '€ ${formatNumber(e.value)}'))
                       .toList(),
             ),
           ],
@@ -143,7 +138,7 @@ class BustaPagaDetailScreen extends StatelessWidget {
   }
 
   Widget _documentoRow(BuildContext context, String filePath) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.bustePaga, context);
+    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
     return CupertinoFormRow(
       prefix: const Text('PDF'),
       child: GestureDetector(
@@ -250,7 +245,7 @@ class _HeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            '€ ${BustaPagaDetailScreen._formatNumber(bustaPaga.netto)}',
+            '€ ${formatNumber(bustaPaga.netto)}',
             style: AppTextStyles.cardAmountLarge.copyWith(
               fontSize: 34,
               color: labelPrimary,

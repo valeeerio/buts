@@ -285,7 +285,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   Widget build(BuildContext context) {
     final labelSecondary =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
-    final accent = CupertinoDynamicColor.resolve(AppColors.bustePaga, context);
+    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
 
     return CupertinoPageScaffold(
       backgroundColor:
@@ -295,7 +295,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
         trailing: LiquidGlassButton(
           onPressed: _save,
           radius: AppRadius.glassSmall,
-          tint: CupertinoTheme.of(context).primaryColor,
+          tint: accent,
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpacing.md,
             vertical: AppSpacing.xs,
@@ -303,7 +303,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
           child: Text(
             'Salva',
             style: TextStyle(
-              color: CupertinoTheme.of(context).primaryColor,
+              color: accent,
               fontWeight: FontWeight.w600,
             ),
           ),
