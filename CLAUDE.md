@@ -33,12 +33,16 @@ originale); nel dettaglio si apre via foglio di condivisione di sistema
 via AI locale on-device resta una fase futura (vedi sotto), in v1 l'inserimento è
 solo manuale.
 
-Componenti di stile riutilizzabili introdotti per questa sezione (validi ovunque
-serva più "materialità" Apple): `lib/widgets/material_surface.dart` (superficie
-traslucida/sfocata via `BackdropFilter`, usata sulla hero card) e
-`lib/widgets/spring_button.dart` (pressione con rimbalzo a molla, usato sui CTA
-principali). Restano dentro i design token esistenti — nessun nuovo colore o corner
-radius introdotto.
+Componenti di stile riutilizzabili dell'app (Liquid Glass, vedi sezione "Stile
+visivo" sotto): `lib/widgets/liquid_glass_surface.dart` (superficie in vetro
+traslucido/blur, standard per ogni card/sezione — hero card, righe elenco, sezioni
+del form, dettaglio, card statistiche, sotto-navigazione), `lib/widgets/
+liquid_glass_button.dart` (CTA in vetro, compone `LiquidGlassSurface` con
+`lib/widgets/spring_button.dart` per la pressione a molla) e `lib/widgets/
+squircle_clipper.dart` (curva "continua" a superellisse usata dal clip del vetro).
+`lib/widgets/glass_form_section.dart` compone `LiquidGlassSurface` nella forma di
+una sezione di form/dettaglio raggruppata (header, righe con separatori, footer),
+usata da form e dettaglio busta paga.
 
 ## Navigazione
 
@@ -53,16 +57,41 @@ in `lib/providers/buste_paga_provider.dart`).
 
 ## Stile visivo — non negoziabile senza conferma esplicita dell'utente
 
-Direzione: **struttura/interazione di Revolut** (card-based, whitespace generoso,
-palette semantica ristretta, alta densità informativa ma ordinata) **vestita con
-estetica Apple/iOS nativa** (system font, colori semantici di sistema, corner radius
-leggero, superfici pulite, no pill/capsule).
+Direzione: **"Liquid Glass"**, approssimazione Flutter-only (nessun ponte nativo
+iOS/`UIGlassEffect`) del materiale in vetro liquido introdotto da Apple con iOS 26
+(HIG "Materials" / WWDC25 "Meet Liquid Glass"). Card, sezioni, righe di elenco e CTA
+sono superfici in vetro traslucido/sfocato che rifrangono ciò che hanno dietro,
+non più rettangoli piatti a tinta unita. Sostituisce la direzione precedente
+("struttura Revolut + estetica Apple, superfici piatte") — validata dall'utente
+sul pilota Archivio Buste Paga ed estesa a tutta l'app.
 
+- **Materiale**: ogni superficie/card usa `lib/widgets/liquid_glass_surface.dart`
+  (`LiquidGlassSurface`) — mai `Container`/`DecoratedBox` con colore pieno per una
+  card. Combina `BackdropFilter` (blur del contenuto sottostante), un riempimento
+  quasi neutro (`glassFill`), un bordo con gradiente di luce catturata
+  (`glassHighlight`/`glassShadowEdge`) e un'ombra a rilievo (`PhysicalShape`). I CTA
+  usano `lib/widgets/liquid_glass_button.dart` (`LiquidGlassButton`), che compone
+  `LiquidGlassSurface` con `lib/widgets/spring_button.dart` per la pressione a
+  molla. **Nota implementativa**: `LiquidGlassSurface` applica un `ClipPath`
+  esplicito attorno al `BackdropFilter` (oltre al clip di `PhysicalShape`) — su
+  device reale con Impeller, un `BackdropFilter` senza un clip layer diretto come
+  antenato può sbiancare il resto dello schermo. Non rimuovere quel `ClipPath` se
+  si tocca il widget.
 - **Colori**: colori semantici Apple — vedi `lib/theme/app_colors.dart`. systemRed
-  riservato ad alert e variazioni sfavorevoli. Light e dark mode entrambi previsti
-  fin da subito tramite `CupertinoDynamicColor`.
-- **Forme**: corner radius leggero, 8–12px (vedi `lib/theme/app_spacing.dart` →
-  `AppRadius`). Mai pill/capsule stondate al massimo.
+  riservato ad alert e variazioni sfavorevoli. La palette del vetro (`glassFill`,
+  `glassHighlight`, `glassShadowEdge`) resta volutamente sobria/neutra: il colore è
+  riservato ad accenti puntuali (badge di stato, CTA primaria via il parametro
+  `tint` di `LiquidGlassSurface`/`LiquidGlassButton`), mai come riempimento pieno
+  della superficie. Light e dark mode entrambi previsti fin da subito tramite
+  `CupertinoDynamicColor`.
+- **Forme**: corner radius "squircle" continui (superellisse, non il doppio arco di
+  `BorderRadius.circular`) via `lib/widgets/squircle_clipper.dart`, applicati da
+  `LiquidGlassSurface`/`LiquidGlassButton`. Raggi in `lib/theme/app_spacing.dart` →
+  `AppRadius.glass` (28, hero card/contenitori principali) e `AppRadius.glassSmall`
+  (18, righe elenco/chip/CTA compatte). I raggi piccoli precedenti
+  (`small`/`medium`/`large`/`card`) restano solo per dettagli minuti che non sono
+  superfici di vetro (badge, barre di grafici). Mai pill/capsule stondate al
+  massimo.
 - **Tipografia**: system font (SF Pro su iOS via Cupertino di default). Gerarchia
   in `lib/theme/app_text_styles.dart`.
 - **Icone**: sempre `CupertinoIcons` (SF Symbols-style). Mai emoji nei componenti

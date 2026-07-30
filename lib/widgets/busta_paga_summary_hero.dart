@@ -4,10 +4,14 @@ import '../models/busta_paga.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
-import 'material_surface.dart';
+import 'liquid_glass_surface.dart';
+import 'spring_button.dart';
 
 /// Card in evidenza per l'ultima busta paga in archivio: periodo formattato
 /// e netto ben visibile. Tap-only, apre il dettaglio.
+///
+/// Usa `LiquidGlassSurface`, vedi `liquid_glass_surface.dart` per i dettagli
+/// del materiale approssimato.
 class BustaPagaSummaryHero extends StatelessWidget {
   final BustaPaga bustaPaga;
   final VoidCallback onTap;
@@ -32,10 +36,10 @@ class BustaPagaSummaryHero extends StatelessWidget {
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
     final accent = CupertinoDynamicColor.resolve(AppColors.bustePaga, context);
 
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: MaterialSurface(
+    return SpringButton(
+      onPressed: onTap,
+      child: LiquidGlassSurface(
+        radius: AppRadius.glass,
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(

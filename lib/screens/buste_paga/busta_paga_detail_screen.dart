@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../models/busta_paga.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
+import '../../widgets/glass_form_section.dart';
 import 'busta_paga_form_screen.dart';
 
 /// Vista di sola lettura di tutti i campi di una busta paga, con lo stesso
@@ -47,10 +48,15 @@ class BustaPagaDetailScreen extends StatelessWidget {
       ),
       child: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.screenHorizontal,
+            AppSpacing.sm,
+            AppSpacing.screenHorizontal,
+            AppSpacing.xl,
+          ),
           children: [
-            CupertinoFormSection.insetGrouped(
-              header: const Text('Periodo'),
+            GlassFormSection(
+              header: 'Periodo',
               children: [
                 _readOnlyRow('Mese', _periodoLabel),
                 _readOnlyRow(
@@ -62,12 +68,12 @@ class BustaPagaDetailScreen extends StatelessWidget {
               ],
             ),
             if (bustaPaga.fileOrigine != null)
-              CupertinoFormSection.insetGrouped(
-                header: const Text('Documento'),
+              GlassFormSection(
+                header: 'Documento',
                 children: [_documentoRow(context, bustaPaga.fileOrigine!)],
               ),
-            CupertinoFormSection.insetGrouped(
-              header: const Text('Importi'),
+            GlassFormSection(
+              header: 'Importi',
               children: [
                 _readOnlyRow('Lordo', '€ ${_formatNumber(bustaPaga.lordo)}'),
                 _readOnlyRow('Netto', '€ ${_formatNumber(bustaPaga.netto)}'),
@@ -75,24 +81,24 @@ class BustaPagaDetailScreen extends StatelessWidget {
                     '€ ${_formatNumber(bustaPaga.straordinari)}'),
               ],
             ),
-            CupertinoFormSection.insetGrouped(
-              header: const Text('Ferie'),
+            GlassFormSection(
+              header: 'Ferie',
               children: [
                 _readOnlyRow('Maturate', _formatNumber(bustaPaga.ferieMaturate)),
                 _readOnlyRow('Godute', _formatNumber(bustaPaga.ferieGodute)),
                 _readOnlyRow('Residue', _formatNumber(bustaPaga.ferieResidue)),
               ],
             ),
-            CupertinoFormSection.insetGrouped(
-              header: const Text('ROL'),
+            GlassFormSection(
+              header: 'ROL',
               children: [
                 _readOnlyRow('Maturati', _formatNumber(bustaPaga.rolMaturati)),
                 _readOnlyRow('Goduti', _formatNumber(bustaPaga.rolGoduti)),
                 _readOnlyRow('Residui', _formatNumber(bustaPaga.rolResidui)),
               ],
             ),
-            CupertinoFormSection.insetGrouped(
-              header: const Text('Permessi e ore'),
+            GlassFormSection(
+              header: 'Permessi e ore',
               children: [
                 _readOnlyRow(
                     'Permessi goduti', _formatNumber(bustaPaga.permessiGoduti)),
@@ -100,8 +106,8 @@ class BustaPagaDetailScreen extends StatelessWidget {
                     'Ore lavorate', _formatNumber(bustaPaga.oreLavorate)),
               ],
             ),
-            CupertinoFormSection.insetGrouped(
-              header: const Text('Trattenute'),
+            GlassFormSection(
+              header: 'Trattenute',
               children: bustaPaga.trattenute.isEmpty
                   ? [_readOnlyRow('Nessuna trattenuta', '—')]
                   : bustaPaga.trattenute.entries

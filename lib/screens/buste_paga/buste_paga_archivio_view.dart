@@ -8,6 +8,8 @@ import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../widgets/busta_paga_list_item.dart';
 import '../../widgets/busta_paga_summary_hero.dart';
+import '../../widgets/liquid_glass_button.dart';
+import '../../widgets/liquid_glass_surface.dart';
 
 /// Contenuto della tab "Archivio" della sezione Buste Paga: card in
 /// evidenza sull'ultima busta paga + elenco completo ordinato per periodo
@@ -107,45 +109,52 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
+    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    return LiquidGlassSurface(
+      radius: AppRadius.glass,
       padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: CupertinoDynamicColor.resolve(AppColors.surface, context),
-        borderRadius: BorderRadius.circular(AppRadius.card),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            CupertinoIcons.doc_text_search,
-            size: 32,
-            color: CupertinoDynamicColor.resolve(AppColors.labelSecondary, context),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Nessuna busta paga in archivio',
-            style: AppTextStyles.subtitle.copyWith(
-              fontWeight: FontWeight.w600,
-              color: CupertinoDynamicColor.resolve(
-                  AppColors.labelPrimary, context),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Aggiungi la tua prima busta paga per iniziare l\'archivio.',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.cardLabel.copyWith(
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          children: [
+            Icon(
+              CupertinoIcons.doc_text_search,
+              size: 32,
               color: CupertinoDynamicColor.resolve(
                   AppColors.labelSecondary, context),
             ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          CupertinoButton.filled(
-            borderRadius: BorderRadius.circular(AppRadius.medium),
-            onPressed: onAdd,
-            child: const Text('Aggiungi busta paga'),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Nessuna busta paga in archivio',
+              style: AppTextStyles.subtitle.copyWith(
+                fontWeight: FontWeight.w600,
+                color: CupertinoDynamicColor.resolve(
+                    AppColors.labelPrimary, context),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Aggiungi la tua prima busta paga per iniziare l\'archivio.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.cardLabel.copyWith(
+                color: CupertinoDynamicColor.resolve(
+                    AppColors.labelSecondary, context),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            LiquidGlassButton(
+              onPressed: onAdd,
+              tint: accent,
+              child: Text(
+                'Aggiungi busta paga',
+                style: AppTextStyles.subtitle.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: accent,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

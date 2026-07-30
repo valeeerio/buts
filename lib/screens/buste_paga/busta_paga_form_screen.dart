@@ -8,7 +8,8 @@ import '../../services/pdf_import_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
-import '../../widgets/spring_button.dart';
+import '../../widgets/glass_form_section.dart';
+import '../../widgets/liquid_glass_button.dart';
 
 /// Form di inserimento/modifica manuale di una busta paga. Se [existing] è
 /// presente, precompila i campi e salva con `update`; altrimenti crea un
@@ -289,8 +290,14 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
           CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
       navigationBar: CupertinoNavigationBar(
         middle: Text(_isEditing ? 'Modifica busta paga' : 'Nuova busta paga'),
-        trailing: SpringButton(
+        trailing: LiquidGlassButton(
           onPressed: _save,
+          radius: AppRadius.glassSmall,
+          tint: CupertinoTheme.of(context).primaryColor,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
           child: Text(
             'Salva',
             style: TextStyle(
@@ -304,10 +311,15 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
         child: Form(
           key: _formKey,
           child: ListView(
-            padding: const EdgeInsets.only(bottom: AppSpacing.xl),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screenHorizontal,
+              AppSpacing.sm,
+              AppSpacing.screenHorizontal,
+              AppSpacing.xl,
+            ),
             children: [
-              CupertinoFormSection.insetGrouped(
-                header: const Text('Periodo'),
+              GlassFormSection(
+                header: 'Periodo',
                 children: [
                   CupertinoFormRow(
                     prefix: const Text('Mese'),
@@ -327,14 +339,14 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                   ),
                 ],
               ),
-              CupertinoFormSection.insetGrouped(
-                header: const Text('Documento'),
-                footer: const Text(
-                    'Solo PDF con testo selezionabile (no scansioni/foto) in questa versione.'),
+              GlassFormSection(
+                header: 'Documento',
+                footer:
+                    'Solo PDF con testo selezionabile (no scansioni/foto) in questa versione.',
                 children: [_documentoRow(accent, labelSecondary)],
               ),
-              CupertinoFormSection.insetGrouped(
-                header: const Text('Importi'),
+              GlassFormSection(
+                header: 'Importi',
                 children: [
                   _numberField(
                     label: 'Lordo',
@@ -351,8 +363,8 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                   ),
                 ],
               ),
-              CupertinoFormSection.insetGrouped(
-                header: const Text('Ferie'),
+              GlassFormSection(
+                header: 'Ferie',
                 children: [
                   _numberField(
                       label: 'Maturate', controller: _ferieMaturateController),
@@ -362,8 +374,8 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                       label: 'Residue', controller: _ferieResidueController),
                 ],
               ),
-              CupertinoFormSection.insetGrouped(
-                header: const Text('ROL'),
+              GlassFormSection(
+                header: 'ROL',
                 children: [
                   _numberField(
                       label: 'Maturati', controller: _rolMaturatiController),
@@ -373,8 +385,8 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                       label: 'Residui', controller: _rolResiduiController),
                 ],
               ),
-              CupertinoFormSection.insetGrouped(
-                header: const Text('Permessi e ore'),
+              GlassFormSection(
+                header: 'Permessi e ore',
                 children: [
                   _numberField(
                       label: 'Permessi goduti',
@@ -383,10 +395,10 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                       label: 'Ore lavorate', controller: _oreLavorateController),
                 ],
               ),
-              CupertinoFormSection.insetGrouped(
-                header: const Text('Trattenute'),
-                footer: const Text(
-                    'Aggiungi le voci di trattenuta indicate in busta paga (es. INPS, IRPEF).'),
+              GlassFormSection(
+                header: 'Trattenute',
+                footer:
+                    'Aggiungi le voci di trattenuta indicate in busta paga (es. INPS, IRPEF).',
                 children: [
                   for (var i = 0; i < _trattenute.length; i++)
                     _trattenutaRow(i),

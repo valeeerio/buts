@@ -4,7 +4,8 @@ import '../../models/busta_paga.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
-import '../../widgets/spring_button.dart';
+import '../../widgets/liquid_glass_button.dart';
+import '../../widgets/liquid_glass_surface.dart';
 import 'busta_paga_detail_screen.dart';
 import 'busta_paga_form_screen.dart';
 import 'buste_paga_archivio_view.dart';
@@ -70,11 +71,13 @@ class _BustePagaSectionScreenState
                       ),
                     ),
                   ),
-                  SpringButton(
+                  LiquidGlassButton(
                     onPressed: () => _openForm(context),
+                    radius: AppRadius.glassSmall,
+                    padding: const EdgeInsets.all(AppSpacing.xs),
                     child: Icon(
                       CupertinoIcons.add_circled_solid,
-                      size: 30,
+                      size: 26,
                       color: CupertinoDynamicColor.resolve(
                           AppColors.bustePaga, context),
                     ),
@@ -86,26 +89,34 @@ class _BustePagaSectionScreenState
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.screenHorizontal,
               ),
-              child: CupertinoSlidingSegmentedControl<_BustePagaTab>(
-                groupValue: _tab,
-                backgroundColor: CupertinoDynamicColor.resolve(
-                    AppColors.backgroundPrimary, context),
-                thumbColor: CupertinoDynamicColor.resolve(
-                    AppColors.surface, context),
-                children: {
-                  _BustePagaTab.archivio: _SegmentLabel(
-                    label: 'Archivio',
-                    selected: _tab == _BustePagaTab.archivio,
+              child: LiquidGlassSurface(
+                radius: AppRadius.glassSmall,
+                blurSigma: 22,
+                elevation: 4,
+                padding: const EdgeInsets.all(4),
+                child: CupertinoSlidingSegmentedControl<_BustePagaTab>(
+                  groupValue: _tab,
+                  backgroundColor: const CupertinoDynamicColor.withBrightness(
+                    color: Color(0x00000000),
+                    darkColor: Color(0x00000000),
                   ),
-                  _BustePagaTab.statistiche: _SegmentLabel(
-                    label: 'Statistiche',
-                    selected: _tab == _BustePagaTab.statistiche,
-                  ),
-                },
-                onValueChanged: (value) {
-                  if (value == null) return;
-                  setState(() => _tab = value);
-                },
+                  thumbColor: CupertinoDynamicColor.resolve(
+                      AppColors.surface, context),
+                  children: {
+                    _BustePagaTab.archivio: _SegmentLabel(
+                      label: 'Archivio',
+                      selected: _tab == _BustePagaTab.archivio,
+                    ),
+                    _BustePagaTab.statistiche: _SegmentLabel(
+                      label: 'Statistiche',
+                      selected: _tab == _BustePagaTab.statistiche,
+                    ),
+                  },
+                  onValueChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _tab = value);
+                  },
+                ),
               ),
             ),
             const SizedBox(height: AppSpacing.sm),

@@ -4,9 +4,14 @@ import '../models/busta_paga.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
+import 'liquid_glass_surface.dart';
+import 'spring_button.dart';
 
 /// Riga compatta per l'archivio buste paga: periodo, netto in evidenza,
 /// badge di stato verifica e chevron.
+///
+/// Superficie in vetro (`LiquidGlassSurface`), con la stessa curva continua
+/// della hero card ma più contenuta (`AppRadius.glassSmall`).
 class BustaPagaListItem extends StatelessWidget {
   final BustaPaga bustaPaga;
   final VoidCallback onTap;
@@ -36,17 +41,15 @@ class BustaPagaListItem extends StatelessWidget {
     final labelSecondary =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
 
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
+    return SpringButton(
+      onPressed: onTap,
+      child: LiquidGlassSurface(
+        radius: AppRadius.glassSmall,
+        blurSigma: 22,
+        elevation: 4,
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
           vertical: AppSpacing.sm + 4,
-        ),
-        decoration: BoxDecoration(
-          color: CupertinoDynamicColor.resolve(AppColors.surface, context),
-          borderRadius: BorderRadius.circular(AppRadius.medium),
         ),
         child: Row(
           children: [

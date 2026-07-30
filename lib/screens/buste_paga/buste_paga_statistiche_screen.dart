@@ -8,6 +8,7 @@ import '../../providers/buste_paga_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
+import '../../widgets/liquid_glass_surface.dart';
 
 /// Contenuto della tab "Statistiche" della sezione Buste Paga: andamento
 /// netto/lordo, ferie/ROL/permessi residui e ore di straordinario nel tempo.
@@ -114,40 +115,39 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
 class _EmptyStatistiche extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
+    return LiquidGlassSurface(
+      radius: AppRadius.glass,
       padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: CupertinoDynamicColor.resolve(AppColors.surface, context),
-        borderRadius: BorderRadius.circular(AppRadius.card),
-      ),
-      child: Column(
-        children: [
-          Icon(
-            CupertinoIcons.chart_bar_alt_fill,
-            size: 32,
-            color: CupertinoDynamicColor.resolve(
-                AppColors.labelSecondary, context),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Dati insufficienti',
-            style: AppTextStyles.subtitle.copyWith(
-              fontWeight: FontWeight.w600,
-              color: CupertinoDynamicColor.resolve(
-                  AppColors.labelPrimary, context),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Servono almeno 2 buste paga per vedere l\'andamento nel tempo.',
-            textAlign: TextAlign.center,
-            style: AppTextStyles.cardLabel.copyWith(
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          children: [
+            Icon(
+              CupertinoIcons.chart_bar_alt_fill,
+              size: 32,
               color: CupertinoDynamicColor.resolve(
                   AppColors.labelSecondary, context),
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Dati insufficienti',
+              style: AppTextStyles.subtitle.copyWith(
+                fontWeight: FontWeight.w600,
+                color: CupertinoDynamicColor.resolve(
+                    AppColors.labelPrimary, context),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Servono almeno 2 buste paga per vedere l\'andamento nel tempo.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.cardLabel.copyWith(
+                color: CupertinoDynamicColor.resolve(
+                    AppColors.labelSecondary, context),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -173,36 +173,35 @@ class _ChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
+    return LiquidGlassSurface(
+      radius: AppRadius.glass,
       padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: CupertinoDynamicColor.resolve(AppColors.surface, context),
-        borderRadius: BorderRadius.circular(AppRadius.card),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: AppTextStyles.subtitle.copyWith(
-              fontWeight: FontWeight.w600,
-              color: CupertinoDynamicColor.resolve(
-                  AppColors.labelPrimary, context),
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: AppTextStyles.subtitle.copyWith(
+                fontWeight: FontWeight.w600,
+                color: CupertinoDynamicColor.resolve(
+                    AppColors.labelPrimary, context),
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Wrap(
-            spacing: AppSpacing.md,
-            runSpacing: AppSpacing.xs,
-            children: [
-              for (final entry in legend)
-                _LegendChip(entry: entry),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          SizedBox(height: 180, child: chart),
-        ],
+            const SizedBox(height: AppSpacing.xs),
+            Wrap(
+              spacing: AppSpacing.md,
+              runSpacing: AppSpacing.xs,
+              children: [
+                for (final entry in legend)
+                  _LegendChip(entry: entry),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(height: 180, child: chart),
+          ],
+        ),
       ),
     );
   }
