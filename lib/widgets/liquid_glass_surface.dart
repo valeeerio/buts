@@ -95,41 +95,26 @@ class LiquidGlassSurface extends StatelessWidget {
           children: [
             BackdropFilter(
               filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final aspect = constraints.hasBoundedWidth &&
-                          constraints.hasBoundedHeight &&
-                          constraints.maxHeight > 0
-                      ? constraints.maxWidth / constraints.maxHeight
-                      : 1.0;
-                  // L'angolo percepito del riflesso deve restare
-                  // ~diagonale indipendentemente da quanto la superficie
-                  // sia larga/bassa o stretta/alta: si comprime la
-                  // componente dominante dell'Alignment invece di
-                  // lasciarla stirare fino a diventare orizzontale o
-                  // verticale.
-                  final begin = aspect >= 1
-                      ? Alignment(-1 / aspect.clamp(1.0, 6.0), -1.0)
-                      : Alignment(-1.0, -(1 / aspect).clamp(1.0, 6.0));
-                  final end = Alignment(-begin.x, -begin.y);
-                  return Container(
-                    padding: padding,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: begin,
-                        end: end,
-                        colors: [
-                          baseFill,
-                          baseFill.withValues(
-                            alpha: (baseFill.a - (isDark ? 0.05 : 0.08))
-                                .clamp(0.0, 1.0),
-                          ),
-                        ],
-                      ),
-                    ),
-                    child: child,
-                  );
-                },
+              // Il riempimento a gradiente è dipinto via `CustomPaint`
+              // invece che con un `LayoutBuilder`+`BoxDecoration.gradient`
+              // calcolati sull'aspect ratio delle *constraints* in ingresso:
+              // dentro una `ListView`/`Row` (es. le mini-card affiancate del
+              // dettaglio busta paga) l'altezza in arrivo è spesso illimitata
+              // (`hasBoundedHeight == false`), quindi l'aspect ratio
+              // ricadeva sempre sul fallback 1.0 (quadrato) — il gradiente
+              // tornava così ad essere l'esatta diagonale angolo-angolo
+              // che si voleva evitare, quasi orizzontale su una card larga
+              // e bassa, visibile come una "cucitura" netta invece che una
+              // sfumatura morbida. `CustomPaint.paint(canvas, size)` riceve
+              // sempre la size finale reale (mai le constraints), quindi
+              // niente fallback: stessa tecnica ad angolo fisso già usata
+              // da `_SpecularBorderPainter` per il bordo.
+              child: CustomPaint(
+                painter: _GlassFillPainter(baseFill: baseFill, isDark: isDark),
+                child: Padding(
+                  padding: padding ?? EdgeInsets.zero,
+                  child: child,
+                ),
               ),
             ),
             Positioned.fill(
@@ -210,4 +195,46 @@ class _SpecularBorderPainter extends CustomPainter {
       oldDelegate.highlight != highlight ||
       oldDelegate.shadowEdge != shadowEdge ||
       oldDelegate.clipper.radius != clipper.radius;
+}
+
+/// Riempimento a gradiente della superficie: stesso angolo fisso di
+/// `_SpecularBorderPainter`, così luce e riempimento restano coerenti.
+/// Riceve la `size` reale in `paint()` (mai le constraints di layout, che
+/// possono essere illimitate dentro `ListView`/`Row`), quindi il gradiente
+/// resta sempre diagonale indipendentemente da dove viene usata la card.
+class _GlassFillPainter extends CustomPainter {
+  final Color baseFill;
+  final bool isDark;
+
+  _GlassFillPainter({required this.baseFill, required this.isDark});
+
+  static const double _lightAngleDeg = 35.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const rad = _lightAngleDeg * math.pi / 180;
+    final dir = Offset(math.cos(rad), math.sin(rad));
+    final center = Offset(size.width / 2, size.height / 2);
+    final halfDiag =
+        math.sqrt(size.width * size.width + size.height * size.height) / 2;
+    final begin = center - dir * halfDiag;
+    final end = center + dir * halfDiag;
+
+    final paint = Paint()
+      ..shader = ui.Gradient.linear(
+        begin,
+        end,
+        [
+          baseFill,
+          baseFill.withValues(
+            alpha: (baseFill.a - (isDark ? 0.05 : 0.08)).clamp(0.0, 1.0),
+          ),
+        ],
+      );
+    canvas.drawRect(Offset.zero & size, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _GlassFillPainter oldDelegate) =>
+      oldDelegate.baseFill != baseFill || oldDelegate.isDark != isDark;
 }

@@ -7,7 +7,7 @@ import '../../services/pdf_import_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
-import '../../widgets/liquid_glass_surface.dart';
+import '../../widgets/flat_chip_button.dart';
 import '../../widgets/spring_button.dart';
 import 'busta_paga_detail_screen.dart';
 import 'busta_paga_form_screen.dart';
@@ -222,15 +222,15 @@ class _BustePagaSectionScreenState
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    // Stop espliciti: il blu resta pieno più a lungo (fino al
-                    // 50% dell'altezza) prima di iniziare a sfumare in
-                    // trasparenza, per un colore più marcato/presente.
-                    stops: const [0.0, 0.5, 1.0],
+                    // Dissolvenza continua su tutta l'altezza della fascia
+                    // (niente più plateau di blu pieno): passaggio più
+                    // lungo e leggero verso il contenuto sotto, in linea
+                    // col trattamento "wash" leggero già usato dai chip
+                    // pieni della sidecar (`FlatChipButton`).
                     colors: [
                       CupertinoDynamicColor.resolve(
-                          AppColors.systemBlue, context),
-                      CupertinoDynamicColor.resolve(
-                          AppColors.systemBlue, context),
+                              AppColors.systemBlue, context)
+                          .withValues(alpha: 0.55),
                       CupertinoDynamicColor.resolve(
                               AppColors.systemBlue, context)
                           .withValues(alpha: 0),
@@ -369,65 +369,37 @@ class _BustePagaSidecar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Stesso colore della fascia di benvenuto in alto, usato per il "+" e
-    // per l'effetto "illuminato" del segmento attivo.
+    // per il tab attivo.
     final plusAccent = CupertinoDynamicColor.resolve(
         AppColors.systemBlue, context);
+    final labelSecondary =
+        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
 
+    // Chip piatti senza superficie di vetro dietro (stessa resa di
+    // "Conferma"/"Modifica" nel dettaglio busta paga, vedi
+    // `FlatChipButton`): solo il tab attivo ha il riempimento colorato, il
+    // tab non attivo resta icona+testo grigi senza sfondo.
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
-          child: LiquidGlassSurface(
-            radius: AppRadius.glass,
-            blurSigma: 26,
-            elevation: 10,
-            padding: const EdgeInsets.all(AppSpacing.xs),
-            child: Stack(
-              children: [
-                AnimatedAlign(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOutCubic,
-                  alignment: tab == _BustePagaTab.archivio
-                      ? Alignment.centerLeft
-                      : Alignment.centerRight,
-                  child: FractionallySizedBox(
-                    widthFactor: 0.5,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.xs / 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: plusAccent.withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(
-                          AppRadius.glassSmall,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _SegmentButton(
-                        icon: CupertinoIcons.archivebox,
-                        label: 'Archivio',
-                        selected: tab == _BustePagaTab.archivio,
-                        onTap: () => onTabChanged(_BustePagaTab.archivio),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: _SegmentButton(
-                        icon: CupertinoIcons.chart_bar_alt_fill,
-                        label: 'Statistiche',
-                        selected: tab == _BustePagaTab.statistiche,
-                        onTap: () => onTabChanged(_BustePagaTab.statistiche),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+          child: FlatChipButton(
+            icon: CupertinoIcons.archivebox,
+            label: 'Archivio',
+            color: tab == _BustePagaTab.archivio ? plusAccent : labelSecondary,
+            filled: tab == _BustePagaTab.archivio,
+            onPressed: () => onTabChanged(_BustePagaTab.archivio),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: FlatChipButton(
+            icon: CupertinoIcons.chart_bar_alt_fill,
+            label: 'Statistiche',
+            color:
+                tab == _BustePagaTab.statistiche ? plusAccent : labelSecondary,
+            filled: tab == _BustePagaTab.statistiche,
+            onPressed: () => onTabChanged(_BustePagaTab.statistiche),
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
@@ -451,59 +423,6 @@ class _BustePagaSidecar extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _SegmentButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _SegmentButton({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
-    final labelSecondary =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
-    final color = selected ? accent : labelSecondary;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: Icon(icon, key: ValueKey(color), size: 20, color: color),
-            ),
-            const SizedBox(height: 2),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-              style: (selected
-                      ? AppTextStyles.tabLabelActive
-                      : AppTextStyles.tabLabel)
-                  .copyWith(color: color),
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

@@ -9,7 +9,19 @@ Legenda skill: skill di Claude Code da invocare per quel task (vedi
 
 ## Buste Paga
 
-- [ ] **Redesign pagina dettaglio busta paga**
+- [ ] **Uniformare stile etichetta "colonna" tra hero Archivio e dettaglio**:
+      le intestazioni Ferie/ROL/Ore nell'hero (`lib/widgets/
+      busta_paga_summary_hero.dart:66-88`) usano `AppTextStyles.subtitle`
+      (15px, w700), mentre "Maturato/Goduto/Residuo" nel dettaglio busta
+      paga (`_tableHeaderRow` in `busta_paga_detail_screen.dart`) usano
+      `AppTextStyles.cardLabel` (12px, w700) — stesso ruolo semantico
+      (etichetta di colonna sopra un valore), basi tipografiche diverse.
+      Emerso da audit di coerenza whole-project del 2026-07-31.
+- [ ] **Sostituire i `TextStyle(...)` scritti a mano in
+      `busta_paga_form_screen.dart`** (righe 305-309, 335, 440) con token
+      `AppTextStyles.*.copyWith(...)`, pattern usato ovunque nel resto del
+      codebase — unico file dove compaiono stili non derivati dal catalogo.
+      Emerso da audit di coerenza whole-project del 2026-07-31.
 
 ## Budget
 
@@ -17,6 +29,39 @@ Legenda skill: skill di Claude Code da invocare per quel task (vedi
 
 ## Fatto
 
+- [x] **Redesign pagina dettaglio busta paga** (2026-07-31, branch
+      `dettagli-buste-paga`): hero con badge di stato (verde/rosso, stessa
+      semantica del pallino in Archivio), riga di mini-statistiche
+      Ferie/ROL/Ore lavorate e riga Lordo/Straordinari unificate in
+      un'unica `LiquidGlassSurface` a scomparti (`_StatRow`, fix di un bug
+      di rendering con `BackdropFilter` multipli ravvicinati — vedi sotto),
+      tabella unica "Ferie, ROL e permessi" (Maturato/Goduto/Residuo) al
+      posto di 3 sezioni separate, chip documento PDF tappabile, sezioni
+      Trattenute senza più titoli ridondanti sopra la card. Aggiunta una
+      barra flottante in basso con "Conferma" (solo se stato "Da
+      confermare") e "Modifica" (spostata qui dalla nav bar in alto); la
+      schermata ora è `ConsumerWidget` e legge sempre lo stato corrente dal
+      provider, aggiornandosi subito dopo conferma o modifica.
+- [x] **Fix bug visivo `LiquidGlassSurface` con più superfici di vetro
+      affiancate** (2026-07-31): card ravvicinate (es. mini-statistiche in
+      riga) mostravano una "cucitura" netta per via di `BackdropFilter`
+      multipli a pochi pixel di distanza. Corretto a livello di
+      composizione — mai più superfici di vetro affiancate, ma un'unica
+      `LiquidGlassSurface` con scomparti interni piatti separati da un
+      divisore sottile (pattern già usato dalla sidecar, esteso a
+      `_StatRow` nel dettaglio). Contestualmente irrobustito anche il
+      riempimento a gradiente di `LiquidGlassSurface`: calcolato ora via
+      `CustomPaint` sulla `size` reale invece che sulle constraints di
+      layout (che possono essere illimitate dentro `ListView`/`Row`).
+- [x] **Nuovo componente condiviso `FlatChipButton`**
+      (`lib/widgets/flat_chip_button.dart`, 2026-07-31): chip piatto
+      icona+testo senza vetro, con stato `filled` per differenziare
+      selezionato/non selezionato. Uniforma lo stile dei bottoni
+      "Conferma"/"Modifica" nel dettaglio busta paga e dei tab
+      Archivio/Statistiche nella sidecar in basso (che prima usava una
+      `LiquidGlassSurface` con highlight animato che scorreva dietro il
+      tab attivo) — decisione esplicita dell'utente di estendere questo
+      stile a tutta la sotto-navigazione.
 - [x] **Redesign Archivio (pagina principale)** (2026-07-31): barra di
       ricerca per periodo (mese/anno) nel titolo, raggruppamento delle
       buste paga per anno con header sticky fluido (`flutter_sticky_header`,
