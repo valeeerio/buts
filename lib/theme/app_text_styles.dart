@@ -52,14 +52,4 @@ class AppTextStyles {
     fontWeight: FontWeight.w500,
     height: 1.3,
   );
-
-  static const tabLabel = TextStyle(
-    fontSize: 10,
-    fontWeight: FontWeight.w400,
-  );
-
-  static const tabLabelActive = TextStyle(
-    fontSize: 10,
-    fontWeight: FontWeight.w600,
-  );
 }

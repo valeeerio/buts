@@ -9,6 +9,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/busta_paga_formatting.dart';
+import '../../widgets/flat_chip_button.dart';
 import '../../widgets/glass_form_section.dart';
 import '../../widgets/liquid_glass_surface.dart';
 import '../../widgets/spring_button.dart';
@@ -470,67 +471,24 @@ class _ConfermaModificaBar extends StatelessWidget {
       children: [
         if (daConfermare) ...[
           Expanded(
-            child: _ActionChip(
+            child: FlatChipButton(
               icon: CupertinoIcons.checkmark_alt,
               label: 'Conferma',
               color: accent,
-              onTap: onConferma,
+              onPressed: onConferma,
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
         ],
         Expanded(
-          child: _ActionChip(
+          child: FlatChipButton(
             icon: CupertinoIcons.pencil,
             label: 'Modifica',
             color: accent,
-            onTap: onModifica,
+            onPressed: onModifica,
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Scomparto piatto (no vetro annidato) della barra di azione: stessa
-/// tecnica del "+" e dell'highlight del tab attivo nella sidecar
-/// (`buste_paga_section_screen.dart`), un `Container` a colore pieno con
-/// bassa opacità dentro l'unica `LiquidGlassSurface` del contenitore.
-class _ActionChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _ActionChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SpringButton(
-      onPressed: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.16),
-          borderRadius: BorderRadius.circular(AppRadius.glassSmall),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 18, color: color),
-            const SizedBox(width: AppSpacing.xs),
-            Text(
-              label,
-              style: AppTextStyles.cardAmount.copyWith(color: color),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
