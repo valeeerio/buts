@@ -15,15 +15,20 @@ import '../../widgets/liquid_glass_surface.dart';
 import '../../widgets/spring_button.dart';
 import '../../widgets/swipe_delete_background.dart';
 
-/// Altezza approssimativa riservata alla barra flottante "Conferma/Modifica"
-/// (o "Salva/Annulla" in modifica) in basso (barra + margini), da sottrarre
-/// al contenuto scrollabile sottostante perché non finisca nascosto dietro
-/// di essa — stessa logica di `_sidecarReservedHeight` in
-/// `buste_paga_section_screen.dart`. Deve restare maggiore di `fadeHeight`
-/// (la dissolvenza dello `ShaderMask` sopra la barra) più un margine, così
-/// l'ultimo elemento della lista resta sempre leggibile sopra la zona di
-/// dissolvenza.
-const double _actionBarReservedHeight = 150;
+/// Altezza riservata alla barra flottante "Conferma/Modifica" (o
+/// "Salva/Annulla" in modifica) in basso, usata come padding in fondo al
+/// contenuto scrollabile perché l'ultima card non finisca nascosta/tappabile
+/// dietro di essa. Nessun effetto di dissolvenza in questa schermata
+/// (abbandonato il 2026-07-31): la hero card resta fissa in alto fuori dalla
+/// lista e il resto scorre con scroll naturale — questo valore è quindi un
+/// margine di sicurezza puro, non un calcolo legato a uno shader. Più
+/// generoso di quanto basterebbe alla sola `_ActionBar` (che da sola misura
+/// meno) perché in modifica l'ultimo elemento scrollabile è spesso il footer
+/// testuale (due righe) della sezione Trattenute, più alto del contenuto
+/// tipico della vista di sola lettura: senza questo margine extra, quel
+/// footer restava visibilmente sovrapposto/nascosto dietro la barra invece
+/// di poterci scorrere sopra come qualunque altra card.
+const double _actionBarReservedHeight = 80;
 
 /// Riga di trattenuta in editing: chiave + importo come controller separati,
 /// stessa forma di `_TrattenutaRow` in `BustaPagaFormScreen`. `id` è una
@@ -391,118 +396,148 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       child: Stack(
         children: [
           SafeArea(
-            child: ShaderMask(
-              blendMode: BlendMode.dstIn,
-              shaderCallback: (rect) {
-                const fadeHeight = 200.0;
-                final stop = 1 - (fadeHeight / rect.height).clamp(0.0, 1.0);
-                return LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: const [
-                    CupertinoColors.white,
-                    CupertinoColors.white,
-                    CupertinoColors.transparent,
-                  ],
-                  stops: [0.0, stop, 1.0],
-                ).createShader(rect);
-              },
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.screenHorizontal,
-                  AppSpacing.sm,
-                  AppSpacing.screenHorizontal,
-                  AppSpacing.xl + _actionBarReservedHeight,
-                ),
-                children: [
-                  _HeroCard(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.screenHorizontal,
+                    AppSpacing.sm,
+                    AppSpacing.screenHorizontal,
+                    0,
+                  ),
+                  child: _HeroCard(
                     bustaPaga: corrente,
                     periodoLabel: periodoLabelVista,
                     isEditing: _isEditing,
                     nettoController: _isEditing ? _nettoCtrl : null,
                     onTapPeriodo: _isEditing ? _pickPeriodo : null,
                   ),
-                  const SizedBox(height: AppSpacing.lg),
-                  _StatRow(items: [
-                    (
-                      'Ferie residue',
-                      Text(
-                        _isEditing
-                            ? formatNumber(_parse(_ferieResidueCtrl))
-                            : formatNumber(corrente.ferieResidue),
-                        textAlign: TextAlign.center,
+                ),
+                Expanded(
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.only(bottom: _actionBarReservedHeight),
+                    child: ShaderMask(
+                      blendMode: BlendMode.dstIn,
+                      shaderCallback: (rect) {
+                        const fadeHeight = 32.0;
+                        final stop =
+                            1 - (fadeHeight / rect.height).clamp(0.0, 1.0);
+                        return LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: const [
+                            CupertinoColors.white,
+                            CupertinoColors.white,
+                            CupertinoColors.transparent,
+                          ],
+                          stops: [0.0, stop, 1.0],
+                        ).createShader(rect);
+                      },
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.screenHorizontal,
+                          AppSpacing.lg,
+                          AppSpacing.screenHorizontal,
+                          AppSpacing.xl,
+                        ),
+                        children: [
+                          _StatRow(items: [
+                            (
+                              'Ferie residue',
+                              Text(
+                                _isEditing
+                                    ? formatNumber(_parse(_ferieResidueCtrl))
+                                    : formatNumber(corrente.ferieResidue),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            (
+                              'ROL residui',
+                              Text(
+                                _isEditing
+                                    ? formatNumber(_parse(_rolResiduiCtrl))
+                                    : formatNumber(corrente.rolResidui),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            (
+                              'Ore lavorate',
+                              _isEditing
+                                  ? _inlineNumberField(_oreLavorateCtrl)
+                                  : Text(formatNumber(corrente.oreLavorate),
+                                      textAlign: TextAlign.center),
+                            ),
+                          ]),
+                          const SizedBox(height: AppSpacing.lg),
+                          if (corrente.fileOrigine != null) ...[
+                            _DocumentoChip(filePath: corrente.fileOrigine!),
+                            const SizedBox(height: AppSpacing.lg),
+                          ],
+                          _MaturazioniSection(
+                            bustaPaga: corrente,
+                            isEditing: _isEditing,
+                            ferieMaturateCtrl:
+                                _isEditing ? _ferieMaturateCtrl : null,
+                            ferieGoduteCtrl:
+                                _isEditing ? _ferieGoduteCtrl : null,
+                            ferieResidueCtrl:
+                                _isEditing ? _ferieResidueCtrl : null,
+                            rolMaturatiCtrl:
+                                _isEditing ? _rolMaturatiCtrl : null,
+                            rolGodutiCtrl: _isEditing ? _rolGodutiCtrl : null,
+                            rolResiduiCtrl: _isEditing ? _rolResiduiCtrl : null,
+                            permessiGodutiCtrl:
+                                _isEditing ? _permessiGodutiCtrl : null,
+                          ),
+                          _StatRow(items: [
+                            (
+                              'Lordo',
+                              _isEditing
+                                  ? _inlineNumberField(_lordoCtrl, prefix: '€ ')
+                                  : Text('€ ${formatNumber(corrente.lordo)}',
+                                      textAlign: TextAlign.center),
+                            ),
+                            (
+                              'Straordinari',
+                              _isEditing
+                                  ? _inlineNumberField(_straordinariCtrl,
+                                      prefix: '€ ')
+                                  : Text(
+                                      '€ ${formatNumber(corrente.straordinari)}',
+                                      textAlign: TextAlign.center),
+                            ),
+                          ]),
+                          const SizedBox(height: AppSpacing.lg),
+                          GlassFormSection(
+                            footer: _isEditing
+                                ? 'Aggiungi le voci di trattenuta indicate in busta '
+                                    'paga (es. INPS, IRPEF).'
+                                : null,
+                            children: _isEditing
+                                ? [
+                                    for (var i = 0;
+                                        i < _trattenuteEdit.length;
+                                        i++)
+                                      _trattenutaEditRow(i),
+                                    _aggiungiVoceButton(context),
+                                  ]
+                                : corrente.trattenute.isEmpty
+                                    ? [
+                                        _trattenutaRow(
+                                            'Nessuna trattenuta', '—')
+                                      ]
+                                    : corrente.trattenute.entries
+                                        .map((e) => _trattenutaRow(e.key,
+                                            '− € ${formatNumber(e.value)}'))
+                                        .toList(),
+                          ),
+                        ],
                       ),
                     ),
-                    (
-                      'ROL residui',
-                      Text(
-                        _isEditing
-                            ? formatNumber(_parse(_rolResiduiCtrl))
-                            : formatNumber(corrente.rolResidui),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    (
-                      'Ore lavorate',
-                      _isEditing
-                          ? _inlineNumberField(_oreLavorateCtrl)
-                          : Text(formatNumber(corrente.oreLavorate),
-                              textAlign: TextAlign.center),
-                    ),
-                  ]),
-                  const SizedBox(height: AppSpacing.lg),
-                  if (corrente.fileOrigine != null) ...[
-                    _DocumentoChip(filePath: corrente.fileOrigine!),
-                    const SizedBox(height: AppSpacing.lg),
-                  ],
-                  _MaturazioniSection(
-                    bustaPaga: corrente,
-                    isEditing: _isEditing,
-                    ferieMaturateCtrl: _isEditing ? _ferieMaturateCtrl : null,
-                    ferieGoduteCtrl: _isEditing ? _ferieGoduteCtrl : null,
-                    ferieResidueCtrl: _isEditing ? _ferieResidueCtrl : null,
-                    rolMaturatiCtrl: _isEditing ? _rolMaturatiCtrl : null,
-                    rolGodutiCtrl: _isEditing ? _rolGodutiCtrl : null,
-                    rolResiduiCtrl: _isEditing ? _rolResiduiCtrl : null,
-                    permessiGodutiCtrl: _isEditing ? _permessiGodutiCtrl : null,
                   ),
-                  _StatRow(items: [
-                    (
-                      'Lordo',
-                      _isEditing
-                          ? _inlineNumberField(_lordoCtrl, prefix: '€ ')
-                          : Text('€ ${formatNumber(corrente.lordo)}',
-                              textAlign: TextAlign.center),
-                    ),
-                    (
-                      'Straordinari',
-                      _isEditing
-                          ? _inlineNumberField(_straordinariCtrl, prefix: '€ ')
-                          : Text('€ ${formatNumber(corrente.straordinari)}',
-                              textAlign: TextAlign.center),
-                    ),
-                  ]),
-                  const SizedBox(height: AppSpacing.lg),
-                  GlassFormSection(
-                    footer: _isEditing
-                        ? 'Aggiungi le voci di trattenuta indicate in busta '
-                            'paga (es. INPS, IRPEF).'
-                        : null,
-                    children: _isEditing
-                        ? [
-                            for (var i = 0; i < _trattenuteEdit.length; i++)
-                              _trattenutaEditRow(i),
-                            _aggiungiVoceButton(context),
-                          ]
-                        : corrente.trattenute.isEmpty
-                            ? [_trattenutaRow('Nessuna trattenuta', '—')]
-                            : corrente.trattenute.entries
-                                .map((e) => _trattenutaRow(
-                                    e.key, '− € ${formatNumber(e.value)}'))
-                                .toList(),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           Positioned(
@@ -640,17 +675,16 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                 ),
                 Expanded(
                   flex: 2,
-                  child: CupertinoTextField(
-                    controller: row.importo,
-                    placeholder: '0',
-                    textAlign: TextAlign.center,
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true, signed: false),
-                    decoration: const BoxDecoration(),
-                    padding: EdgeInsets.zero,
-                    style: AppTextStyles.cardAmount.copyWith(
-                      color: labelPrimary,
-                      fontWeight: FontWeight.w400,
+                  // Stesso prefisso "− € " e centratura della corrispondente
+                  // riga di sola lettura (`_trattenutaRow`): l'importo
+                  // digitato resta sempre positivo, il segno e il simbolo
+                  // sono un prefisso fisso, non editabile.
+                  child: Center(
+                    child: _inlineNumberField(
+                      row.importo,
+                      prefix: '− € ',
+                      style: AppTextStyles.cardAmount
+                          .copyWith(fontWeight: FontWeight.w400),
                     ),
                   ),
                 ),
@@ -665,11 +699,28 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
 
 /// Campo di testo numerico compatto, senza bordo/riempimento proprio (si
 /// appoggia sopra il vetro della card ospitante), stile allineato al valore
-/// che sostituisce. Riusato da hero, `_StatRow` e tabella Maturazioni.
+/// che sostituisce. Riusato da `_StatRow` e tabella Maturazioni.
+///
+/// Con `prefix` (es. "€ " in `_StatRow` Lordo/Straordinari, "− € " nelle
+/// trattenute), il blocco "prefisso + campo" si dimensiona sul proprio
+/// contenuto (`IntrinsicWidth`, non una larghezza fissa arbitraria): entrare
+/// in modifica non deve introdurre alcun gap visibile tra simbolo e numero
+/// rispetto alla vista di sola lettura (che è un unico `Text` con
+/// spaziatura naturale). `IntrinsicWidth` qui è sicuro: entrambi gli usi
+/// attuali (`_StatRow`, `_trattenutaEditRow`) vivono dentro un `Expanded`/
+/// `Center` a larghezza già vincolata, non dentro un `LayoutBuilder` a
+/// constraints illimitate (il bug storico documentato altrove nel file
+/// riguardava tutt'altro contesto). `rowAlignment` permette di riprodurre
+/// esattamente lo stesso allineamento della corrispondente vista di sola
+/// lettura — centrato, sia in `_StatRow` sia nella colonna valore di
+/// `_trattenutaRow` — l'unica differenza visibile tra vista e modifica deve
+/// restare "il testo è ora in un campo tappabile", non lo spostamento del
+/// blocco.
 Widget _inlineNumberField(
   TextEditingController controller, {
   TextStyle? style,
   String? prefix,
+  MainAxisAlignment rowAlignment = MainAxisAlignment.center,
 }) {
   return Builder(
     builder: (context) {
@@ -690,15 +741,17 @@ Widget _inlineNumberField(
         style: resolvedStyle,
       );
       if (prefix == null) return field;
-      // Stessa struttura del campo "Netto" nella hero (`_HeroCard`): `Row`
-      // di larghezza piena (nessun `mainAxisSize.min`, che in combinazione
-      // con un figlio flessibile forzava un layout instabile con "€" e
-      // numero su righe separate) con il campo in `Expanded` invece che
-      // `Flexible`, così restano sempre affiancati sulla stessa riga.
+      // `IntrinsicWidth` invece di una larghezza fissa: il campo si
+      // dimensiona sul testo digitato, come farebbe il `Text` di sola
+      // lettura che sostituisce. Con `mainAxisSize.min` il blocco
+      // "prefisso + campo" resta un'unica unità di larghezza nota, sicura
+      // da centrare o allineare a destra nella riga ospitante.
       return Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: rowAlignment,
         children: [
           Text(prefix, style: resolvedStyle),
-          Expanded(child: field),
+          IntrinsicWidth(child: field),
         ],
       );
     },
