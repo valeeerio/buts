@@ -127,10 +127,7 @@ sul pilota Archivio Buste Paga ed estesa a tutta l'app.
 
 ## Cosa manca (prossimi passi, in ordine di priorità suggerito)
 
-1. Redesign Archivio (pagina principale).
-2. Redesign pagina dettaglio busta paga.
-3. Separazione nella sidebar inferiore tra il "+" e le due sezioni
-   (Archivio/Statistiche) — vedi `BACKLOG.md`.
+1. Redesign pagina dettaglio busta paga.
 
 **Nota**: l'estrazione dati via AI locale on-device (`llama_cpp_dart`), valutata
 in una fase precedente, è stata **abbandonata (2026-07-30)** — vedi "Decisioni
