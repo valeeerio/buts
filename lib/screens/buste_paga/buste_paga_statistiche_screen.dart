@@ -2,13 +2,13 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../models/busta_paga.dart';
 import '../../providers/buste_paga_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
+import '../../utils/busta_paga_formatting.dart';
 import '../../widgets/liquid_glass_button.dart';
 import '../../widgets/liquid_glass_surface.dart';
 
@@ -20,7 +20,15 @@ import '../../widgets/liquid_glass_surface.dart';
 /// questi grafici non rappresentano aree) così la stessa grandezza è
 /// riconoscibile a colpo d'occhio tra i vari grafici della schermata.
 class BustePagaStatisticheScreen extends ConsumerWidget {
-  const BustePagaStatisticheScreen({super.key});
+  final ({DateTime start, DateTime end})? periodoFiltro;
+
+  const BustePagaStatisticheScreen({super.key, this.periodoFiltro});
+
+  // Dissolvenza in fondo allo scroll, stesso pattern di
+  // BustePagaArchivioView ma con fadeHeight tarato a parte: il viewport qui
+  // ha densità diversa (3 card ampie invece di righe fitte), vedi CLAUDE.md
+  // sulla nota "non assumere lo stesso valore assoluto tra schermate".
+  static const _fadeHeight = 90.0;
 
   static const _nettoColor = AppColors.systemGreen;
   static const _lordoColor = AppColors.systemBlue;
@@ -33,8 +41,31 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final buste = ref.watch(busteRepositoryProvider);
     final sorted = [...buste]..sort((a, b) => a.periodo.compareTo(b.periodo));
+    final filtro = periodoFiltro;
+    final filtrati = filtro == null
+        ? sorted
+        : sorted
+            .where((b) =>
+                !b.periodo.isBefore(filtro.start) &&
+                !b.periodo.isAfter(filtro.end))
+            .toList();
 
-    return CustomScrollView(
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (rect) {
+        final stop = 1 - (_fadeHeight / rect.height).clamp(0.0, 1.0);
+        return LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: const [
+            CupertinoColors.white,
+            CupertinoColors.white,
+            CupertinoColors.transparent,
+          ],
+          stops: [0.0, stop, 1.0],
+        ).createShader(rect);
+      },
+      child: CustomScrollView(
       slivers: [
         if (kDebugMode)
           SliverPadding(
@@ -69,7 +100,7 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
                 _LegendEntry(label: 'Netto', color: _nettoColor),
                 _LegendEntry(label: 'Lordo', color: _lordoColor),
               ],
-              chart: _NettoLordoChart(buste: sorted),
+              chart: _NettoLordoChart(buste: filtrati),
             ),
           ),
         ),
@@ -88,7 +119,7 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
                 _LegendEntry(label: 'ROL residui', color: _rolColor),
                 _LegendEntry(label: 'Permessi goduti', color: _permessiColor),
               ],
-              chart: _FerieRolPermessiChart(buste: sorted),
+              chart: _FerieRolPermessiChart(buste: filtrati),
             ),
           ),
         ),
@@ -106,11 +137,12 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
                 _LegendEntry(
                     label: 'Ore straordinario', color: _straordinarioColor),
               ],
-              chart: _StraordinarioChart(buste: sorted),
+              chart: _StraordinarioChart(buste: filtrati),
             ),
           ),
         ),
       ],
+      ),
     );
   }
 }
@@ -314,20 +346,49 @@ class _LegendChip extends StatelessWidget {
   }
 }
 
-/// Etichetta breve del periodo (es. "gen '24") usata sull'asse X di tutti
-/// i grafici della schermata, per coerenza.
-String _periodoAxisLabel(DateTime periodo) {
-  final month = DateFormat('MMM', 'it_IT').format(periodo);
-  final year = DateFormat('yy', 'it_IT').format(periodo);
-  return "$month '$year";
+/// Interval degli indici mostrati sull'asse X: non solo in base al conteggio
+/// di buste paga, ma anche alla larghezza reale disponibile per etichetta —
+/// altrimenti con poche buste (interval sempre 1) le etichette da 6-7
+/// caratteri si sovrappongono quando le barre/punti sono ravvicinati.
+double _bottomTitleInterval({required int count, required double availableWidth}) {
+  if (count <= 1) return 1;
+  const estimatedLabelWidth = 34.0; // "mmm 'yy" a fontSize 10, con margine
+  final maxLabelsThatFit =
+      (availableWidth / estimatedLabelWidth).floor().clamp(1, count);
+  return (count / maxLabelsThatFit).ceilToDouble();
 }
 
-/// Interval degli indici mostrati sull'asse X, per non affollare l'asse
-/// quando l'archivio ha molte buste paga.
-double _bottomTitleInterval(int count) {
-  if (count <= 6) return 1;
-  if (count <= 12) return 2;
-  return (count / 6).ceilToDouble();
+/// Asse X condiviso dai tre grafici della schermata (etichette periodo
+/// diradate in base allo spazio disponibile) — estratto per evitare che il
+/// fix della sovrapposizione venga applicato a un solo grafico per errore.
+AxisTitles _periodoBottomAxisTitles({
+  required List<BustaPaga> buste,
+  required double availableWidth,
+  required Color labelColor,
+}) {
+  final interval =
+      _bottomTitleInterval(count: buste.length, availableWidth: availableWidth);
+  return AxisTitles(
+    sideTitles: SideTitles(
+      showTitles: true,
+      reservedSize: 22,
+      interval: interval,
+      getTitlesWidget: (value, meta) {
+        final index = value.round();
+        if (index < 0 || index >= buste.length) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            periodoAxisLabel(buste[index].periodo),
+            style: AppTextStyles.cardLabel.copyWith(
+                color: labelColor, fontSize: 10),
+          ),
+        );
+      },
+    ),
+  );
 }
 
 class _NettoLordoChart extends StatelessWidget {
@@ -348,53 +409,40 @@ class _NettoLordoChart extends StatelessWidget {
     final labelColor =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
 
-    final interval = _bottomTitleInterval(buste.length);
-
-    return LineChart(
-      LineChartData(
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          horizontalInterval: null,
-          getDrawingHorizontalLine: (_) =>
-              FlLine(color: gridColor, strokeWidth: 0.5),
-        ),
-        borderData: FlBorderData(show: false),
-        titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 22,
-              interval: interval,
-              getTitlesWidget: (value, meta) {
-                final index = value.round();
-                if (index < 0 || index >= buste.length) {
-                  return const SizedBox.shrink();
-                }
-                return Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    _periodoAxisLabel(buste[index].periodo),
-                    style: AppTextStyles.cardLabel.copyWith(
-                        color: labelColor, fontSize: 10),
-                  ),
-                );
-              },
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return LineChart(
+          LineChartData(
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              horizontalInterval: null,
+              getDrawingHorizontalLine: (_) =>
+                  FlLine(color: gridColor, strokeWidth: 0.5),
             ),
+            borderData: FlBorderData(show: false),
+            titlesData: FlTitlesData(
+              topTitles:
+                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles:
+                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              leftTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              bottomTitles: _periodoBottomAxisTitles(
+                buste: buste,
+                availableWidth: constraints.maxWidth,
+                labelColor: labelColor,
+              ),
+            ),
+            lineTouchData: const LineTouchData(enabled: false),
+            lineBarsData: [
+              _line(buste.map((b) => b.netto).toList(), nettoColor),
+              _line(buste.map((b) => b.lordo).toList(), lordoColor),
+            ],
           ),
-        ),
-        lineTouchData: const LineTouchData(enabled: false),
-        lineBarsData: [
-          _line(buste.map((b) => b.netto).toList(), nettoColor),
-          _line(buste.map((b) => b.lordo).toList(), lordoColor),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -433,53 +481,41 @@ class _FerieRolPermessiChart extends StatelessWidget {
     final labelColor =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
 
-    final interval = _bottomTitleInterval(buste.length);
-
-    return LineChart(
-      LineChartData(
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          getDrawingHorizontalLine: (_) =>
-              FlLine(color: gridColor, strokeWidth: 0.5),
-        ),
-        borderData: FlBorderData(show: false),
-        titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 22,
-              interval: interval,
-              getTitlesWidget: (value, meta) {
-                final index = value.round();
-                if (index < 0 || index >= buste.length) {
-                  return const SizedBox.shrink();
-                }
-                return Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    _periodoAxisLabel(buste[index].periodo),
-                    style: AppTextStyles.cardLabel.copyWith(
-                        color: labelColor, fontSize: 10),
-                  ),
-                );
-              },
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return LineChart(
+          LineChartData(
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              getDrawingHorizontalLine: (_) =>
+                  FlLine(color: gridColor, strokeWidth: 0.5),
             ),
+            borderData: FlBorderData(show: false),
+            titlesData: FlTitlesData(
+              topTitles:
+                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles:
+                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              leftTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              bottomTitles: _periodoBottomAxisTitles(
+                buste: buste,
+                availableWidth: constraints.maxWidth,
+                labelColor: labelColor,
+              ),
+            ),
+            lineTouchData: const LineTouchData(enabled: false),
+            lineBarsData: [
+              _line(buste.map((b) => b.ferieResidue).toList(), ferieColor),
+              _line(buste.map((b) => b.rolResidui).toList(), rolColor),
+              _line(
+                  buste.map((b) => b.permessiGoduti).toList(), permessiColor),
+            ],
           ),
-        ),
-        lineTouchData: const LineTouchData(enabled: false),
-        lineBarsData: [
-          _line(buste.map((b) => b.ferieResidue).toList(), ferieColor),
-          _line(buste.map((b) => b.rolResidui).toList(), rolColor),
-          _line(buste.map((b) => b.permessiGoduti).toList(), permessiColor),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -514,66 +550,80 @@ class _StraordinarioChart extends StatelessWidget {
     final labelColor =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
 
-    final interval = _bottomTitleInterval(buste.length);
+    final tooltipBg =
+        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
+    final tooltipText =
+        CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context);
     final maxValue = buste
         .map((b) => b.straordinari)
         .fold<double>(0, (max, v) => v > max ? v : max);
+    final maxIndex = buste.indexWhere((b) => b.straordinari == maxValue);
 
-    return BarChart(
-      BarChartData(
-        maxY: maxValue <= 0 ? 1 : maxValue * 1.2,
-        gridData: FlGridData(
-          show: true,
-          drawVerticalLine: false,
-          getDrawingHorizontalLine: (_) =>
-              FlLine(color: gridColor, strokeWidth: 0.5),
-        ),
-        borderData: FlBorderData(show: false),
-        titlesData: FlTitlesData(
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 22,
-              interval: interval,
-              getTitlesWidget: (value, meta) {
-                final index = value.round();
-                if (index < 0 || index >= buste.length) {
-                  return const SizedBox.shrink();
-                }
-                return Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    _periodoAxisLabel(buste[index].periodo),
-                    style: AppTextStyles.cardLabel.copyWith(
-                        color: labelColor, fontSize: 10),
-                  ),
-                );
-              },
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return BarChart(
+          BarChartData(
+            maxY: maxValue <= 0 ? 1 : maxValue * 1.2,
+            groupsSpace: 20,
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              getDrawingHorizontalLine: (_) =>
+                  FlLine(color: gridColor, strokeWidth: 0.5),
             ),
-          ),
-        ),
-        barTouchData: BarTouchData(enabled: false),
-        barGroups: [
-          for (var i = 0; i < buste.length; i++)
-            BarChartGroupData(
-              x: i,
-              barRods: [
-                BarChartRodData(
-                  toY: buste[i].straordinari,
-                  color: barColor,
-                  width: 12,
-                  borderRadius: BorderRadius.circular(AppRadius.small / 2),
+            borderData: FlBorderData(show: false),
+            titlesData: FlTitlesData(
+              topTitles:
+                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles:
+                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              leftTitles: const AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              bottomTitles: _periodoBottomAxisTitles(
+                buste: buste,
+                availableWidth: constraints.maxWidth,
+                labelColor: labelColor,
+              ),
+            ),
+            barTouchData: BarTouchData(
+              enabled: true,
+              touchTooltipData: BarTouchTooltipData(
+                getTooltipColor: (_) => tooltipBg,
+                fitInsideHorizontally: true,
+                fitInsideVertically: true,
+                getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                  final busta = buste[group.x];
+                  return BarTooltipItem(
+                    '${periodoAxisLabel(busta.periodo)}\n'
+                    '${formatNumber(rod.toY)} h',
+                    AppTextStyles.cardLabel.copyWith(
+                      color: tooltipText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  );
+                },
+              ),
+            ),
+            barGroups: [
+              for (var i = 0; i < buste.length; i++)
+                BarChartGroupData(
+                  x: i,
+                  barRods: [
+                    BarChartRodData(
+                      toY: buste[i].straordinari,
+                      color: i == maxIndex
+                          ? barColor
+                          : barColor.withValues(alpha: 0.55),
+                      width: 16,
+                      borderRadius: BorderRadius.circular(AppRadius.small / 2),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-        ],
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

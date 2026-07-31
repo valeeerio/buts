@@ -2,11 +2,13 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../models/busta_paga.dart';
+import '../../providers/buste_paga_provider.dart';
 import '../../services/busta_paga_regex_parser.dart';
 import '../../services/pdf_import_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
+import '../../widgets/cupertino_range_slider.dart';
 import '../../widgets/flat_chip_button.dart';
 import '../../widgets/spring_button.dart';
 import 'busta_paga_detail_screen.dart';
@@ -51,6 +53,12 @@ class _BustePagaSectionScreenState
   bool _importingPdf = false;
   bool _searchActive = false;
   final _searchController = TextEditingController();
+
+  /// Periodo selezionato dallo slider di Statistiche (`null` = nessun
+  /// filtro, tutti i periodi disponibili). Vive qui, non in un provider
+  /// Riverpod: è stato di UI locale alla sessione, non dato di dominio,
+  /// stesso trattamento di `_tab`/`_searchActive`.
+  ({DateTime start, DateTime end})? _periodoFiltro;
 
   @override
   void dispose() {
@@ -201,6 +209,7 @@ class _BustePagaSectionScreenState
     final labelSecondary =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
     final now = DateTime.now();
+    final periodoRangeDisponibile = ref.watch(periodoRangeDisponibileProvider);
     final dataLabel = () {
       final formatted = DateFormat('EEEE d MMMM', 'it_IT').format(now);
       return formatted[0].toUpperCase() + formatted.substring(1);
@@ -270,6 +279,26 @@ class _BustePagaSectionScreenState
               Expanded(
                 child: Column(
                   children: [
+                    if (_tab == _BustePagaTab.statistiche &&
+                        periodoRangeDisponibile != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.screenHorizontal,
+                          AppSpacing.sm,
+                          AppSpacing.screenHorizontal,
+                          0,
+                        ),
+                        child: CupertinoRangeSlider(
+                          minDate: periodoRangeDisponibile.start,
+                          maxDate: periodoRangeDisponibile.end,
+                          startValue:
+                              _periodoFiltro?.start ?? periodoRangeDisponibile.start,
+                          endValue:
+                              _periodoFiltro?.end ?? periodoRangeDisponibile.end,
+                          onChanged: (range) =>
+                              setState(() => _periodoFiltro = range),
+                        ),
+                      ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(
                         AppSpacing.screenHorizontal,
@@ -318,8 +347,9 @@ class _BustePagaSectionScreenState
                               searchActive: _searchActive,
                               query: _searchController.text,
                             ),
-                          _BustePagaTab.statistiche =>
-                            const BustePagaStatisticheScreen(),
+                          _BustePagaTab.statistiche => BustePagaStatisticheScreen(
+                              periodoFiltro: _periodoFiltro,
+                            ),
                         },
                       ),
                     ),

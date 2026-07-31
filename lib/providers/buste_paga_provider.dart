@@ -153,3 +153,14 @@ final ultimaBustaPagaProvider = Provider<BustaPaga?>((ref) {
   final sorted = [...buste]..sort((a, b) => b.periodo.compareTo(a.periodo));
   return sorted.first;
 });
+
+/// Intervallo di periodi coperto dall'archivio (prima/ultima busta paga per
+/// data), usato come estremi min/max del selettore di periodo in
+/// Statistiche (`CupertinoRangeSlider`). `null` con archivio vuoto.
+final periodoRangeDisponibileProvider =
+    Provider<({DateTime start, DateTime end})?>((ref) {
+  final buste = ref.watch(busteRepositoryProvider);
+  if (buste.isEmpty) return null;
+  final periodi = buste.map((b) => b.periodo).toList()..sort();
+  return (start: periodi.first, end: periodi.last);
+});

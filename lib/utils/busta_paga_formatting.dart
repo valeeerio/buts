@@ -17,6 +17,15 @@ String meseLabel(BustaPaga bustaPaga) {
   return formatted[0].toUpperCase() + formatted.substring(1);
 }
 
+/// Etichetta breve di una data periodo (es. "gen '24"), usata sull'asse X
+/// dei grafici Statistiche e dal selettore di periodo (`CupertinoRangeSlider`)
+/// — condivisa perché entrambi devono restare coerenti nel formato.
+String periodoAxisLabel(DateTime periodo) {
+  final month = DateFormat('MMM', 'it_IT').format(periodo);
+  final year = DateFormat('yy', 'it_IT').format(periodo);
+  return "$month '$year";
+}
+
 /// Formatta un numero troncando a intero se il valore è intero, altrimenti
 /// mostra due cifre decimali — estratta da `_formatNumber` in
 /// `BustaPagaDetailScreen`, riusata anche da `BustaPagaSummaryHero`.
