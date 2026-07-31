@@ -222,15 +222,15 @@ class _BustePagaSectionScreenState
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    // Stop espliciti: il blu resta pieno più a lungo (fino al
-                    // 50% dell'altezza) prima di iniziare a sfumare in
-                    // trasparenza, per un colore più marcato/presente.
-                    stops: const [0.0, 0.5, 1.0],
+                    // Dissolvenza continua su tutta l'altezza della fascia
+                    // (niente più plateau di blu pieno): passaggio più
+                    // lungo e leggero verso il contenuto sotto, in linea
+                    // col trattamento "wash" leggero già usato dai chip
+                    // pieni della sidecar (`FlatChipButton`).
                     colors: [
                       CupertinoDynamicColor.resolve(
-                          AppColors.systemBlue, context),
-                      CupertinoDynamicColor.resolve(
-                          AppColors.systemBlue, context),
+                              AppColors.systemBlue, context)
+                          .withValues(alpha: 0.55),
                       CupertinoDynamicColor.resolve(
                               AppColors.systemBlue, context)
                           .withValues(alpha: 0),

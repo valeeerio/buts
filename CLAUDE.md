@@ -22,10 +22,12 @@ dell'app: barra di benvenuto in cima (saluto dinamico in base all'ora del giorno
 ferie/ROL/permessi residui, straordinario per mese — mostrati sempre, anche con 0
 o 1 busta paga: ogni grafico senza dati sufficienti mostra il messaggio "Non ci
 sono dati" al posto di bloccare l'intera pagina). La sotto-navigazione non è più
-un tab in alto ma una **sidecar flottante ancorata in basso** (`LiquidGlassSurface`,
-widget privato `_BustePagaSidecar`), che incorpora anche il bottone "+" come terzo
-elemento accanto ai due segmenti Archivio/Statistiche. Nessuna navigazione radice
-a più sezioni sopra di essa.
+un tab in alto ma una **sidecar flottante ancorata in basso**, widget privato
+`_BustePagaSidecar`: i due segmenti Archivio/Statistiche sono `FlatChipButton`
+(`lib/widgets/flat_chip_button.dart`, vedi sotto) — solo il segmento attivo ha il
+riempimento colorato, senza più una `LiquidGlassSurface` di sfondo con highlight
+animato — più il bottone "+" (cerchio blu pieno) come terzo elemento. Nessuna
+navigazione radice a più sezioni sopra di essa.
 
 **Solo import PDF, niente inserimento manuale**: il bottone "+" nella sidecar
 avvia direttamente `PdfImportService.pickAndImport()` (`lib/services/
@@ -45,24 +47,40 @@ esplicita "dati estratti automaticamente, verifica prima di salvare" finché
 del salvataggio. Estrazione automatica via AI locale on-device resta una fase
 futura (vedi sotto), oggi la precompilazione è solo tramite parser regex.
 
-**Dettaglio busta paga** (`busta_paga_detail_screen.dart`): hero card in cima
-(mese, badge di stato Confermato/Da confermare, netto in evidenza massima), sotto
-una riga di mini-card per ROL residui e ore lavorate, poi le sezioni dettagliate
-esistenti (Documento, Importi, Ferie, ROL, Permessi e ore, Trattenute) — "Netto"
-non è ripetuto nella sezione Importi per evitare il doppione con la hero.
+**Dettaglio busta paga** (`busta_paga_detail_screen.dart`, `ConsumerWidget`): hero
+card in cima (mese, badge di stato Confermato/Da confermare — verde/rosso, stessa
+semantica del pallino in Archivio — netto in evidenza massima), sotto una riga di
+mini-statistiche Ferie residue/ROL residui/Ore lavorate e più sotto una riga
+Lordo/Straordinari, entrambe **un'unica** `LiquidGlassSurface` a scomparti
+(`_StatRow` — mai più superfici di vetro affiancate, vedi nota bug in "Stile
+visivo"), una tabella unica "Ferie, ROL e permessi" (colonne Maturato/Goduto/
+Residuo, `_MaturazioniSection`) al posto di sezioni separate per categoria, chip
+documento PDF tappabile (`_DocumentoChip`) e sezione Trattenute — nessuna di
+queste sezioni ha più un titolo sopra la card (rimossi per pulizia visiva). In
+fondo, una barra flottante (`_ConfermaModificaBar`, stessa posizione/pattern della
+sidecar) con "Conferma" (visibile solo se lo stato è "Da confermare", aggiorna lo
+stato senza uscire dalla schermata) e "Modifica" (spostata qui dalla nav bar in
+alto, apre il form precompilato) — entrambe `FlatChipButton`. La schermata legge
+sempre la versione corrente della busta paga dal provider (`ref.watch(
+busteRepositoryProvider)` filtrato per id), non il valore statico ricevuto
+all'apertura, così si aggiorna subito dopo "Conferma" o al ritorno da "Modifica".
 Nel dettaglio il PDF si apre via foglio di condivisione di sistema (`share_plus`),
 nessun visualizzatore PDF in-app.
 
 Componenti di stile riutilizzabili dell'app (Liquid Glass, vedi sezione "Stile
 visivo" sotto): `lib/widgets/liquid_glass_surface.dart` (superficie in vetro
 traslucido/blur, standard per ogni card/sezione — hero card, righe elenco, sezioni
-del form, dettaglio, card statistiche, sotto-navigazione), `lib/widgets/
-liquid_glass_button.dart` (CTA in vetro, compone `LiquidGlassSurface` con
-`lib/widgets/spring_button.dart` per la pressione a molla) e `lib/widgets/
-squircle_clipper.dart` (curva "continua" a superellisse usata dal clip del vetro).
-`lib/widgets/glass_form_section.dart` compone `LiquidGlassSurface` nella forma di
-una sezione di form/dettaglio raggruppata (header, righe con separatori, footer),
-usata da form e dettaglio busta paga.
+del form, dettaglio, card statistiche), `lib/widgets/liquid_glass_button.dart` (CTA
+in vetro, compone `LiquidGlassSurface` con `lib/widgets/spring_button.dart` per la
+pressione a molla) e `lib/widgets/squircle_clipper.dart` (curva "continua" a
+superellisse usata dal clip del vetro). `lib/widgets/glass_form_section.dart`
+compone `LiquidGlassSurface` nella forma di una sezione di form/dettaglio
+raggruppata (header opzionale, righe con separatori, footer), usata da form e
+dettaglio busta paga. `lib/widgets/flat_chip_button.dart` (`FlatChipButton`) è il
+chip piatto icona+testo **senza vetro** (parametro `filled` per lo stato
+selezionato/non selezionato) usato dalla sotto-navigazione e dalla barra
+Conferma/Modifica — scelta deliberata di rompere col Liquid Glass per queste due
+CTA, vedi nota in "Stile visivo".
 
 ## Navigazione
 
@@ -103,7 +121,20 @@ sul pilota Archivio Buste Paga ed estesa a tutta l'app.
   (in cima allo `Stack` interno, quindi il primo testato) intercetta ogni tocco
   sull'intera superficie prima che raggiunga il contenuto reale sottostante
   (bottoni, righe, sotto-navigazione). Se si riscrive `LiquidGlassSurface`,
-  mantenere quell'override.
+  mantenere quell'override. **Altra nota implementativa (bug corretto il
+  2026-07-31)**: mai istanziare più `LiquidGlassSurface` affiancate a poca
+  distanza nello stesso `Row`/`Column` (es. card in riga con un gap di pochi
+  `AppSpacing`) — più `BackdropFilter` ravvicinati producono un artefatto di
+  rendering visibile come una "cucitura" netta tra una superficie e l'altra.
+  Per compartimenti multipli in riga (mini-statistiche, tab della
+  sotto-navigazione) usare **una sola** `LiquidGlassSurface`/superficie
+  esterna con scomparti piatti interni separati da un divisore sottile (vedi
+  `_StatRow` in `busta_paga_detail_screen.dart`), oppure — per CTA/tab dove
+  il vetro non è necessario — `FlatChipButton` (nessun vetro). Il
+  riempimento a gradiente di `LiquidGlassSurface` è calcolato in
+  `CustomPaint` sulla `size` reale del widget (mai sulle constraints di
+  `LayoutBuilder`, che possono essere illimitate dentro `ListView`/`Row`):
+  non reintrodurre quel calcolo via `LayoutBuilder` se si tocca il widget.
 - **Colori**: colori semantici Apple — vedi `lib/theme/app_colors.dart`. systemRed
   riservato ad alert e variazioni sfavorevoli. La palette del vetro (`glassFill`,
   `glassHighlight`, `glassShadowEdge`) resta volutamente sobria/neutra: il colore è
@@ -118,7 +149,11 @@ sul pilota Archivio Buste Paga ed estesa a tutta l'app.
   (18, righe elenco/chip/CTA compatte). I raggi piccoli precedenti
   (`small`/`medium`/`large`/`card`) restano solo per dettagli minuti che non sono
   superfici di vetro (badge, barre di grafici). Mai pill/capsule stondate al
-  massimo.
+  massimo. Eccezione confermata esplicitamente dall'utente (2026-07-31):
+  `FlatChipButton` usa `AppRadius.glassSmall` su un bottone di altezza compatta,
+  quindi visivamente molto arrotondato — resta comunque un token, non un raggio
+  letterale enorme da vera capsula, e l'uso è limitato a quel componente
+  (sotto-navigazione, barra Conferma/Modifica).
 - **Tipografia**: system font (SF Pro su iOS via Cupertino di default). Gerarchia
   in `lib/theme/app_text_styles.dart`.
 - **Icone**: sempre `CupertinoIcons` (SF Symbols-style). Mai emoji nei componenti
@@ -127,7 +162,9 @@ sul pilota Archivio Buste Paga ed estesa a tutta l'app.
 
 ## Cosa manca (prossimi passi, in ordine di priorità suggerito)
 
-1. Redesign pagina dettaglio busta paga.
+Nessun redesign aperto al momento (l'ultimo, la pagina dettaglio busta paga, è
+stato completato il 2026-07-31 — vedi `BACKLOG.md` per il dettaglio). Prossimi
+passi da concordare con l'utente alla prossima sessione.
 
 **Nota**: l'estrazione dati via AI locale on-device (`llama_cpp_dart`), valutata
 in una fase precedente, è stata **abbandonata (2026-07-30)** — vedi "Decisioni

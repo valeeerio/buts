@@ -302,7 +302,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
           ),
           child: Text(
             'Salva',
-            style: TextStyle(
+            style: AppTextStyles.subtitle.copyWith(
               color: accent,
               fontWeight: FontWeight.w600,
             ),
@@ -332,7 +332,9 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(_periodoLabel, style: TextStyle(color: accent)),
+                          Text(_periodoLabel,
+                              style:
+                                  AppTextStyles.subtitle.copyWith(color: accent)),
                           const SizedBox(width: AppSpacing.xs),
                           Icon(CupertinoIcons.chevron_down,
                               size: 14, color: labelSecondary),
@@ -437,7 +439,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
         p.basename(_fileOrigine!),
         overflow: TextOverflow.ellipsis,
         textAlign: TextAlign.end,
-        style: TextStyle(color: labelSecondary),
+        style: AppTextStyles.subtitle.copyWith(color: labelSecondary),
       ),
     );
   }

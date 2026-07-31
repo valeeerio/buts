@@ -65,7 +65,7 @@ class BustaPagaDetailScreen extends ConsumerWidget {
               ),
               children: [
                 _HeroCard(bustaPaga: corrente, periodoLabel: periodoLabel),
-                const SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: AppSpacing.lg),
                 _StatRow(items: [
                   ('Ferie residue', formatNumber(corrente.ferieResidue)),
                   ('ROL residui', formatNumber(corrente.rolResidui)),
@@ -77,7 +77,6 @@ class BustaPagaDetailScreen extends ConsumerWidget {
                   const SizedBox(height: AppSpacing.lg),
                 ],
                 _MaturazioniSection(bustaPaga: corrente),
-                const SizedBox(height: AppSpacing.xs),
                 _StatRow(items: [
                   ('Lordo', '€ ${formatNumber(corrente.lordo)}'),
                   ('Straordinari', '€ ${formatNumber(corrente.straordinari)}'),
@@ -85,9 +84,9 @@ class BustaPagaDetailScreen extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.lg),
                 GlassFormSection(
                   children: corrente.trattenute.isEmpty
-                      ? [_readOnlyRow('Nessuna trattenuta', '—')]
+                      ? [_trattenutaRow('Nessuna trattenuta', '—')]
                       : corrente.trattenute.entries
-                          .map((e) => _readOnlyRow(
+                          .map((e) => _trattenutaRow(
                               e.key, '− € ${formatNumber(e.value)}'))
                           .toList(),
                 ),
@@ -123,19 +122,40 @@ class BustaPagaDetailScreen extends ConsumerWidget {
     );
   }
 
-  Widget _readOnlyRow(String label, String value) {
-    return CupertinoFormRow(
-      prefix: Text(label),
-      child: Builder(
-        builder: (context) => Text(
-          value,
-          textAlign: TextAlign.end,
-          style: TextStyle(
-            color: CupertinoDynamicColor.resolve(
-                AppColors.labelPrimary, context),
+  Widget _trattenutaRow(String label, String value) {
+    return Builder(
+      builder: (context) {
+        final labelPrimary =
+            CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
+          child: Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Text(
+                  label,
+                  style: AppTextStyles.subtitle.copyWith(
+                    color: labelPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Text(
+                  value,
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.cardAmount.copyWith(
+                    color: labelPrimary,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -229,8 +249,6 @@ class _StatRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final labelPrimary =
         CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-    final labelSecondary =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
     final separator =
         CupertinoDynamicColor.resolve(AppColors.separator, context);
 
@@ -255,14 +273,16 @@ class _StatRow extends StatelessWidget {
                 ),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       items[i].$1,
-                      style: AppTextStyles.cardLabel.copyWith(
-                        color: labelSecondary,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.subtitle.copyWith(
+                        color: labelPrimary,
+                        fontWeight: FontWeight.w700,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -270,8 +290,10 @@ class _StatRow extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       items[i].$2,
+                      textAlign: TextAlign.center,
                       style: AppTextStyles.cardAmount.copyWith(
                         color: labelPrimary,
+                        fontWeight: FontWeight.w400,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -387,15 +409,33 @@ class _MaturazioniSection extends StatelessWidget {
           const Expanded(flex: 3, child: SizedBox.shrink()),
           Expanded(
             flex: 2,
-            child: Text('Maturato', style: style, textAlign: TextAlign.center),
+            child: Text(
+              'Maturato',
+              style: style,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           Expanded(
             flex: 2,
-            child: Text('Goduto', style: style, textAlign: TextAlign.center),
+            child: Text(
+              'Goduto',
+              style: style,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           Expanded(
             flex: 2,
-            child: Text('Residuo', style: style, textAlign: TextAlign.center),
+            child: Text(
+              'Residuo',
+              style: style,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
@@ -411,7 +451,10 @@ class _MaturazioniSection extends StatelessWidget {
   }) {
     final labelPrimary =
         CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-    final valueStyle = AppTextStyles.cardAmount.copyWith(color: labelPrimary);
+    final valueStyle = AppTextStyles.cardAmount.copyWith(
+      color: labelPrimary,
+      fontWeight: FontWeight.w400,
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
@@ -423,7 +466,7 @@ class _MaturazioniSection extends StatelessWidget {
               label,
               style: AppTextStyles.subtitle.copyWith(
                 color: labelPrimary,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -464,6 +507,8 @@ class _ConfermaModificaBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final greenAccent =
+        CupertinoDynamicColor.resolve(AppColors.systemGreen, context);
     final daConfermare =
         bustaPaga.statoVerifica == StatoVerificaBustaPaga.daConfermare;
 
@@ -471,23 +516,33 @@ class _ConfermaModificaBar extends StatelessWidget {
       children: [
         if (daConfermare) ...[
           Expanded(
+            flex: 7,
             child: FlatChipButton(
               icon: CupertinoIcons.checkmark_alt,
               label: 'Conferma',
-              color: accent,
+              color: greenAccent,
               onPressed: onConferma,
             ),
           ),
           const SizedBox(width: AppSpacing.sm),
-        ],
-        Expanded(
-          child: FlatChipButton(
-            icon: CupertinoIcons.pencil,
-            label: 'Modifica',
-            color: accent,
-            onPressed: onModifica,
+          Expanded(
+            flex: 3,
+            child: FlatChipButton(
+              icon: CupertinoIcons.pencil,
+              label: 'Modifica',
+              color: accent,
+              onPressed: onModifica,
+            ),
           ),
-        ),
+        ] else
+          Expanded(
+            child: FlatChipButton(
+              icon: CupertinoIcons.pencil,
+              label: 'Modifica',
+              color: accent,
+              onPressed: onModifica,
+            ),
+          ),
       ],
     );
   }
