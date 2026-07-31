@@ -38,7 +38,7 @@ class CupertinoRangeSlider extends StatefulWidget {
 class _CupertinoRangeSliderState extends State<CupertinoRangeSlider> {
   // Area di tocco piena 44x44pt anche se il thumb visivo è più piccolo.
   static const _thumbTouchSize = 44.0;
-  static const _thumbVisualSize = 22.0;
+  static const _thumbVisualSize = 14.0;
   static const _trackHeight = 4.0;
   static const _minGapMs = 30 * 24 * 60 * 60 * 1000; // ~1 mese
 

@@ -391,6 +391,42 @@ AxisTitles _periodoBottomAxisTitles({
   );
 }
 
+/// Asse Y condiviso (valori sempre visibili, per dare la scala generale del
+/// grafico senza dover toccare ogni punto/barra). Un solo asse per grafico:
+/// nei grafici multi-serie tutte le serie condividono la stessa scala,
+/// approccio più semplice scelto come primo passo — da rivedere con doppio
+/// asse solo se le grandezze combinate risultassero poco leggibili.
+AxisTitles _valueLeftAxisTitles({
+  required Color labelColor,
+  String Function(double value) formatValue = formatNumber,
+}) {
+  return AxisTitles(
+    sideTitles: SideTitles(
+      showTitles: true,
+      reservedSize: 40,
+      getTitlesWidget: (value, meta) {
+        return Padding(
+          padding: const EdgeInsets.only(right: 6),
+          child: Text(
+            formatValue(value),
+            style: AppTextStyles.cardLabel.copyWith(
+                color: labelColor, fontSize: 10),
+          ),
+        );
+      },
+    ),
+  );
+}
+
+/// Colori condivisi per lo sfondo/testo dei tooltip al tocco, usati da tutti
+/// e tre i grafici — estratti per non avere tre calcoli divergenti.
+({Color background, Color text}) _tooltipColors(BuildContext context) {
+  return (
+    background: CupertinoDynamicColor.resolve(AppColors.labelPrimary, context),
+    text: CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
+  );
+}
+
 class _NettoLordoChart extends StatelessWidget {
   final List<BustaPaga> buste;
 
@@ -408,6 +444,7 @@ class _NettoLordoChart extends StatelessWidget {
         CupertinoDynamicColor.resolve(AppColors.separator, context);
     final labelColor =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+    final tooltip = _tooltipColors(context);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -426,8 +463,9 @@ class _NettoLordoChart extends StatelessWidget {
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               rightTitles:
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              leftTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
+              leftTitles: _valueLeftAxisTitles(
+                labelColor: labelColor,
+                formatValue: (v) => '€${formatNumber(v)}',
               ),
               bottomTitles: _periodoBottomAxisTitles(
                 buste: buste,
@@ -435,7 +473,23 @@ class _NettoLordoChart extends StatelessWidget {
                 labelColor: labelColor,
               ),
             ),
-            lineTouchData: const LineTouchData(enabled: false),
+            lineTouchData: LineTouchData(
+              touchTooltipData: LineTouchTooltipData(
+                getTooltipColor: (_) => tooltip.background,
+                fitInsideHorizontally: true,
+                fitInsideVertically: true,
+                getTooltipItems: (touchedSpots) {
+                  return [
+                    for (var i = 0; i < touchedSpots.length; i++)
+                      _tooltipItem(
+                        touchedSpots[i],
+                        showPeriodo: i == 0,
+                        textColor: tooltip.text,
+                      ),
+                  ];
+                },
+              ),
+            ),
             lineBarsData: [
               _line(buste.map((b) => b.netto).toList(), nettoColor),
               _line(buste.map((b) => b.lordo).toList(), lordoColor),
@@ -443,6 +497,25 @@ class _NettoLordoChart extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  LineTooltipItem _tooltipItem(
+    LineBarSpot spot, {
+    required bool showPeriodo,
+    required Color textColor,
+  }) {
+    final busta = buste[spot.x.toInt()];
+    final label = spot.barIndex == 0 ? 'Netto' : 'Lordo';
+    final text = showPeriodo
+        ? '${periodoAxisLabel(busta.periodo)}\n$label: €${formatNumber(spot.y)}'
+        : '$label: €${formatNumber(spot.y)}';
+    return LineTooltipItem(
+      text,
+      AppTextStyles.cardLabel.copyWith(
+        color: textColor,
+        fontWeight: FontWeight.w600,
+      ),
     );
   }
 
@@ -480,6 +553,7 @@ class _FerieRolPermessiChart extends StatelessWidget {
         CupertinoDynamicColor.resolve(AppColors.separator, context);
     final labelColor =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+    final tooltip = _tooltipColors(context);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -497,16 +571,30 @@ class _FerieRolPermessiChart extends StatelessWidget {
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               rightTitles:
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              leftTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
-              ),
+              leftTitles: _valueLeftAxisTitles(labelColor: labelColor),
               bottomTitles: _periodoBottomAxisTitles(
                 buste: buste,
                 availableWidth: constraints.maxWidth,
                 labelColor: labelColor,
               ),
             ),
-            lineTouchData: const LineTouchData(enabled: false),
+            lineTouchData: LineTouchData(
+              touchTooltipData: LineTouchTooltipData(
+                getTooltipColor: (_) => tooltip.background,
+                fitInsideHorizontally: true,
+                fitInsideVertically: true,
+                getTooltipItems: (touchedSpots) {
+                  return [
+                    for (var i = 0; i < touchedSpots.length; i++)
+                      _tooltipItem(
+                        touchedSpots[i],
+                        showPeriodo: i == 0,
+                        textColor: tooltip.text,
+                      ),
+                  ];
+                },
+              ),
+            ),
             lineBarsData: [
               _line(buste.map((b) => b.ferieResidue).toList(), ferieColor),
               _line(buste.map((b) => b.rolResidui).toList(), rolColor),
@@ -516,6 +604,29 @@ class _FerieRolPermessiChart extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  LineTooltipItem _tooltipItem(
+    LineBarSpot spot, {
+    required bool showPeriodo,
+    required Color textColor,
+  }) {
+    final busta = buste[spot.x.toInt()];
+    final label = switch (spot.barIndex) {
+      0 => 'Ferie residue',
+      1 => 'ROL residui',
+      _ => 'Permessi goduti',
+    };
+    final text = showPeriodo
+        ? '${periodoAxisLabel(busta.periodo)}\n$label: ${formatNumber(spot.y)}'
+        : '$label: ${formatNumber(spot.y)}';
+    return LineTooltipItem(
+      text,
+      AppTextStyles.cardLabel.copyWith(
+        color: textColor,
+        fontWeight: FontWeight.w600,
+      ),
     );
   }
 
@@ -550,10 +661,7 @@ class _StraordinarioChart extends StatelessWidget {
     final labelColor =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
 
-    final tooltipBg =
-        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-    final tooltipText =
-        CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context);
+    final tooltip = _tooltipColors(context);
     final maxValue = buste
         .map((b) => b.straordinari)
         .fold<double>(0, (max, v) => v > max ? v : max);
@@ -577,9 +685,7 @@ class _StraordinarioChart extends StatelessWidget {
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               rightTitles:
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              leftTitles: const AxisTitles(
-                sideTitles: SideTitles(showTitles: false),
-              ),
+              leftTitles: _valueLeftAxisTitles(labelColor: labelColor),
               bottomTitles: _periodoBottomAxisTitles(
                 buste: buste,
                 availableWidth: constraints.maxWidth,
@@ -589,7 +695,7 @@ class _StraordinarioChart extends StatelessWidget {
             barTouchData: BarTouchData(
               enabled: true,
               touchTooltipData: BarTouchTooltipData(
-                getTooltipColor: (_) => tooltipBg,
+                getTooltipColor: (_) => tooltip.background,
                 fitInsideHorizontally: true,
                 fitInsideVertically: true,
                 getTooltipItem: (group, groupIndex, rod, rodIndex) {
@@ -598,7 +704,7 @@ class _StraordinarioChart extends StatelessWidget {
                     '${periodoAxisLabel(busta.periodo)}\n'
                     '${formatNumber(rod.toY)} h',
                     AppTextStyles.cardLabel.copyWith(
-                      color: tooltipText,
+                      color: tooltip.text,
                       fontWeight: FontWeight.w600,
                     ),
                   );
