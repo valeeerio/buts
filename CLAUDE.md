@@ -39,17 +39,20 @@ directory). Se il file non ha testo estraibile, o il parser regex
 "JOB") non riconosce i dati principali (netto e periodo entrambi assenti), viene
 mostrato un alert bloccante e **il form non si apre** — non esiste più un modo di
 aprire il form vuoto per un inserimento libero da zero. Il form
-(`busta_paga_form_screen.dart`) si apre solo in due casi: precompilato dai dati
-estratti da un import riuscito (costruttore `.daImport`, con banner di conferma
-esplicita "dati estratti automaticamente, verifica prima di salvare" finché
-`_valoriDaConferma == true`) oppure in modifica di una busta paga esistente
-(`existing`, dal dettaglio) — in entrambi i casi i campi restano editabili prima
-del salvataggio. Estrazione automatica via AI locale on-device resta una fase
-futura (vedi sotto), oggi la precompilazione è solo tramite parser regex.
+(`busta_paga_form_screen.dart`) si apre **solo** per l'import: precompilato dai
+dati estratti da un import riuscito (costruttore `.daImport`, con banner di
+conferma esplicita "dati estratti automaticamente, verifica prima di salvare"
+finché `_valoriDaConferma == true`). Non esiste più una modalità "existing"/di
+modifica di una busta paga già salvata (rimossa il 2026-07-31): la modifica
+avviene interamente nel dettaglio, vedi sotto. Estrazione automatica via AI
+locale on-device resta una fase futura (vedi sotto), oggi la precompilazione è
+solo tramite parser regex.
 
-**Dettaglio busta paga** (`busta_paga_detail_screen.dart`, `ConsumerWidget`): hero
-card in cima (mese, badge di stato Confermato/Da confermare — verde/rosso, stessa
-semantica del pallino in Archivio — netto in evidenza massima), sotto una riga di
+**Dettaglio busta paga** (`busta_paga_detail_screen.dart`,
+`ConsumerStatefulWidget` — non più `ConsumerWidget`, serve stato locale per la
+modalità modifica): hero card in cima (mese, badge di stato Confermato/Da
+confermare — verde/rosso, stessa semantica del pallino in Archivio — netto in
+evidenza massima) **fissa fuori dall'area scrollabile**, sotto una riga di
 mini-statistiche Ferie residue/ROL residui/Ore lavorate e più sotto una riga
 Lordo/Straordinari, entrambe **un'unica** `LiquidGlassSurface` a scomparti
 (`_StatRow` — mai più superfici di vetro affiancate, vedi nota bug in "Stile
@@ -57,15 +60,38 @@ visivo"), una tabella unica "Ferie, ROL e permessi" (colonne Maturato/Goduto/
 Residuo, `_MaturazioniSection`) al posto di sezioni separate per categoria, chip
 documento PDF tappabile (`_DocumentoChip`) e sezione Trattenute — nessuna di
 queste sezioni ha più un titolo sopra la card (rimossi per pulizia visiva). In
-fondo, una barra flottante (`_ConfermaModificaBar`, stessa posizione/pattern della
+fondo, una barra flottante (`_ActionBar`, stessa posizione/pattern della
 sidecar) con "Conferma" (visibile solo se lo stato è "Da confermare", aggiorna lo
-stato senza uscire dalla schermata) e "Modifica" (spostata qui dalla nav bar in
-alto, apre il form precompilato) — entrambe `FlatChipButton`. La schermata legge
-sempre la versione corrente della busta paga dal provider (`ref.watch(
-busteRepositoryProvider)` filtrato per id), non il valore statico ricevuto
-all'apertura, così si aggiorna subito dopo "Conferma" o al ritorno da "Modifica".
-Nel dettaglio il PDF si apre via foglio di condivisione di sistema (`share_plus`),
-nessun visualizzatore PDF in-app.
+stato senza uscire dalla schermata, mostra un popup "Dati confermati") e
+"Modifica" — entrambe `FlatChipButton`. La schermata legge sempre la versione
+corrente della busta paga dal provider (`ref.watch(busteRepositoryProvider)`
+filtrato per id), non il valore statico ricevuto all'apertura, così si aggiorna
+subito dopo "Conferma" o "Salva". Nel dettaglio il PDF si apre via foglio di
+condivisione di sistema (`share_plus`), nessun visualizzatore PDF in-app.
+
+**Modifica inline (2026-07-31)**: "Modifica" non naviga più verso
+`busta_paga_form_screen.dart` — attiva `_isEditing = true` sulla stessa
+schermata di dettaglio, e le stesse card diventano editabili sul posto (hero
+Netto e periodo tappabile con lo stesso picker mese/anno del vecchio form,
+`_StatRow` Ferie/ROL/Ore e Lordo/Straordinari, tabella Maturazioni, righe
+Trattenute con `Dismissible`+`SwipeDeleteBackground` al posto di un bottone
+"meno" per rimuoverle). **Requisito non negoziabile confermato più volte
+dall'utente**: entrare in modifica non deve cambiare NULLA visivamente
+(allineamento, prefissi "€"/"− €", stile) rispetto alla vista di sola lettura,
+a parte rendere il testo tappabile — verificare questo ad ogni modifica a
+questa schermata, è la causa di diversi bug corretti in questa sessione. La
+barra in basso diventa "Salva"/"Annulla" (`FlatChipButton`, ~50/50, "Salva" blu
+di sistema, "Annulla" grigio). "Salva" valida il Netto (obbligatorio/numerico),
+calcola un diff campo per campo rispetto ai valori originali e, se non vuoto,
+mostra un popup "Hai modificato i seguenti dati, confermi?" con l'elenco
+vecchio → nuovo prima di applicare (`copyWith` con `statoVerifica` che torna
+automaticamente a `daConfermare` se la busta era "Confermata"); se il diff è
+vuoto esce dalla modifica senza popup. "Annulla" scarta tutti i controller e
+torna alla vista di sola lettura. Ferie residue/ROL residui in `_StatRow`
+restano sempre di sola lettura anche in modifica: rispecchiano live (via
+listener sui controller) il campo "Residuo" della tabella Maturazioni, che è
+l'unico editabile per quei dati (evita due campi indipendenti per lo stesso
+valore).
 
 Componenti di stile riutilizzabili dell'app (Liquid Glass, vedi sezione "Stile
 visivo" sotto): `lib/widgets/liquid_glass_surface.dart` (superficie in vetro
@@ -160,11 +186,30 @@ sul pilota Archivio Buste Paga ed estesa a tutta l'app.
   di produzione — se ne trovi in mockup precedenti (HTML) sono placeholder da
   sostituire.
 
+**Scroll e dissolvenza in fondo alla lista**: nell'Archivio (`buste_paga_
+archivio_view.dart`) la lista scrollabile è avvolta in uno `ShaderMask` con
+`fadeHeight` fisso in pixel (120.0), dentro un `Expanded` la cui altezza reale
+è ridotta da un `Padding(bottom: _sidecarReservedHeight)` esterno (non solo
+padding di contenuto) — è questo che riduce il viewport e fa coincidere la
+zona di dissolvenza con le ultime righe realmente visibili sopra la sidecar.
+Nel dettaglio busta paga (`busta_paga_detail_screen.dart`) è stato **abbandonato
+un approccio analogo con `ShaderMask` a piena altezza** (provato con più valori
+di `fadeHeight`, mai percepito come "uguale" all'Archivio a causa del viewport
+di altezza diversa — niente banner di benvenuto sopra la lista nel dettaglio):
+la schermata usa invece la hero card fissa fuori dallo scroll (vedi sopra) più
+scroll naturale sotto, con lo stesso pattern di `Padding` esterno che riduce il
+viewport (`_actionBarReservedHeight`) per il margine verso la barra flottante,
+e un `ShaderMask` con `fadeHeight` piccolo (poche decine di pixel, non l'intero
+margine) solo per ammorbidire lo stacco finale, non per "nascondere" più righe
+di contenuto come nell'Archivio. Se si ritocca uno dei due effetti, non
+assumere che debbano avere lo stesso valore assoluto di `fadeHeight`: il
+viewport sottostante è diverso in altezza tra le due schermate.
+
 ## Cosa manca (prossimi passi, in ordine di priorità suggerito)
 
-Nessun redesign aperto al momento (l'ultimo, la pagina dettaglio busta paga, è
-stato completato il 2026-07-31 — vedi `BACKLOG.md` per il dettaglio). Prossimi
-passi da concordare con l'utente alla prossima sessione.
+Nessun redesign aperto al momento (l'ultimo, la modifica inline nel dettaglio
+busta paga, è stato completato il 2026-07-31 — vedi `BACKLOG.md` per il
+dettaglio). Prossimi passi da concordare con l'utente alla prossima sessione.
 
 **Nota**: l'estrazione dati via AI locale on-device (`llama_cpp_dart`), valutata
 in una fase precedente, è stata **abbandonata (2026-07-30)** — vedi "Decisioni

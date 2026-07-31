@@ -29,6 +29,26 @@ Legenda skill: skill di Claude Code da invocare per quel task (vedi
 
 ## Fatto
 
+- [x] **Modifica inline nel dettaglio busta paga** (2026-07-31, branch
+      `dettagli-buste-paga`, merged in `main`): "Modifica" non apre più
+      `BustaPagaFormScreen` — le stesse card del dettaglio (hero Netto,
+      periodo, `_StatRow` Ferie/ROL/Ore e Lordo/Straordinari, tabella
+      Maturazioni, Trattenute con swipe-to-delete al posto del bottone
+      "meno") diventano editabili sul posto, stesso layout della vista di
+      sola lettura. "Conferma" mostra un popup "Dati confermati"; "Salva"
+      calcola un diff dei campi cambiati e mostra un popup di riepilogo
+      prima di applicare (con reset automatico a "Da confermare" se la
+      busta era "Confermata"); "Annulla" scarta le modifiche.
+      `BustaPagaFormScreen` ora usata solo per l'import PDF (`.daImport`,
+      rimossa la modalità "existing"). La schermata è `ConsumerStatefulWidget`.
+      Hero card fissa in alto fuori dallo scroll, resto del contenuto con
+      scroll naturale e una leggera dissolvenza finale verso la barra
+      flottante (abbandonato un precedente approccio a `ShaderMask` su
+      tutto il viewport, che non garantiva lo stesso effetto percepito
+      dell'Archivio per via di viewport di altezza diversa tra le due
+      schermate). Fix contestuali da design-audit: touch target 44×44pt sul
+      bottone rimuovi-trattenuta del form, nuovo token
+      `AppTextStyles.heroAmount` al posto di un `fontSize` hardcoded.
 - [x] **Redesign pagina dettaglio busta paga** (2026-07-31, branch
       `dettagli-buste-paga`): hero con badge di stato (verde/rosso, stessa
       semantica del pallino in Archivio), riga di mini-statistiche
