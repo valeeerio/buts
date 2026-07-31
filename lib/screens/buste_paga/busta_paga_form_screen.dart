@@ -12,34 +12,26 @@ import '../../widgets/glass_form_section.dart';
 import '../../widgets/liquid_glass_button.dart';
 import '../../widgets/liquid_glass_surface.dart';
 
-/// Form di revisione/modifica di una busta paga. Il form si apre in due
-/// modalità soltanto:
-/// - modifica di una busta paga esistente ([existing] non nullo, dal
-///   dettaglio);
-/// - revisione di un nuovo import PDF già processato a monte
-///   ([estratti] non nullo, con [fileOrigine] il path del PDF già copiato):
-///   i campi sono precompilati dal parser regex e restano editabili prima
-///   della conferma esplicita (pulsante Salva).
+/// Form di revisione di un nuovo import PDF già processato a monte: i campi
+/// sono precompilati dal parser regex ([estratti], con [fileOrigine] il path
+/// del PDF già copiato) e restano editabili prima della conferma esplicita
+/// (pulsante Salva).
 ///
-/// Non esiste più una modalità "vuota" per inserimento manuale libero: il
-/// PDF viene sempre scelto e processato prima di arrivare qui (vedi
+/// La modifica di una busta paga già esistente non passa più da qui: dal
+/// dettaglio (`BustaPagaDetailScreen`) è ora inline nella stessa pagina,
+/// senza navigazione verso un form separato. Non esiste più nemmeno una
+/// modalità "vuota" per inserimento manuale libero: il PDF viene sempre
+/// scelto e processato prima di arrivare qui (vedi
 /// `buste_paga_section_screen.dart` / CLAUDE.md).
 class BustaPagaFormScreen extends ConsumerStatefulWidget {
-  final BustaPaga? existing;
-  final String? fileOrigine;
-  final BustaPagaEstratti? estratti;
-
-  const BustaPagaFormScreen({
-    super.key,
-    this.existing,
-  })  : fileOrigine = null,
-        estratti = null;
+  final String fileOrigine;
+  final BustaPagaEstratti estratti;
 
   const BustaPagaFormScreen.daImport({
     super.key,
-    required String this.fileOrigine,
-    required BustaPagaEstratti this.estratti,
-  }) : existing = null;
+    required this.fileOrigine,
+    required this.estratti,
+  });
 
   @override
   ConsumerState<BustaPagaFormScreen> createState() =>
@@ -89,54 +81,45 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   /// non ancora confermati esplicitamente (salvataggio) dall'utente.
   bool _valoriDaConferma = false;
 
-  bool get _isEditing => widget.existing != null;
-
   @override
   void initState() {
     super.initState();
-    final existing = widget.existing;
     final estratti = widget.estratti;
 
-    _fileOrigine = existing?.fileOrigine ?? widget.fileOrigine;
-    _valoriDaConferma = existing != null
-        ? existing.statoVerifica == StatoVerificaBustaPaga.daConfermare
-        : estratti != null;
-    _warnings = estratti?.warnings ?? const [];
+    _fileOrigine = widget.fileOrigine;
+    _valoriDaConferma = true;
+    _warnings = estratti.warnings;
 
-    _periodo = existing?.periodo ??
-        _periodoFromEstratti(estratti?.periodo) ??
+    _periodo = _periodoFromEstratti(estratti.periodo) ??
         DateTime(DateTime.now().year, DateTime.now().month);
 
-    _lordoController = TextEditingController(
-        text: _formatNumber(existing?.lordo ?? estratti?.lordo));
-    _nettoController = TextEditingController(
-        text: _formatNumber(existing?.netto ?? estratti?.netto));
-    _straordinariController = TextEditingController(
-        text: _formatNumber(existing?.straordinari ?? estratti?.straordinari));
+    _lordoController =
+        TextEditingController(text: _formatNumber(estratti.lordo));
+    _nettoController =
+        TextEditingController(text: _formatNumber(estratti.netto));
+    _straordinariController =
+        TextEditingController(text: _formatNumber(estratti.straordinari));
 
-    _ferieMaturateController = TextEditingController(
-        text:
-            _formatNumber(existing?.ferieMaturate ?? estratti?.ferieMaturate));
-    _ferieGoduteController = TextEditingController(
-        text: _formatNumber(existing?.ferieGodute ?? estratti?.ferieGodute));
-    _ferieResidueController = TextEditingController(
-        text: _formatNumber(existing?.ferieResidue ?? estratti?.ferieResidue));
+    _ferieMaturateController =
+        TextEditingController(text: _formatNumber(estratti.ferieMaturate));
+    _ferieGoduteController =
+        TextEditingController(text: _formatNumber(estratti.ferieGodute));
+    _ferieResidueController =
+        TextEditingController(text: _formatNumber(estratti.ferieResidue));
 
-    _rolMaturatiController = TextEditingController(
-        text: _formatNumber(existing?.rolMaturati ?? estratti?.rolMaturati));
-    _rolGodutiController = TextEditingController(
-        text: _formatNumber(existing?.rolGoduti ?? estratti?.rolGoduti));
-    _rolResiduiController = TextEditingController(
-        text: _formatNumber(existing?.rolResidui ?? estratti?.rolResidui));
+    _rolMaturatiController =
+        TextEditingController(text: _formatNumber(estratti.rolMaturati));
+    _rolGodutiController =
+        TextEditingController(text: _formatNumber(estratti.rolGoduti));
+    _rolResiduiController =
+        TextEditingController(text: _formatNumber(estratti.rolResidui));
 
-    _permessiGodutiController = TextEditingController(
-        text:
-            _formatNumber(existing?.permessiGoduti ?? estratti?.permessiGoduti));
-    _oreLavorateController = TextEditingController(
-        text: _formatNumber(existing?.oreLavorate ?? estratti?.oreLavorate));
+    _permessiGodutiController =
+        TextEditingController(text: _formatNumber(estratti.permessiGoduti));
+    _oreLavorateController =
+        TextEditingController(text: _formatNumber(estratti.oreLavorate));
 
-    final trattenuteIniziali =
-        existing?.trattenute ?? estratti?.trattenute ?? const {};
+    final trattenuteIniziali = estratti.trattenute;
     _trattenute = trattenuteIniziali.isEmpty
         ? [_TrattenutaRow()]
         : trattenuteIniziali.entries
@@ -252,8 +235,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     }
 
     final bustaPaga = BustaPaga(
-      id: widget.existing?.id ??
-          'bp-${DateTime.now().millisecondsSinceEpoch}',
+      id: 'bp-${DateTime.now().millisecondsSinceEpoch}',
       periodo: _periodo,
       fileOrigine: _fileOrigine,
       lordo: _parse(_lordoController),
@@ -273,11 +255,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
           : StatoVerificaBustaPaga.confermato,
     );
 
-    if (_isEditing) {
-      ref.read(busteRepositoryProvider.notifier).update(bustaPaga);
-    } else {
-      ref.read(busteRepositoryProvider.notifier).add(bustaPaga);
-    }
+    ref.read(busteRepositoryProvider.notifier).add(bustaPaga);
     Navigator.of(context).pop();
   }
 
@@ -291,7 +269,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
       backgroundColor:
           CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
       navigationBar: CupertinoNavigationBar(
-        middle: Text(_isEditing ? 'Modifica busta paga' : 'Nuova busta paga'),
+        middle: const Text('Nuova busta paga'),
         trailing: LiquidGlassButton(
           onPressed: _save,
           radius: AppRadius.glassSmall,
@@ -499,7 +477,6 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
           const SizedBox(width: AppSpacing.xs),
           CupertinoButton(
             padding: EdgeInsets.zero,
-            minimumSize: Size.zero,
             onPressed: _trattenute.length > 1
                 ? () => _removeTrattenuta(index)
                 : null,
