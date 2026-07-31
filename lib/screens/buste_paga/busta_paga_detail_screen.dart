@@ -83,7 +83,6 @@ class BustaPagaDetailScreen extends ConsumerWidget {
                 ]),
                 const SizedBox(height: AppSpacing.lg),
                 GlassFormSection(
-                  header: 'Trattenute',
                   children: corrente.trattenute.isEmpty
                       ? [_readOnlyRow('Nessuna trattenuta', '—')]
                       : corrente.trattenute.entries
@@ -351,7 +350,6 @@ class _MaturazioniSection extends StatelessWidget {
     final labelSecondary =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
     return GlassFormSection(
-      header: 'Ferie, ROL e permessi',
       children: [
         _tableHeaderRow(labelSecondary),
         _tableDataRow(
@@ -446,11 +444,11 @@ class _MaturazioniSection extends StatelessWidget {
   }
 }
 
-/// Barra flottante in basso, stessa filosofia della sidecar
-/// (`_BustePagaSidecar`): **una sola** `LiquidGlassSurface` che contiene gli
-/// scomparti di azione come widget piatti (mai vetro annidato). Mostra
-/// "Conferma" solo se lo stato è ancora "Da confermare"; "Modifica" è
-/// sempre presente (sostituisce il bottone che prima stava nella nav bar).
+/// Barra flottante in basso: chip piatti senza superficie di vetro attorno
+/// (nessun "pill" bianco dietro), stesso trattamento del "+" nella sidecar
+/// (`_BustePagaSidecar`). Mostra "Conferma" solo se lo stato è ancora
+/// "Da confermare"; "Modifica" è sempre presente (sostituisce il bottone
+/// che prima stava nella nav bar).
 class _ConfermaModificaBar extends StatelessWidget {
   final BustaPaga bustaPaga;
   final VoidCallback onConferma;
@@ -468,34 +466,28 @@ class _ConfermaModificaBar extends StatelessWidget {
     final daConfermare =
         bustaPaga.statoVerifica == StatoVerificaBustaPaga.daConfermare;
 
-    return LiquidGlassSurface(
-      radius: AppRadius.glass,
-      blurSigma: 26,
-      elevation: 10,
-      padding: const EdgeInsets.all(AppSpacing.xs),
-      child: Row(
-        children: [
-          if (daConfermare) ...[
-            Expanded(
-              child: _ActionChip(
-                icon: CupertinoIcons.checkmark_alt,
-                label: 'Conferma',
-                color: accent,
-                onTap: onConferma,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-          ],
+    return Row(
+      children: [
+        if (daConfermare) ...[
           Expanded(
             child: _ActionChip(
-              icon: CupertinoIcons.pencil,
-              label: 'Modifica',
+              icon: CupertinoIcons.checkmark_alt,
+              label: 'Conferma',
               color: accent,
-              onTap: onModifica,
+              onTap: onConferma,
             ),
           ),
+          const SizedBox(width: AppSpacing.sm),
         ],
-      ),
+        Expanded(
+          child: _ActionChip(
+            icon: CupertinoIcons.pencil,
+            label: 'Modifica',
+            color: accent,
+            onTap: onModifica,
+          ),
+        ),
+      ],
     );
   }
 }
