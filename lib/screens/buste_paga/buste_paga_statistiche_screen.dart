@@ -418,6 +418,23 @@ AxisTitles _valueLeftAxisTitles({
   );
 }
 
+/// Arrotonda un intervallo di dati a multipli "puliti" di [step], così il
+/// bordo dell'asse (`minY`/`maxY`) coincide sempre con un tick reale.
+/// Senza questo, lasciare che fl_chart calcoli da solo `minY`/`maxY` produce
+/// spesso un bordo non allineato ai tick automatici (es. 105.60 quando i
+/// tick sono 0/50/100): fl_chart aggiunge comunque un'etichetta forzata al
+/// bordo, che finisce per sovrapporsi al tick "pulito" più vicino.
+({double min, double max}) _niceAxisBounds(
+  double dataMin,
+  double dataMax, {
+  required double step,
+}) {
+  final min = (dataMin / step).floor() * step;
+  var max = (dataMax / step).ceil() * step;
+  if (max <= min) max += step;
+  return (min: min, max: max);
+}
+
 /// Colori condivisi per lo sfondo/testo dei tooltip al tocco, usati da tutti
 /// e tre i grafici — estratti per non avere tre calcoli divergenti.
 ({Color background, Color text}) _tooltipColors(BuildContext context) {
@@ -446,10 +463,30 @@ class _NettoLordoChart extends StatelessWidget {
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
     final tooltip = _tooltipColors(context);
 
+    // Range ristretto ai dati reali (non da 0): Netto e Lordo hanno un
+    // divario fisso di alcune centinaia di euro (INPS/IRPEF) che, su un
+    // asse condiviso partito da 0, schiacciava le due linee ciascuna vicino
+    // al proprio estremo con un grande vuoto in mezzo. Margine 8% sopra e
+    // sotto il range osservato, poi arrotondato a centinaia "pulite".
+    final valori = [
+      ...buste.map((b) => b.netto),
+      ...buste.map((b) => b.lordo),
+    ];
+    final datiMin = valori.reduce((a, b) => a < b ? a : b);
+    final datiMax = valori.reduce((a, b) => a > b ? a : b);
+    final margine = (datiMax - datiMin) * 0.08;
+    final bounds = _niceAxisBounds(
+      datiMin - margine,
+      datiMax + margine,
+      step: 100,
+    );
+
     return LayoutBuilder(
       builder: (context, constraints) {
         return LineChart(
           LineChartData(
+            minY: bounds.min,
+            maxY: bounds.max,
             gridData: FlGridData(
               show: true,
               drawVerticalLine: false,
@@ -555,10 +592,21 @@ class _FerieRolPermessiChart extends StatelessWidget {
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
     final tooltip = _tooltipColors(context);
 
+    // Solo bound "puliti" (fix sovrapposizione etichette): a differenza di
+    // Netto/Lordo, qui il range resta da 0 — non richiesto restringerlo.
+    final valoriMax = [
+      ...buste.map((b) => b.ferieResidue),
+      ...buste.map((b) => b.rolResidui),
+      ...buste.map((b) => b.permessiGoduti),
+    ].reduce((a, b) => a > b ? a : b);
+    final bounds = _niceAxisBounds(0, valoriMax, step: 20);
+
     return LayoutBuilder(
       builder: (context, constraints) {
         return LineChart(
           LineChartData(
+            minY: bounds.min,
+            maxY: bounds.max,
             gridData: FlGridData(
               show: true,
               drawVerticalLine: false,
@@ -666,12 +714,15 @@ class _StraordinarioChart extends StatelessWidget {
         .map((b) => b.straordinari)
         .fold<double>(0, (max, v) => v > max ? v : max);
     final maxIndex = buste.indexWhere((b) => b.straordinari == maxValue);
+    final bounds = _niceAxisBounds(0, maxValue <= 0 ? 1 : maxValue * 1.2,
+        step: 20);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         return BarChart(
           BarChartData(
-            maxY: maxValue <= 0 ? 1 : maxValue * 1.2,
+            minY: bounds.min,
+            maxY: bounds.max,
             groupsSpace: 20,
             gridData: FlGridData(
               show: true,
