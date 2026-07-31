@@ -32,6 +32,12 @@ class AppTextStyles {
     fontWeight: FontWeight.w700,
   );
 
+  /// Cifra netta in evidenza massima nella hero card del dettaglio busta paga.
+  static const heroAmount = TextStyle(
+    fontSize: 34,
+    fontWeight: FontWeight.w700,
+  );
+
   static const cardAmount = TextStyle(
     fontSize: 16,
     fontWeight: FontWeight.w700,

@@ -477,7 +477,6 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
           const SizedBox(width: AppSpacing.xs),
           CupertinoButton(
             padding: EdgeInsets.zero,
-            minimumSize: Size.zero,
             onPressed: _trattenute.length > 1
                 ? () => _removeTrattenuta(index)
                 : null,

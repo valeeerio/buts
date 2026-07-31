@@ -736,8 +736,8 @@ class _HeroCard extends StatelessWidget {
       isConfermato ? AppColors.systemGreen : AppColors.systemRed,
       context,
     );
-    final heroAmountStyle = AppTextStyles.cardAmountLarge
-        .copyWith(fontSize: 34, color: labelPrimary);
+    final heroAmountStyle =
+        AppTextStyles.heroAmount.copyWith(color: labelPrimary);
 
     return LiquidGlassSurface(
       radius: AppRadius.glass,
@@ -944,7 +944,7 @@ class _DocumentoChip extends StatelessWidget {
               'Condividi',
               style: AppTextStyles.cardLabel.copyWith(color: labelSecondary),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: AppSpacing.xs),
             Icon(CupertinoIcons.square_arrow_up, size: 16, color: accent),
           ],
         ),
