@@ -367,13 +367,48 @@ double _bottomTitleInterval({
 /// anche dopo il diradamento di `_bottomTitleInterval`.
 const _yearlyLabelsThreshold = 14;
 
-/// Indici della prima busta paga di ogni anno presente in [buste] (assume
-/// [buste] ordinata per periodo crescente) — usati per le etichette asse X
-/// in modalità annuale.
-List<int> _yearBoundaryIndices(List<BustaPaga> buste) {
+/// Oltre questo numero di buste paga, `_StraordinarioChart` passa da barre
+/// mensili a barre trimestrali (somma ore per trimestre): con 2+ anni di
+/// dati mensili le barre diventano troppo sottili per essere lette anche con
+/// lo scroll orizzontale, e 30 barre singole sono meno leggibili di un
+/// andamento aggregato per trimestre.
+const _quarterlyAggregationThreshold = 24;
+
+/// Etichetta trimestre (es. "T1 '24"), usata sull'asse X e nel tooltip di
+/// `_StraordinarioChart` quando le barre sono aggregate per trimestre.
+String _trimestreLabel(DateTime periodo) {
+  final trimestre = (periodo.month - 1) ~/ 3 + 1;
+  return "T$trimestre '${annoAxisLabel(periodo).substring(1)}";
+}
+
+/// Aggrega [buste] per trimestre solare, sommando le ore di straordinario di
+/// ogni trimestre. Il [DateTime] di ogni bucket è il primo giorno del primo
+/// mese del trimestre, usato come riferimento per etichette e tooltip.
+/// Assume [buste] ordinata per periodo crescente.
+List<({DateTime periodo, double totale})> _aggregaStraordinariPerTrimestre(
+    List<BustaPaga> buste) {
+  final totali = <int, double>{};
+  final riferimenti = <int, DateTime>{};
+  for (final busta in buste) {
+    final trimestre = (busta.periodo.month - 1) ~/ 3;
+    final chiave = busta.periodo.year * 10 + trimestre;
+    totali[chiave] = (totali[chiave] ?? 0) + busta.straordinari;
+    riferimenti[chiave] ??= DateTime(busta.periodo.year, trimestre * 3 + 1);
+  }
+  final chiaviOrdinate = totali.keys.toList()..sort();
+  return [
+    for (final chiave in chiaviOrdinate)
+      (periodo: riferimenti[chiave]!, totale: totali[chiave]!),
+  ];
+}
+
+/// Indici del primo periodo di ogni anno presente in [periodi] (assume
+/// [periodi] ordinata crescente) — usati per le etichette asse X in
+/// modalità annuale.
+List<int> _yearBoundaryIndices(List<DateTime> periodi) {
   final indices = <int>[];
-  for (var i = 0; i < buste.length; i++) {
-    if (i == 0 || buste[i].periodo.year != buste[i - 1].periodo.year) {
+  for (var i = 0; i < periodi.length; i++) {
+    if (i == 0 || periodi[i].year != periodi[i - 1].year) {
       indices.add(i);
     }
   }
@@ -383,16 +418,22 @@ List<int> _yearBoundaryIndices(List<BustaPaga> buste) {
 /// Asse X condiviso dai tre grafici della schermata (etichette periodo
 /// diradate in base allo spazio disponibile) — estratto per evitare che il
 /// fix della sovrapposizione venga applicato a un solo grafico per errore.
+/// Prende una lista di [periodi] invece delle buste paga intere, così può
+/// essere riusata anche per punti aggregati (es. barre trimestrali di
+/// `_StraordinarioChart`) che non corrispondono 1:1 a una `BustaPaga`.
+/// [shortLabelBuilder] permette di personalizzare l'etichetta di dettaglio
+/// (default "gen '24"), usato per il caso trimestrale ("T1 '24").
 AxisTitles _periodoBottomAxisTitles({
-  required List<BustaPaga> buste,
+  required List<DateTime> periodi,
   required double availableWidth,
   required Color labelColor,
+  String Function(DateTime periodo) shortLabelBuilder = periodoAxisLabel,
 }) {
   final textStyle =
       AppTextStyles.cardLabel.copyWith(color: labelColor, fontSize: 10);
 
-  if (buste.length > _yearlyLabelsThreshold) {
-    final boundaries = _yearBoundaryIndices(buste);
+  if (periodi.length > _yearlyLabelsThreshold) {
+    final boundaries = _yearBoundaryIndices(periodi);
     final boundaryInterval = _bottomTitleInterval(
       count: boundaries.length,
       availableWidth: availableWidth,
@@ -409,20 +450,20 @@ AxisTitles _periodoBottomAxisTitles({
         interval: 1,
         getTitlesWidget: (value, meta) {
           final index = value.round();
-          if (index < 0 || index >= buste.length || !shown.contains(index)) {
+          if (index < 0 || index >= periodi.length || !shown.contains(index)) {
             return const SizedBox.shrink();
           }
           return Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: Text(annoAxisLabel(buste[index].periodo), style: textStyle),
+            child: Text(annoAxisLabel(periodi[index]), style: textStyle),
           );
         },
       ),
     );
   }
 
-  final interval =
-      _bottomTitleInterval(count: buste.length, availableWidth: availableWidth);
+  final interval = _bottomTitleInterval(
+      count: periodi.length, availableWidth: availableWidth);
   return AxisTitles(
     sideTitles: SideTitles(
       showTitles: true,
@@ -430,12 +471,12 @@ AxisTitles _periodoBottomAxisTitles({
       interval: interval,
       getTitlesWidget: (value, meta) {
         final index = value.round();
-        if (index < 0 || index >= buste.length) {
+        if (index < 0 || index >= periodi.length) {
           return const SizedBox.shrink();
         }
         return Padding(
           padding: const EdgeInsets.only(top: 6),
-          child: Text(periodoAxisLabel(buste[index].periodo), style: textStyle),
+          child: Text(shortLabelBuilder(periodi[index]), style: textStyle),
         );
       },
     ),
@@ -556,7 +597,7 @@ class _NettoLordoChart extends StatelessWidget {
                 formatValue: (v) => '€${formatNumber(v)}',
               ),
               bottomTitles: _periodoBottomAxisTitles(
-                buste: buste,
+                periodi: buste.map((b) => b.periodo).toList(),
                 availableWidth: constraints.maxWidth,
                 labelColor: labelColor,
               ),
@@ -672,7 +713,7 @@ class _FerieRolPermessiChart extends StatelessWidget {
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               leftTitles: _valueLeftAxisTitles(labelColor: labelColor),
               bottomTitles: _periodoBottomAxisTitles(
-                buste: buste,
+                periodi: buste.map((b) => b.periodo).toList(),
                 availableWidth: constraints.maxWidth,
                 labelColor: labelColor,
               ),
@@ -744,10 +785,23 @@ class _FerieRolPermessiChart extends StatelessWidget {
   }
 }
 
+/// Grafico Straordinario per mese. Su range ampi (> [_quarterlyAggregationThreshold]
+/// buste) le barre passano da mensili a trimestrali (vedi
+/// `_aggregaStraordinariPerTrimestre`); se anche con l'aggregazione le barre
+/// risulterebbero più strette di [_minGroupSlotWidth], il grafico diventa
+/// scrollabile in orizzontale (barre a larghezza fissa leggibile) con
+/// l'asse valori a sinistra tenuto fisso in un `BarChart` "scheletro"
+/// separato — fl_chart non supporta nativamente un asse fisso + plot
+/// scrollabile in un singolo chart.
 class _StraordinarioChart extends StatelessWidget {
   final List<BustaPaga> buste;
 
   const _StraordinarioChart({required this.buste});
+
+  static const _barWidth = 16.0;
+  static const _groupsSpace = 20.0;
+  static const _minGroupSlotWidth = _barWidth + _groupsSpace;
+  static const _leftAxisWidth = 40.0;
 
   @override
   Widget build(BuildContext context) {
@@ -759,22 +813,30 @@ class _StraordinarioChart extends StatelessWidget {
         CupertinoDynamicColor.resolve(AppColors.separator, context);
     final labelColor =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
-
     final tooltip = _tooltipColors(context);
-    final maxValue = buste
-        .map((b) => b.straordinari)
-        .fold<double>(0, (max, v) => v > max ? v : max);
-    final maxIndex = buste.indexWhere((b) => b.straordinari == maxValue);
+
+    final aggregato = buste.length > _quarterlyAggregationThreshold;
+    final punti = aggregato
+        ? _aggregaStraordinariPerTrimestre(buste)
+        : [
+            for (final b in buste) (periodo: b.periodo, totale: b.straordinari)
+          ];
+    final shortLabelBuilder = aggregato ? _trimestreLabel : periodoAxisLabel;
+
+    final maxValue =
+        punti.fold<double>(0, (max, p) => p.totale > max ? p.totale : max);
+    final maxIndex = punti.indexWhere((p) => p.totale == maxValue);
     final bounds = _niceAxisBounds(0, maxValue <= 0 ? 1 : maxValue * 1.2,
         step: 20);
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return BarChart(
+    Widget buildPlot({required double width, required bool showLeftAxis}) {
+      return SizedBox(
+        width: width,
+        child: BarChart(
           BarChartData(
             minY: bounds.min,
             maxY: bounds.max,
-            groupsSpace: 20,
+            groupsSpace: _groupsSpace,
             gridData: FlGridData(
               show: true,
               drawVerticalLine: false,
@@ -787,11 +849,15 @@ class _StraordinarioChart extends StatelessWidget {
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               rightTitles:
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              leftTitles: _valueLeftAxisTitles(labelColor: labelColor),
+              leftTitles: showLeftAxis
+                  ? _valueLeftAxisTitles(labelColor: labelColor)
+                  : const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
               bottomTitles: _periodoBottomAxisTitles(
-                buste: buste,
-                availableWidth: constraints.maxWidth,
+                periodi: [for (final p in punti) p.periodo],
+                availableWidth: width,
                 labelColor: labelColor,
+                shortLabelBuilder: shortLabelBuilder,
               ),
             ),
             barTouchData: BarTouchData(
@@ -801,9 +867,9 @@ class _StraordinarioChart extends StatelessWidget {
                 fitInsideHorizontally: true,
                 fitInsideVertically: true,
                 getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                  final busta = buste[group.x];
+                  final punto = punti[group.x];
                   return BarTooltipItem(
-                    '${periodoAxisLabel(busta.periodo)}\n'
+                    '${shortLabelBuilder(punto.periodo)}\n'
                     '${formatNumber(rod.toY)} h',
                     AppTextStyles.cardLabel.copyWith(
                       color: tooltip.text,
@@ -814,22 +880,72 @@ class _StraordinarioChart extends StatelessWidget {
               ),
             ),
             barGroups: [
-              for (var i = 0; i < buste.length; i++)
+              for (var i = 0; i < punti.length; i++)
                 BarChartGroupData(
                   x: i,
                   barRods: [
                     BarChartRodData(
-                      toY: buste[i].straordinari,
+                      toY: punti[i].totale,
                       color: i == maxIndex
                           ? barColor
                           : barColor.withValues(alpha: 0.55),
-                      width: 16,
+                      width: _barWidth,
                       borderRadius: BorderRadius.circular(AppRadius.small / 2),
                     ),
                   ],
                 ),
             ],
           ),
+        ),
+      );
+    }
+
+    Widget buildAxisOnly() {
+      return SizedBox(
+        width: _leftAxisWidth,
+        child: BarChart(
+          BarChartData(
+            minY: bounds.min,
+            maxY: bounds.max,
+            barGroups: const [],
+            gridData: const FlGridData(show: false),
+            borderData: FlBorderData(show: false),
+            titlesData: FlTitlesData(
+              topTitles:
+                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles:
+                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              bottomTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false, reservedSize: 22)),
+              leftTitles: _valueLeftAxisTitles(labelColor: labelColor),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final viewportWidth = constraints.maxWidth;
+        final contentWidth = punti.length * _minGroupSlotWidth;
+        final needsScroll =
+            contentWidth > viewportWidth - _leftAxisWidth;
+
+        if (!needsScroll) {
+          return buildPlot(width: viewportWidth, showLeftAxis: true);
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            buildAxisOnly(),
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: buildPlot(width: contentWidth, showLeftAxis: false),
+              ),
+            ),
+          ],
         );
       },
     );
