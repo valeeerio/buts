@@ -14,8 +14,12 @@ import 'spring_button.dart';
 /// bottoni del dettaglio), `false` per uno stato non selezionato (es. il
 /// tab non attivo nella sidecar), che resta solo icona+testo colorati senza
 /// sfondo.
+///
+/// [icon] è opzionale: `null` per i bottoni dei popup (`AppAlertDialog`),
+/// che non hanno mai avuto un'icona nello stile nativo iOS che sostituiscono
+/// — solo testo colorato sul chip pieno.
 class FlatChipButton extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
   final String label;
   final Color color;
   final bool filled;
@@ -23,7 +27,7 @@ class FlatChipButton extends StatelessWidget {
 
   const FlatChipButton({
     super.key,
-    required this.icon,
+    this.icon,
     required this.label,
     required this.color,
     required this.onPressed,
@@ -45,8 +49,10 @@ class FlatChipButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 18, color: color),
-            const SizedBox(width: AppSpacing.xs),
+            if (icon != null) ...[
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: AppSpacing.xs),
+            ],
             Text(
               label,
               style: AppTextStyles.cardAmount.copyWith(color: color),

@@ -47,6 +47,11 @@ class LiquidGlassSurface extends StatelessWidget {
   /// `LiquidGlassButton`). Lasciare `null` per il vetro neutro standard.
   final Color? tint;
 
+  /// Spessore del bordo speculare. Default: `1.1`, coerente con ogni altra
+  /// card dell'app — solo popup/superfici piccole e centrate possono avere
+  /// bisogno di un bordo più marcato per restare riconoscibili.
+  final double borderWidth;
+
   const LiquidGlassSurface({
     super.key,
     required this.child,
@@ -55,6 +60,7 @@ class LiquidGlassSurface extends StatelessWidget {
     this.elevation = 10,
     this.padding,
     this.tint,
+    this.borderWidth = 1.1,
   });
 
   @override
@@ -123,6 +129,7 @@ class LiquidGlassSurface extends StatelessWidget {
                   clipper: clipper,
                   highlight: highlight,
                   shadowEdge: shadowEdge,
+                  strokeWidth: borderWidth,
                 ),
               ),
             ),
@@ -140,11 +147,13 @@ class _SpecularBorderPainter extends CustomPainter {
   final SquircleClipper clipper;
   final Color highlight;
   final Color shadowEdge;
+  final double strokeWidth;
 
   _SpecularBorderPainter({
     required this.clipper,
     required this.highlight,
     required this.shadowEdge,
+    required this.strokeWidth,
   });
 
   /// Senza questo override, `RenderCustomPaint.hitTestSelf` ricade sul
@@ -176,7 +185,7 @@ class _SpecularBorderPainter extends CustomPainter {
 
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.1
+      ..strokeWidth = strokeWidth
       ..shader = ui.Gradient.linear(
         begin,
         end,
@@ -194,7 +203,8 @@ class _SpecularBorderPainter extends CustomPainter {
   bool shouldRepaint(covariant _SpecularBorderPainter oldDelegate) =>
       oldDelegate.highlight != highlight ||
       oldDelegate.shadowEdge != shadowEdge ||
-      oldDelegate.clipper.radius != clipper.radius;
+      oldDelegate.clipper.radius != clipper.radius ||
+      oldDelegate.strokeWidth != strokeWidth;
 }
 
 /// Riempimento a gradiente della superficie: stesso angolo fisso di

@@ -26,6 +26,16 @@ String periodoAxisLabel(DateTime periodo) {
   return "$month '$year";
 }
 
+/// Etichetta breve solo mese (es. "ago"), usata sull'asse X dei grafici
+/// Statistiche per le etichette mensili normali — l'anno è già visibile
+/// nello slider di periodo sopra i grafici, ripeterlo su ogni tick sarebbe
+/// ridondante. Non usata per tooltip/tabelle statistiche sotto i grafici
+/// (restano su [periodoAxisLabel], dove il contesto dello slider non è
+/// detto sia visibile nello stesso colpo d'occhio).
+String meseAxisLabel(DateTime periodo) {
+  return DateFormat('MMM', 'it_IT').format(periodo);
+}
+
 /// Etichetta solo anno (es. "'24"), usata sull'asse X dei grafici Statistiche
 /// quando il periodo selezionato copre molti mesi e mostrare un'etichetta per
 /// ogni mese affollerebbe l'asse — vedi `_periodoBottomAxisTitles` in

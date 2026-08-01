@@ -66,9 +66,12 @@ final busteRepositoryProvider =
 );
 
 /// Busta paga più recente per periodo — unico punto di lettura del netto
-/// dell'ultimo periodo disponibile.
+/// dell'ultimo periodo disponibile. Solo mensili: una 13esima/14esima più
+/// recente di data non deve mai sostituire l'ultima mensile nell'hero.
 final ultimaBustaPagaProvider = Provider<BustaPaga?>((ref) {
-  final buste = ref.watch(busteRepositoryProvider);
+  final buste = ref
+      .watch(busteRepositoryProvider)
+      .where((b) => b.tipo == TipoBustaPaga.mensile);
   if (buste.isEmpty) return null;
   final sorted = [...buste]..sort((a, b) => b.periodo.compareTo(a.periodo));
   return sorted.first;

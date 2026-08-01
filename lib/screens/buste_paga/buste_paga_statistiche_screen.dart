@@ -260,48 +260,71 @@ class _StatsTable extends StatelessWidget {
     final valueStyle = AppTextStyles.cardLabel.copyWith(color: valueColor);
 
     Widget divider() => Container(height: 0.5, color: dividerColor);
+    Widget columnDivider() => Container(
+          width: 0.5,
+          margin: const EdgeInsets.symmetric(vertical: 2),
+          color: dividerColor,
+        );
+
+    // Il testo non deve mai andare a capo (anche con celle lunghe tipo
+    // "€ 1563.99 (mag '26)" in colonne strette): FittedBox lo restringe
+    // fino a stare su una riga sola invece di lasciarlo wrappare — garanzia
+    // strutturale indipendente dal numero di colonne del grafico.
+    Widget cell(String text, TextStyle style, {TextAlign align = TextAlign.center}) {
+      return FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment:
+            align == TextAlign.center ? Alignment.center : Alignment.centerLeft,
+        child: Text(text, style: style, maxLines: 1, softWrap: false),
+      );
+    }
+
+    // Un divisore verticale sottile tra ogni colonna (oltre a quelli
+    // orizzontali tra le righe), per separare a colpo d'occhio le serie
+    // quando sono 2-3 affiancate (Netto/Lordo, Ferie/ROL/Permessi).
+    List<Widget> withColumnDividers(List<Widget> celle) {
+      return [
+        for (var i = 0; i < celle.length; i++) ...[
+          if (i > 0) columnDivider(),
+          celle[i],
+        ],
+      ];
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
           child: Row(
-            children: [
-              const Expanded(flex: 3, child: SizedBox.shrink()),
+            children: withColumnDividers([
+              const Expanded(flex: 2, child: SizedBox.shrink()),
               for (final colonna in data.colonne)
                 Expanded(
                   flex: 2,
-                  child: Text(
-                    colonna,
-                    style: headerStyle,
-                    textAlign: TextAlign.center,
-                  ),
+                  child: cell(colonna, headerStyle),
                 ),
-            ],
+            ]),
           ),
         ),
         divider(),
         for (var i = 0; i < data.righe.length; i++) ...[
           if (i > 0) divider(),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
             child: Row(
-              children: [
+              children: withColumnDividers([
                 Expanded(
-                  flex: 3,
-                  child: Text(data.righe[i].$1, style: labelStyle),
+                  flex: 2,
+                  child: cell(data.righe[i].$1, labelStyle,
+                      align: TextAlign.left),
                 ),
                 for (final valore in data.righe[i].$2)
                   Expanded(
                     flex: 2,
-                    child: Text(
-                      valore,
-                      style: valueStyle,
-                      textAlign: TextAlign.center,
-                    ),
+                    child: cell(valore, valueStyle),
                   ),
-              ],
+              ]),
             ),
           ),
         ],
@@ -334,6 +357,13 @@ double _totale(List<BustaPaga> buste, double Function(BustaPaga) selettore) {
   return buste.map(selettore).reduce((a, b) => a + b);
 }
 
+/// Formatta sempre con 2 decimali (a differenza di `formatNumber`, che li
+/// omette per i valori esatti) — usato solo nelle tabelle statistiche
+/// sotto i grafici, dove valori nella stessa colonna con un numero di
+/// decimali incoerente (es. "1487" sotto "1449.25") rendono più difficile
+/// scansionare la colonna a colpo d'occhio.
+String _formatStatNumber(double value) => value.toStringAsFixed(2);
+
 /// Tabella del riepilogo sotto il grafico Netto/Lordo. Opera sulle stesse
 /// [buste] già filtrate (confermate, mensili, nel periodo selezionato) che
 /// alimentano il grafico — nessun ricalcolo parallelo del filtro.
@@ -349,29 +379,29 @@ _StatsTableData? _nettoLordoStats(List<BustaPaga> buste) {
       (
         'Media',
         [
-          '€ ${formatNumber(_media(buste, (b) => b.netto))}',
-          '€ ${formatNumber(_media(buste, (b) => b.lordo))}',
+          '€ ${_formatStatNumber(_media(buste, (b) => b.netto))}',
+          '€ ${_formatStatNumber(_media(buste, (b) => b.lordo))}',
         ],
       ),
       (
         'Minimo',
         [
-          '€ ${formatNumber(minNetto.netto)}\n(${periodoAxisLabel(minNetto.periodo)})',
-          '€ ${formatNumber(minLordo.lordo)}\n(${periodoAxisLabel(minLordo.periodo)})',
+          '€ ${_formatStatNumber(minNetto.netto)} (${periodoAxisLabel(minNetto.periodo)})',
+          '€ ${_formatStatNumber(minLordo.lordo)} (${periodoAxisLabel(minLordo.periodo)})',
         ],
       ),
       (
         'Massimo',
         [
-          '€ ${formatNumber(maxNetto.netto)}\n(${periodoAxisLabel(maxNetto.periodo)})',
-          '€ ${formatNumber(maxLordo.lordo)}\n(${periodoAxisLabel(maxLordo.periodo)})',
+          '€ ${_formatStatNumber(maxNetto.netto)} (${periodoAxisLabel(maxNetto.periodo)})',
+          '€ ${_formatStatNumber(maxLordo.lordo)} (${periodoAxisLabel(maxLordo.periodo)})',
         ],
       ),
       (
         'Totale',
         [
-          '€ ${formatNumber(_totale(buste, (b) => b.netto))}',
-          '€ ${formatNumber(_totale(buste, (b) => b.lordo))}',
+          '€ ${_formatStatNumber(_totale(buste, (b) => b.netto))}',
+          '€ ${_formatStatNumber(_totale(buste, (b) => b.lordo))}',
         ],
       ),
     ],
@@ -396,30 +426,30 @@ _StatsTableData? _ferieRolPermessiStats(List<BustaPaga> buste) {
       (
         'Media',
         [
-          formatNumber(_media(buste, (b) => b.ferieResidue)),
-          formatNumber(_media(buste, (b) => b.rolResidui)),
-          formatNumber(_media(buste, (b) => b.permessiGoduti)),
+          _formatStatNumber(_media(buste, (b) => b.ferieResidue)),
+          _formatStatNumber(_media(buste, (b) => b.rolResidui)),
+          _formatStatNumber(_media(buste, (b) => b.permessiGoduti)),
         ],
       ),
       (
         'Minimo',
         [
-          '${formatNumber(minFerie.ferieResidue)}\n(${periodoAxisLabel(minFerie.periodo)})',
-          '${formatNumber(minRol.rolResidui)}\n(${periodoAxisLabel(minRol.periodo)})',
+          '${_formatStatNumber(minFerie.ferieResidue)} (${periodoAxisLabel(minFerie.periodo)})',
+          '${_formatStatNumber(minRol.rolResidui)} (${periodoAxisLabel(minRol.periodo)})',
           '—',
         ],
       ),
       (
         'Massimo',
         [
-          '${formatNumber(maxFerie.ferieResidue)}\n(${periodoAxisLabel(maxFerie.periodo)})',
-          '${formatNumber(maxRol.rolResidui)}\n(${periodoAxisLabel(maxRol.periodo)})',
+          '${_formatStatNumber(maxFerie.ferieResidue)} (${periodoAxisLabel(maxFerie.periodo)})',
+          '${_formatStatNumber(maxRol.rolResidui)} (${periodoAxisLabel(maxRol.periodo)})',
           '—',
         ],
       ),
       (
         'Totale',
-        ['—', '—', formatNumber(_totale(buste, (b) => b.permessiGoduti))],
+        ['—', '—', _formatStatNumber(_totale(buste, (b) => b.permessiGoduti))],
       ),
     ],
   );
@@ -437,16 +467,16 @@ _StatsTableData? _straordinarioStats(List<BustaPaga> buste) {
   return (
     colonne: const ['Ore straordinario'],
     righe: [
-      ('Media', ['${formatNumber(_media(buste, (b) => b.straordinari))} h/mese']),
+      ('Media', ['${_formatStatNumber(_media(buste, (b) => b.straordinari))} h/mese']),
       (
         'Minimo',
-        ['${formatNumber(min.straordinari)} h\n(${periodoAxisLabel(min.periodo)})'],
+        ['${_formatStatNumber(min.straordinari)} h (${periodoAxisLabel(min.periodo)})'],
       ),
       (
         'Massimo',
-        ['${formatNumber(max.straordinari)} h\n(${periodoAxisLabel(max.periodo)})'],
+        ['${_formatStatNumber(max.straordinari)} h (${periodoAxisLabel(max.periodo)})'],
       ),
-      ('Totale', ['${formatNumber(_totale(buste, (b) => b.straordinari))} h']),
+      ('Totale', ['${_formatStatNumber(_totale(buste, (b) => b.straordinari))} h']),
     ],
   );
 }
@@ -561,7 +591,7 @@ AxisTitles _periodoBottomAxisTitles({
   required List<DateTime> periodi,
   required double availableWidth,
   required Color labelColor,
-  String Function(DateTime periodo) shortLabelBuilder = periodoAxisLabel,
+  String Function(DateTime periodo) shortLabelBuilder = meseAxisLabel,
 }) {
   final textStyle =
       AppTextStyles.cardLabel.copyWith(color: labelColor, fontSize: 10);
@@ -1005,7 +1035,7 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
         : [
             for (final b in buste) (periodo: b.periodo, totale: b.straordinari)
           ];
-    final shortLabelBuilder = aggregato ? _trimestreLabel : periodoAxisLabel;
+    final shortLabelBuilder = aggregato ? _trimestreLabel : meseAxisLabel;
 
     final maxValue =
         punti.fold<double>(0, (max, p) => p.totale > max ? p.totale : max);

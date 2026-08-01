@@ -71,6 +71,18 @@ void main() {
       );
     });
 
+    test(
+        'preferisce "Mens.supplementare MM/YYYY" al mese per esteso trovato '
+        'altrove nel testo (13esima/14esima)', () {
+      final testo = _testoSintetico.replaceFirst(
+        'MARZO 2026',
+        'Mens.supplementare 12/2025 MARZO 2026',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.periodo, '2025-12');
+    });
+
     test('testo vuoto o non riconosciuto produce campi nulli/zero e warning', () {
       final risultato = parser.parse('testo qualunque non riconoscibile');
 

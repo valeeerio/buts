@@ -118,6 +118,18 @@ class BustaPagaRegexParser {
     caseSensitive: false,
   );
 
+  // Periodo di competenza delle mensilità supplementari (13esima/14esima):
+  // il campo "MESE DI RETRIBUZIONE" riporta "Mens.supplementare MM/YYYY"
+  // invece del nome del mese per esteso — un testo affidabile solo per
+  // queste buste, va provato con priorità su [_periodo] perché su una
+  // mensilità supplementare quel nome di mese per esteso trovato altrove
+  // nel documento può appartenere a un contesto diverso (es. data di
+  // stampa) e produrre un periodo di competenza sbagliato.
+  static final _mensSupplementare = RegExp(
+    r'Mens\.?\s*supplementare\s*(\d{1,2})\s*/\s*(\d{4})',
+    caseSensitive: false,
+  );
+
   static final _quattordicesima =
       RegExp(r'quattordicesima', caseSensitive: false);
   static final _tredicesima = RegExp(r'tredicesima', caseSensitive: false);
@@ -130,13 +142,20 @@ class BustaPagaRegexParser {
 
     // --- periodo ---
     String? periodo;
-    final periodoMatch = _periodo.firstMatch(testo);
-    if (periodoMatch != null) {
-      final mese = _mesi[periodoMatch.group(1)!.toLowerCase()]!;
-      final anno = periodoMatch.group(2)!;
-      periodo = '$anno-${mese.toString().padLeft(2, '0')}';
+    final supplementareMatch = _mensSupplementare.firstMatch(testo);
+    if (supplementareMatch != null) {
+      final mese = supplementareMatch.group(1)!.padLeft(2, '0');
+      final anno = supplementareMatch.group(2)!;
+      periodo = '$anno-$mese';
     } else {
-      warnings.add('periodo non trovato');
+      final periodoMatch = _periodo.firstMatch(testo);
+      if (periodoMatch != null) {
+        final mese = _mesi[periodoMatch.group(1)!.toLowerCase()]!;
+        final anno = periodoMatch.group(2)!;
+        periodo = '$anno-${mese.toString().padLeft(2, '0')}';
+      } else {
+        warnings.add('periodo non trovato');
+      }
     }
 
     // --- tipo: 13esima/14esima se il testo le nomina esplicitamente,

@@ -8,6 +8,8 @@ import '../../services/pdf_import_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
+import '../../utils/busta_paga_formatting.dart';
+import '../../widgets/app_alert_dialog.dart';
 import '../../widgets/cupertino_range_slider.dart';
 import '../../widgets/flat_chip_button.dart';
 import '../../widgets/spring_button.dart';
@@ -131,6 +133,35 @@ class _BustePagaSectionScreenState
       return;
     }
 
+    // Blocca l'import di un periodo+tipo già in archivio, indipendentemente
+    // dallo stato di verifica — non blocca invece tipi diversi nello stesso
+    // mese (es. mensile + 14esima di agosto), che possono legittimamente
+    // coesistere. Per le mensili il confronto è anno+mese (una per mese);
+    // per 13esima/14esima è solo sull'anno, non sul mese esatto — il mese
+    // in cui vengono pagate varia (dicembre, gennaio, a rate...), ma non ne
+    // può esistere più di una dello stesso tipo nello stesso anno.
+    final periodoEstratto = _periodoDaStringa(risultato.periodo);
+    if (periodoEstratto != null) {
+      final duplicato = ref.read(busteRepositoryProvider).any((b) {
+        if (b.tipo != risultato.tipo) return false;
+        if (risultato.tipo == TipoBustaPaga.mensile) {
+          return b.periodo.year == periodoEstratto.year &&
+              b.periodo.month == periodoEstratto.month;
+        }
+        return b.periodo.year == periodoEstratto.year;
+      });
+      if (duplicato) {
+        _showImportError(
+          'Busta paga già presente',
+          'Hai già una busta paga per '
+              '${periodoDisplayFor(periodo: periodoEstratto, tipo: risultato.tipo)} '
+              'in archivio. Per correggerla, modificala dal dettaglio invece '
+              'di reimportarla.',
+        );
+        return;
+      }
+    }
+
     if (!mounted) return;
     Navigator.of(context).push(
       CupertinoPageRoute(
@@ -186,19 +217,31 @@ class _BustePagaSectionScreenState
     );
   }
 
+  /// Converte il periodo estratto dal parser (stringa `YYYY-MM`) in un
+  /// `DateTime`, `null` se assente o malformato — stessa logica minimale di
+  /// `_periodoFromEstratti` in `BustaPagaFormScreen`.
+  DateTime? _periodoDaStringa(String? periodo) {
+    if (periodo == null) return null;
+    final parti = periodo.split('-');
+    final anno = int.tryParse(parti.elementAtOrNull(0) ?? '');
+    final mese = int.tryParse(parti.elementAtOrNull(1) ?? '');
+    if (anno == null || mese == null) return null;
+    return DateTime(anno, mese);
+  }
+
   void _showImportError(String title, String message) {
-    showCupertinoDialog<void>(
+    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    showAppAlertDialog<void>(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('OK'),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
+      title: title,
+      message: message,
+      actions: [
+        AppAlertAction(
+          label: 'OK',
+          color: accent,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ],
     );
   }
 
@@ -309,6 +352,19 @@ class _BustePagaSectionScreenState
                               _periodoFiltro?.end ?? periodoRangeDisponibile.end,
                           onChanged: (range) =>
                               setState(() => _periodoFiltro = range),
+                        ),
+                      ),
+                    if (_tab == _BustePagaTab.statistiche &&
+                        periodoRangeDisponibile != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.screenHorizontal,
+                          vertical: AppSpacing.sm,
+                        ),
+                        child: Container(
+                          height: 0.5,
+                          color: CupertinoDynamicColor.resolve(
+                              AppColors.separator, context),
                         ),
                       ),
                     if (_tab == _BustePagaTab.archivio)

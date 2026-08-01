@@ -9,6 +9,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/busta_paga_formatting.dart';
+import '../../widgets/app_alert_dialog.dart';
 import '../../widgets/flat_chip_button.dart';
 import '../../widgets/glass_form_section.dart';
 import '../../widgets/liquid_glass_surface.dart';
@@ -260,18 +261,18 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   }
 
   void _showAlert(String title, String message) {
-    showCupertinoDialog<void>(
+    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    showAppAlertDialog<void>(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('OK'),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
+      title: title,
+      message: message,
+      actions: [
+        AppAlertAction(
+          label: 'OK',
+          color: accent,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ],
     );
   }
 
@@ -313,6 +314,30 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       trattenute: trattenute,
     );
 
+    // Stesso controllo dell'import (vedi `buste_paga_section_screen.dart`):
+    // per le mensili anno+mese+tipo, per 13esima/14esima solo anno+tipo (il
+    // mese esatto in cui vengono pagate varia, ma non può essercene più di
+    // una dello stesso tipo nello stesso anno). Esclude se stessa dal
+    // confronto (l'id non cambia durante la modifica).
+    final conflitto = ref.read(busteRepositoryProvider).any((b) {
+      if (b.id == candidato.id) return false;
+      if (b.tipo != candidato.tipo) return false;
+      if (candidato.tipo == TipoBustaPaga.mensile) {
+        return b.periodo.year == candidato.periodo.year &&
+            b.periodo.month == candidato.periodo.month;
+      }
+      return b.periodo.year == candidato.periodo.year;
+    });
+    if (conflitto) {
+      _showAlert(
+        'Busta paga già presente',
+        'Hai già una busta paga per '
+            '${periodoDisplayFor(periodo: candidato.periodo, tipo: candidato.tipo)} '
+            'in archivio.',
+      );
+      return;
+    }
+
     final diff = _buildDiff(corrente, candidato);
 
     if (diff.isEmpty) {
@@ -320,36 +345,34 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       return;
     }
 
-    showCupertinoDialog<void>(
+    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final labelSecondary =
+        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+    showAppAlertDialog<void>(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Conferma modifiche'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: AppSpacing.sm),
-          child: Text(
-            'Hai modificato i seguenti dati, confermi?\n\n${diff.join('\n')}',
-          ),
+      title: 'Conferma modifiche',
+      message: 'Hai modificato i seguenti dati, confermi?\n\n'
+          '${diff.join('\n')}',
+      actions: [
+        AppAlertAction(
+          label: 'Annulla',
+          color: labelSecondary,
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('Annulla'),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          CupertinoDialogAction(
-            isDefaultAction: true,
-            child: const Text('Conferma'),
-            onPressed: () {
-              ref.read(busteRepositoryProvider.notifier).update(
-                    candidato.copyWith(
-                      statoVerifica: StatoVerificaBustaPaga.daConfermare,
-                    ),
-                  );
-              Navigator.of(context).pop();
-              _cancelEditing();
-            },
-          ),
-        ],
-      ),
+        AppAlertAction(
+          label: 'Conferma',
+          color: accent,
+          onPressed: () {
+            ref.read(busteRepositoryProvider.notifier).update(
+                  candidato.copyWith(
+                    statoVerifica: StatoVerificaBustaPaga.daConfermare,
+                  ),
+                );
+            Navigator.of(context).pop();
+            _cancelEditing();
+          },
+        ),
+      ],
     );
   }
 
@@ -597,17 +620,17 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                             statoVerifica: StatoVerificaBustaPaga.confermato,
                           ),
                         );
-                    showCupertinoDialog<void>(
+                    showAppAlertDialog<void>(
                       context: context,
-                      builder: (context) => CupertinoAlertDialog(
-                        title: const Text('Dati confermati'),
-                        actions: [
-                          CupertinoDialogAction(
-                            child: const Text('OK'),
-                            onPressed: () => Navigator.of(context).pop(),
-                          ),
-                        ],
-                      ),
+                      title: 'Dati confermati',
+                      actions: [
+                        AppAlertAction(
+                          label: 'OK',
+                          color: CupertinoDynamicColor.resolve(
+                              AppColors.systemBlue, context),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
                     );
                   },
                   onModifica: () => _enterEditing(corrente),

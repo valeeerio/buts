@@ -10,6 +10,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/busta_paga_formatting.dart';
+import '../../widgets/app_alert_dialog.dart';
 import '../../widgets/busta_paga_list_item.dart';
 import '../../widgets/busta_paga_summary_hero.dart';
 import '../../widgets/liquid_glass_button.dart';
@@ -43,7 +44,7 @@ Map<int, List<BustaPaga>> _groupByYear(List<BustaPaga> sorted) {
 /// periodo è pilotata dall'esterno (campo minimale nel titolo di
 /// `BustePagaSectionScreen`): quando `searchActive` è vero l'hero
 /// dell'ultima busta paga si nasconde per fare spazio all'elenco filtrato.
-class BustePagaArchivioView extends ConsumerWidget {
+class BustePagaArchivioView extends ConsumerStatefulWidget {
   final ValueChanged<BustaPaga> onOpenDetail;
   final VoidCallback onAdd;
   final bool searchActive;
@@ -57,47 +58,202 @@ class BustePagaArchivioView extends ConsumerWidget {
     required this.query,
   });
 
+  @override
+  ConsumerState<BustePagaArchivioView> createState() =>
+      _BustePagaArchivioViewState();
+}
+
+class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
+  /// Anni con la sotto-sezione "Extra" (13esima/14esima) espansa — vuoto di
+  /// default, quindi tutte chiuse all'apertura dell'Archivio.
+  final Set<int> _extraEspansi = {};
+
+  final _scrollController = ScrollController();
+
+  // true finché non si è scrollato fino in fondo alla lista — nasconde la
+  // dissolvenza di fondo (ShaderMask) non appena non c'è più altro sotto:
+  // altrimenti, essendo un gradiente statico legato al viewport e non alla
+  // posizione di scroll, l'ultima busta paga (o l'intera lista se sta tutta
+  // a schermo senza bisogno di scroll) restava sempre semi-trasparente,
+  // anche quando non c'era nient'altro da rivelare scorrendo oltre.
+  bool _showBottomFade = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_updateBottomFade);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_updateBottomFade);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _updateBottomFade() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final showFade = position.pixels < position.maxScrollExtent - 1;
+    if (showFade != _showBottomFade) {
+      setState(() => _showBottomFade = showFade);
+    }
+  }
+
   /// Alert di conferma prima di eliminare davvero, mostrato dallo
   /// swipe-to-delete sia sull'hero sia sulle righe dell'elenco.
   Future<bool> _confirmaEliminazione(
     BuildContext context,
     BustaPaga bustaPaga,
   ) async {
-    final risultato = await showCupertinoDialog<bool>(
+    final labelSecondary =
+        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+    final destructive =
+        CupertinoDynamicColor.resolve(AppColors.systemRed, context);
+    final risultato = await showAppAlertDialog<bool>(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Elimina busta paga'),
-        content: Text(
-          'Sei sicuro di voler eliminare la busta paga di '
+      title: 'Elimina busta paga',
+      message: 'Sei sicuro di voler eliminare la busta paga di '
           '${periodoLabel(bustaPaga)}?',
+      actions: [
+        AppAlertAction(
+          label: 'Annulla',
+          color: labelSecondary,
+          onPressed: () => Navigator.of(context).pop(false),
         ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Annulla'),
-          ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Elimina'),
-          ),
-        ],
-      ),
+        AppAlertAction(
+          label: 'Elimina',
+          color: destructive,
+          onPressed: () => Navigator.of(context).pop(true),
+        ),
+      ],
     );
     return risultato ?? false;
   }
 
+  /// Righe di un gruppo di buste paga (swipe-to-delete + tap per il
+  /// dettaglio), fattorizzato perché sia la sotto-sezione "Extra" sia le
+  /// mensilità normali di un anno usano esattamente questo pattern.
+  Widget _bustePagaSliverList(WidgetRef ref, List<BustaPaga> buste) {
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.screenHorizontal,
+        AppSpacing.xs,
+        AppSpacing.screenHorizontal,
+        0,
+      ),
+      sliver: SliverList.separated(
+        itemCount: buste.length,
+        separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+        itemBuilder: (context, index) {
+          final bustaPaga = buste[index];
+          return Dismissible(
+            key: ValueKey('row-${bustaPaga.id}'),
+            direction: DismissDirection.endToStart,
+            confirmDismiss: (_) => _confirmaEliminazione(context, bustaPaga),
+            onDismissed: (_) =>
+                ref.read(busteRepositoryProvider.notifier).remove(bustaPaga.id),
+            background:
+                const SwipeDeleteBackground(radius: AppRadius.glassSmall),
+            child: BustaPagaListItem(
+              bustaPaga: bustaPaga,
+              onTap: () => widget.onOpenDetail(bustaPaga),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Contenuto (`sliver:`) di un `SliverStickyHeader` anno: le mensilità
+  /// normali, poi in fondo la sotto-sezione "Extra" (13esima/14esima) se
+  /// presente — header tappabile con freccetta che espande/collassa
+  /// `_bustePagaSliverList(extra)`, chiusa di default (`anno` non in
+  /// `_extraEspansi`). Niente sticky header annidato (non supportato da
+  /// `flutter_sticky_header`), tutto sotto lo stesso header "$anno".
+  Widget _yearSliver(BuildContext context, WidgetRef ref, int anno, List<BustaPaga> buste) {
+    // Ordine fisso per tipo (13esima sempre prima della 14esima), non
+    // cronologico per mese come le mensilità: il mese registrato su
+    // ciascuna può variare da un anno all'altro, l'ordine per tipo resta
+    // prevedibile in ogni sezione "Extra".
+    final extra = buste.where((b) => b.tipo != TipoBustaPaga.mensile).toList()
+      ..sort((a, b) => a.tipo.index.compareTo(b.tipo.index));
+    final normali = buste.where((b) => b.tipo == TipoBustaPaga.mensile).toList();
+    final espansa = _extraEspansi.contains(anno);
+
+    return SliverMainAxisGroup(
+      slivers: [
+        if (extra.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: CupertinoButton(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenHorizontal,
+                AppSpacing.xs,
+                AppSpacing.screenHorizontal,
+                AppSpacing.xs,
+              ),
+              minimumSize: Size.zero,
+              onPressed: () => setState(() {
+                if (espansa) {
+                  _extraEspansi.remove(anno);
+                } else {
+                  _extraEspansi.add(anno);
+                }
+              }),
+              child: Row(
+                children: [
+                  Text(
+                    'Extra',
+                    style: AppTextStyles.cardLabel.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: CupertinoDynamicColor.resolve(
+                          AppColors.labelSecondary, context),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  AnimatedRotation(
+                    turns: espansa ? 0.25 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      CupertinoIcons.chevron_right,
+                      size: 14,
+                      color: CupertinoDynamicColor.resolve(
+                          AppColors.labelSecondary, context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (espansa) _bustePagaSliverList(ref, extra),
+          if (normali.isNotEmpty)
+            const SliverToBoxAdapter(
+              child: SizedBox(height: AppSpacing.md),
+            ),
+        ],
+        if (normali.isNotEmpty) _bustePagaSliverList(ref, normali),
+      ],
+    );
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final buste = ref.watch(busteRepositoryProvider);
     final ultima = ref.watch(ultimaBustaPagaProvider);
     final sorted = [...buste]..sort((a, b) => b.periodo.compareTo(a.periodo));
-    final filtered = searchActive ? _filtered(sorted, query) : sorted;
+    final filtered =
+        widget.searchActive ? _filtered(sorted, widget.query) : sorted;
     final byYear = _groupByYear(filtered);
     final anni = byYear.keys.toList()..sort((a, b) => b.compareTo(a));
-    final nessunRisultato =
-        searchActive && query.trim().isNotEmpty && filtered.isEmpty;
-    final mostraHero = !searchActive && ultima != null;
+    final nessunRisultato = widget.searchActive &&
+        widget.query.trim().isNotEmpty &&
+        filtered.isEmpty;
+    final mostraHero = !widget.searchActive && ultima != null;
+
+    // Ricontrolla dopo ogni layout (non solo sullo scroll dell'utente): il
+    // contenuto della lista cambia (import/eliminazione, ricerca) e con
+    // esso può cambiare se c'è ancora altro da scorrere sotto.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateBottomFade());
 
     return Column(
       children: [
@@ -120,7 +276,7 @@ class BustePagaArchivioView extends ConsumerWidget {
               background: const SwipeDeleteBackground(radius: AppRadius.glass),
               child: BustaPagaSummaryHero(
                 bustaPaga: ultima,
-                onTap: () => onOpenDetail(ultima),
+                onTap: () => widget.onOpenDetail(ultima),
               ),
             ),
           ),
@@ -130,7 +286,7 @@ class BustePagaArchivioView extends ConsumerWidget {
           child: ShaderMask(
             blendMode: BlendMode.dstIn,
             shaderCallback: (rect) {
-              const fadeHeight = 120.0;
+              final fadeHeight = _showBottomFade ? 120.0 : 0.0;
               final stop = 1 - (fadeHeight / rect.height).clamp(0.0, 1.0);
               return LinearGradient(
                 begin: Alignment.topCenter,
@@ -144,6 +300,7 @@ class BustePagaArchivioView extends ConsumerWidget {
               ).createShader(rect);
             },
             child: CustomScrollView(
+              controller: _scrollController,
               slivers: [
                 if (!mostraHero)
                   const SliverToBoxAdapter(
@@ -155,7 +312,7 @@ class BustePagaArchivioView extends ConsumerWidget {
                       horizontal: AppSpacing.screenHorizontal,
                     ),
                     sliver: SliverToBoxAdapter(
-                      child: _EmptyState(onAdd: onAdd),
+                      child: _EmptyState(onAdd: widget.onAdd),
                     ),
                   )
                 else if (nessunRisultato)
@@ -167,11 +324,11 @@ class BustePagaArchivioView extends ConsumerWidget {
                       0,
                     ),
                     sliver: SliverToBoxAdapter(
-                      child: _NessunRisultato(query: query.trim()),
+                      child: _NessunRisultato(query: widget.query.trim()),
                     ),
                   )
                 else
-                  for (final anno in anni)
+                  for (final anno in anni) ...[
                     SliverStickyHeader(
                       header: _pinnedBackground(
                         context,
@@ -195,38 +352,13 @@ class BustePagaArchivioView extends ConsumerWidget {
                           ),
                         ),
                       ),
-                      sliver: SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.screenHorizontal,
-                          AppSpacing.xs,
-                          AppSpacing.screenHorizontal,
-                          0,
-                        ),
-                        sliver: SliverList.separated(
-                          itemCount: byYear[anno]!.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: AppSpacing.sm),
-                          itemBuilder: (context, index) {
-                            final bustaPaga = byYear[anno]![index];
-                            return Dismissible(
-                              key: ValueKey('row-${bustaPaga.id}'),
-                              direction: DismissDirection.endToStart,
-                              confirmDismiss: (_) =>
-                                  _confirmaEliminazione(context, bustaPaga),
-                              onDismissed: (_) => ref
-                                  .read(busteRepositoryProvider.notifier)
-                                  .remove(bustaPaga.id),
-                              background: const SwipeDeleteBackground(
-                                  radius: AppRadius.glassSmall),
-                              child: BustaPagaListItem(
-                                bustaPaga: bustaPaga,
-                                onTap: () => onOpenDetail(bustaPaga),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                      sliver: _yearSliver(context, ref, anno, byYear[anno]!),
                     ),
+                    if (anno != anni.last)
+                      const SliverToBoxAdapter(
+                        child: SizedBox(height: AppSpacing.lg),
+                      ),
+                  ],
                 const SliverToBoxAdapter(
                   child: SizedBox(height: AppSpacing.xl),
                 ),
