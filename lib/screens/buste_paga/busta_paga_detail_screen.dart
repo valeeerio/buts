@@ -422,8 +422,8 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     final corrente = buste.firstWhere((b) => b.id == widget.bustaPaga.id,
         orElse: () => widget.bustaPaga);
     final periodoLabelVista = _isEditing
-        ? _periodoLabelForDate(_periodoEdit)
-        : _periodoLabelForDate(corrente.periodo);
+        ? periodoDisplayFor(periodo: _periodoEdit, tipo: _tipoEdit)
+        : bustaPagaPeriodoDisplay(corrente);
 
     return CupertinoPageScaffold(
       backgroundColor:

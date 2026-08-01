@@ -55,7 +55,7 @@ class BustaPagaSummaryHero extends StatelessWidget {
                   ),
                   Expanded(
                     child: Text(
-                      meseLabel(bustaPaga),
+                      bustaPagaMeseDisplay(bustaPaga),
                       style: AppTextStyles.subtitle.copyWith(
                         color: labelPrimary,
                         fontWeight: FontWeight.w700,

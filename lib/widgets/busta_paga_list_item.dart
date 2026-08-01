@@ -59,7 +59,7 @@ class BustaPagaListItem extends StatelessWidget {
             ),
             Expanded(
               child: Text(
-                meseLabel(bustaPaga),
+                bustaPagaMeseDisplay(bustaPaga),
                 style: AppTextStyles.cardAmount.copyWith(
                   color: labelPrimary,
                   fontWeight: FontWeight.w700,
