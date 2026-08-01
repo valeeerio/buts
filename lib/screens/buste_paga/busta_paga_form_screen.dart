@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:path/path.dart' as p;
 import '../../models/busta_paga.dart';
 import '../../providers/buste_paga_provider.dart';
 import '../../services/busta_paga_regex_parser.dart';
@@ -10,21 +9,35 @@ import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/busta_paga_formatting.dart';
 import '../../widgets/app_alert_dialog.dart';
+import '../../widgets/busta_paga_documento_chip.dart';
+import '../../widgets/busta_paga_hero_card.dart';
+import '../../widgets/busta_paga_maturazioni_section.dart';
+import '../../widgets/busta_paga_stat_row.dart';
+import '../../widgets/flat_chip_button.dart';
 import '../../widgets/glass_form_section.dart';
-import '../../widgets/liquid_glass_button.dart';
 import '../../widgets/liquid_glass_surface.dart';
+import '../../widgets/trattenuta_edit_row.dart';
+
+/// Altezza riservata alla barra flottante "Salva/Annulla" in basso, usata
+/// come padding in fondo al contenuto scrollabile perché l'ultima card non
+/// finisca nascosta/tappabile dietro di essa — stesso valore/motivazione di
+/// `_actionBarReservedHeight` in `busta_paga_detail_screen.dart`.
+const double _actionBarReservedHeight = 80;
 
 /// Form di revisione di un nuovo import PDF già processato a monte: i campi
 /// sono precompilati dal parser regex ([estratti], con [fileOrigine] il path
 /// del PDF già copiato) e restano editabili prima della conferma esplicita
-/// (pulsante Salva).
+/// (bottone "Salva" nella barra flottante in basso). Stesso impianto visivo
+/// del dettaglio busta paga in modifica (`BustaPagaDetailScreen`): hero
+/// card, riga di statistiche a scomparti, tabella unica Maturazioni, chip
+/// documento (qui non tappabile: il file è ancora in fase di revisione),
+/// trattenute con swipe-to-delete.
 ///
 /// La modifica di una busta paga già esistente non passa più da qui: dal
-/// dettaglio (`BustaPagaDetailScreen`) è ora inline nella stessa pagina,
-/// senza navigazione verso un form separato. Non esiste più nemmeno una
-/// modalità "vuota" per inserimento manuale libero: il PDF viene sempre
-/// scelto e processato prima di arrivare qui (vedi
-/// `buste_paga_section_screen.dart` / CLAUDE.md).
+/// dettaglio è ora inline nella stessa pagina, senza navigazione verso un
+/// form separato. Non esiste più nemmeno una modalità "vuota" per
+/// inserimento manuale libero: il PDF viene sempre scelto e processato
+/// prima di arrivare qui (vedi `buste_paga_section_screen.dart` / CLAUDE.md).
 class BustaPagaFormScreen extends ConsumerStatefulWidget {
   final String fileOrigine;
   final BustaPagaEstratti estratti;
@@ -40,23 +53,7 @@ class BustaPagaFormScreen extends ConsumerStatefulWidget {
       _BustaPagaFormScreenState();
 }
 
-class _TrattenutaRow {
-  final TextEditingController chiave;
-  final TextEditingController importo;
-
-  _TrattenutaRow({String chiave = '', String importo = ''})
-      : chiave = TextEditingController(text: chiave),
-        importo = TextEditingController(text: importo);
-
-  void dispose() {
-    chiave.dispose();
-    importo.dispose();
-  }
-}
-
 class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
-  final _formKey = GlobalKey<FormState>();
-
   late DateTime _periodo;
   late TipoBustaPaga _tipo;
 
@@ -75,9 +72,9 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   late final TextEditingController _permessiGodutiController;
   late final TextEditingController _oreLavorateController;
 
-  late List<_TrattenutaRow> _trattenute;
+  late List<TrattenutaEditRow> _trattenute;
 
-  String? _fileOrigine;
+  late final String _fileOrigine;
   List<String> _warnings = const [];
 
   /// True quando i campi sono stati popolati dall'estrazione automatica e
@@ -98,39 +95,48 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     _tipo = estratti.tipo;
 
     _lordoController =
-        TextEditingController(text: _formatNumber(estratti.lordo));
+        TextEditingController(text: _formatNumero(estratti.lordo));
     _nettoController =
-        TextEditingController(text: _formatNumber(estratti.netto));
+        TextEditingController(text: _formatNumero(estratti.netto));
     _straordinariController =
-        TextEditingController(text: _formatNumber(estratti.straordinari));
+        TextEditingController(text: _formatNumero(estratti.straordinari));
 
     _ferieMaturateController =
-        TextEditingController(text: _formatNumber(estratti.ferieMaturate));
+        TextEditingController(text: _formatNumero(estratti.ferieMaturate));
     _ferieGoduteController =
-        TextEditingController(text: _formatNumber(estratti.ferieGodute));
+        TextEditingController(text: _formatNumero(estratti.ferieGodute));
     _ferieResidueController =
-        TextEditingController(text: _formatNumber(estratti.ferieResidue));
+        TextEditingController(text: _formatNumero(estratti.ferieResidue));
 
     _rolMaturatiController =
-        TextEditingController(text: _formatNumber(estratti.rolMaturati));
+        TextEditingController(text: _formatNumero(estratti.rolMaturati));
     _rolGodutiController =
-        TextEditingController(text: _formatNumber(estratti.rolGoduti));
+        TextEditingController(text: _formatNumero(estratti.rolGoduti));
     _rolResiduiController =
-        TextEditingController(text: _formatNumber(estratti.rolResidui));
+        TextEditingController(text: _formatNumero(estratti.rolResidui));
 
     _permessiGodutiController =
-        TextEditingController(text: _formatNumber(estratti.permessiGoduti));
+        TextEditingController(text: _formatNumero(estratti.permessiGoduti));
     _oreLavorateController =
-        TextEditingController(text: _formatNumber(estratti.oreLavorate));
+        TextEditingController(text: _formatNumero(estratti.oreLavorate));
 
     final trattenuteIniziali = estratti.trattenute;
     _trattenute = trattenuteIniziali.isEmpty
-        ? [_TrattenutaRow()]
+        ? [TrattenutaEditRow()]
         : trattenuteIniziali.entries
-            .map((e) => _TrattenutaRow(
+            .map((e) => TrattenutaEditRow(
                 chiave: e.key, importo: e.value.toStringAsFixed(2)))
             .toList();
+
+    // Forza il rebuild della `BustaPagaStatRow` (Ferie/ROL residui) ogni
+    // volta che cambia il campo "Residuo" corrispondente nella tabella
+    // Maturazioni sottostante — stesso meccanismo `_onResiduiChanged` del
+    // dettaglio busta paga.
+    _ferieResidueController.addListener(_onResiduiChanged);
+    _rolResiduiController.addListener(_onResiduiChanged);
   }
+
+  void _onResiduiChanged() => setState(() {});
 
   static DateTime? _periodoFromEstratti(String? periodo) {
     if (periodo == null) return null;
@@ -141,7 +147,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     return DateTime(anno, mese);
   }
 
-  static String _formatNumber(double? value) {
+  static String _formatNumero(double? value) {
     if (value == null) return '';
     return value == value.roundToDouble()
         ? value.toStringAsFixed(0)
@@ -244,7 +250,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   }
 
   void _addTrattenuta() {
-    setState(() => _trattenute.add(_TrattenutaRow()));
+    setState(() => _trattenute.add(TrattenutaEditRow()));
   }
 
   void _removeTrattenuta(int index) {
@@ -272,8 +278,14 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   }
 
   void _save() {
-    final isValid = _formKey.currentState?.validate() ?? false;
-    if (!isValid) return;
+    final nettoText = _nettoController.text.trim().replaceAll(',', '.');
+    if (nettoText.isEmpty || double.tryParse(nettoText) == null) {
+      _showAlert(
+        'Netto non valido',
+        'Inserisci un valore numerico per il netto prima di salvare.',
+      );
+      return;
+    }
 
     // Stesso controllo anti-duplicati già usato dal dettaglio
     // (`busta_paga_detail_screen.dart._save()`): per le mensili anno+mese+
@@ -335,251 +347,159 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final labelSecondary =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
     final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final secondaryAccent =
+        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
 
     return CupertinoPageScaffold(
       backgroundColor:
           CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
-      navigationBar: CupertinoNavigationBar(
-        middle: const Text('Nuova busta paga'),
-        trailing: LiquidGlassButton(
-          onPressed: _save,
-          radius: AppRadius.glassSmall,
-          tint: accent,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.xs,
-          ),
-          child: Text(
-            'Salva',
-            style: AppTextStyles.subtitle.copyWith(
-              color: accent,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('Nuova busta paga'),
       ),
-      child: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.screenHorizontal,
-              AppSpacing.sm,
-              AppSpacing.screenHorizontal,
-              AppSpacing.xl,
-            ),
-            children: [
-              if (_valoriDaConferma) _ConfermaBanner(warnings: _warnings),
-              GlassFormSection(
-                header: 'Periodo',
-                children: [
-                  CupertinoFormRow(
-                    prefix: const Text('Mese'),
-                    child: GestureDetector(
-                      onTap: _pickPeriodo,
-                      behavior: HitTestBehavior.opaque,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(_periodoLabel,
-                              style:
-                                  AppTextStyles.subtitle.copyWith(color: accent)),
-                          const SizedBox(width: AppSpacing.xs),
-                          Icon(CupertinoIcons.chevron_down,
-                              size: 14, color: labelSecondary),
-                        ],
-                      ),
-                    ),
-                  ),
-                  CupertinoFormRow(
-                    prefix: const Text('Tipo'),
-                    child: GestureDetector(
-                      onTap: _pickTipo,
-                      behavior: HitTestBehavior.opaque,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(_tipoLabels[_tipo]!,
-                              style:
-                                  AppTextStyles.subtitle.copyWith(color: accent)),
-                          const SizedBox(width: AppSpacing.xs),
-                          Icon(CupertinoIcons.chevron_down,
-                              size: 14, color: labelSecondary),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (_fileOrigine != null)
-                GlassFormSection(
-                  header: 'Documento',
-                  children: [_documentoRow(labelSecondary)],
-                ),
-              GlassFormSection(
-                header: 'Importi',
-                children: [
-                  _numberField(
-                    label: 'Lordo',
-                    controller: _lordoController,
-                  ),
-                  _numberField(
-                    label: 'Netto',
-                    controller: _nettoController,
-                    requiredField: true,
-                  ),
-                  _numberField(
-                    label: 'Straordinari',
-                    controller: _straordinariController,
-                  ),
-                ],
-              ),
-              GlassFormSection(
-                header: 'Ferie',
-                children: [
-                  _numberField(
-                      label: 'Maturate', controller: _ferieMaturateController),
-                  _numberField(
-                      label: 'Godute', controller: _ferieGoduteController),
-                  _numberField(
-                      label: 'Residue', controller: _ferieResidueController),
-                ],
-              ),
-              GlassFormSection(
-                header: 'ROL',
-                children: [
-                  _numberField(
-                      label: 'Maturati', controller: _rolMaturatiController),
-                  _numberField(
-                      label: 'Goduti', controller: _rolGodutiController),
-                  _numberField(
-                      label: 'Residui', controller: _rolResiduiController),
-                ],
-              ),
-              GlassFormSection(
-                header: 'Permessi e ore',
-                children: [
-                  _numberField(
-                      label: 'Permessi goduti',
-                      controller: _permessiGodutiController),
-                  _numberField(
-                      label: 'Ore lavorate', controller: _oreLavorateController),
-                ],
-              ),
-              GlassFormSection(
-                header: 'Trattenute',
-                footer:
-                    'Aggiungi le voci di trattenuta indicate in busta paga (es. INPS, IRPEF).',
-                children: [
-                  for (var i = 0; i < _trattenute.length; i++)
-                    _trattenutaRow(i),
-                  CupertinoButton(
-                    padding: const EdgeInsets.symmetric(
-                        vertical: AppSpacing.sm),
-                    onPressed: _addTrattenuta,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(CupertinoIcons.add_circled, color: accent, size: 18),
-                        const SizedBox(width: AppSpacing.xs),
-                        Text('Aggiungi voce',
-                            style: AppTextStyles.subtitle.copyWith(color: accent)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Riga di sola visualizzazione del PDF già associato alla busta paga: il
-  /// file è già stato scelto e processato prima di arrivare al form, qui
-  /// non ci sono azioni di allega/rimuovi (vedi CLAUDE.md).
-  Widget _documentoRow(Color labelSecondary) {
-    return CupertinoFormRow(
-      prefix: const Text('PDF'),
-      child: Text(
-        p.basename(_fileOrigine!),
-        overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.end,
-        style: AppTextStyles.subtitle.copyWith(color: labelSecondary),
-      ),
-    );
-  }
-
-  Widget _numberField({
-    required String label,
-    required TextEditingController controller,
-    bool requiredField = false,
-  }) {
-    return CupertinoTextFormFieldRow(
-      prefix: Text(label),
-      controller: controller,
-      textAlign: TextAlign.end,
-      keyboardType:
-          const TextInputType.numberWithOptions(decimal: true, signed: false),
-      placeholder: '0',
-      validator: requiredField
-          ? (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Obbligatorio';
-              }
-              final parsed = double.tryParse(value.trim().replaceAll(',', '.'));
-              if (parsed == null) return 'Valore non valido';
-              return null;
-            }
-          : null,
-    );
-  }
-
-  Widget _trattenutaRow(int index) {
-    final row = _trattenute[index];
-    return CupertinoFormRow(
-      prefix: SizedBox(
-        width: 120,
-        child: CupertinoTextField(
-          controller: row.chiave,
-          placeholder: 'Voce',
-          decoration: const BoxDecoration(),
-          padding: EdgeInsets.zero,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Stack(
         children: [
-          SizedBox(
-            width: 90,
-            child: CupertinoTextField(
-              controller: row.importo,
-              placeholder: '0',
-              textAlign: TextAlign.end,
-              keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true, signed: false),
-              decoration: const BoxDecoration(),
-              padding: EdgeInsets.zero,
+          SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenHorizontal,
+                AppSpacing.sm,
+                AppSpacing.screenHorizontal,
+                _actionBarReservedHeight,
+              ),
+              children: [
+                if (_valoriDaConferma) _ConfermaBanner(warnings: _warnings),
+                BustaPagaHeroCard(
+                  isConfermato: false,
+                  periodoLabel: _periodoLabel,
+                  tipo: _tipo,
+                  isEditing: true,
+                  nettoDisplay: formatNumber(_parse(_nettoController)),
+                  nettoController: _nettoController,
+                  onTapPeriodo: _pickPeriodo,
+                  onTapTipo: _pickTipo,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                BustaPagaStatRow(items: [
+                  (
+                    'Ferie residue',
+                    Text(
+                      formatNumber(_parse(_ferieResidueController)),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  (
+                    'ROL residui',
+                    Text(
+                      formatNumber(_parse(_rolResiduiController)),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  (
+                    'Ore lavorate',
+                    inlineNumberField(_oreLavorateController),
+                  ),
+                ]),
+                const SizedBox(height: AppSpacing.lg),
+                BustaPagaDocumentoChip(filePath: _fileOrigine),
+                const SizedBox(height: AppSpacing.lg),
+                BustaPagaMaturazioniSection(
+                  isEditing: true,
+                  ferieMaturate:
+                      formatNumber(_parse(_ferieMaturateController)),
+                  ferieGodute: formatNumber(_parse(_ferieGoduteController)),
+                  ferieResidue: formatNumber(_parse(_ferieResidueController)),
+                  rolMaturati: formatNumber(_parse(_rolMaturatiController)),
+                  rolGoduti: formatNumber(_parse(_rolGodutiController)),
+                  rolResidui: formatNumber(_parse(_rolResiduiController)),
+                  permessiGoduti:
+                      formatNumber(_parse(_permessiGodutiController)),
+                  ferieMaturateCtrl: _ferieMaturateController,
+                  ferieGoduteCtrl: _ferieGoduteController,
+                  ferieResidueCtrl: _ferieResidueController,
+                  rolMaturatiCtrl: _rolMaturatiController,
+                  rolGodutiCtrl: _rolGodutiController,
+                  rolResiduiCtrl: _rolResiduiController,
+                  permessiGodutiCtrl: _permessiGodutiController,
+                ),
+                BustaPagaStatRow(items: [
+                  (
+                    'Lordo',
+                    inlineNumberField(_lordoController, prefix: '€ '),
+                  ),
+                  (
+                    'Straordinari',
+                    inlineNumberField(_straordinariController, prefix: '€ '),
+                  ),
+                ]),
+                const SizedBox(height: AppSpacing.lg),
+                GlassFormSection(
+                  footer: 'Aggiungi le voci di trattenuta indicate in busta '
+                      'paga (es. INPS, IRPEF).',
+                  children: [
+                    for (var i = 0; i < _trattenute.length; i++)
+                      trattenutaEditRow(
+                        _trattenute[i],
+                        onDismissed: () => _removeTrattenuta(i),
+                      ),
+                    _aggiungiVoceButton(accent),
+                  ],
+                ),
+              ],
             ),
           ),
-          const SizedBox(width: AppSpacing.xs),
-          CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: _trattenute.length > 1
-                ? () => _removeTrattenuta(index)
-                : null,
-            child: Icon(
-              CupertinoIcons.minus_circle,
-              size: 20,
-              color: CupertinoDynamicColor.resolve(
-                  AppColors.systemRed, context),
+          Positioned(
+            left: AppSpacing.screenHorizontal,
+            right: AppSpacing.screenHorizontal,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: FlatChipButton(
+                        icon: CupertinoIcons.checkmark_alt,
+                        label: 'Salva',
+                        color: accent,
+                        onPressed: _save,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: FlatChipButton(
+                        icon: CupertinoIcons.xmark,
+                        label: 'Annulla',
+                        color: secondaryAccent,
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _aggiungiVoceButton(Color accent) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: CupertinoButton(
+        padding: EdgeInsets.zero,
+        onPressed: _addTrattenuta,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(CupertinoIcons.add_circled, color: accent, size: 18),
+            const SizedBox(width: AppSpacing.xs),
+            Text('Aggiungi voce',
+                style: AppTextStyles.subtitle.copyWith(color: accent)),
+          ],
+        ),
       ),
     );
   }
@@ -587,8 +507,9 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
 
 /// Banner di conferma esplicita per i dati estratti automaticamente da un
 /// nuovo import PDF: visibile finché `_valoriDaConferma == true`, incorpora
-/// gli eventuali warning del parser regex. Il pulsante "Salva" nella nav
-/// bar resta il meccanismo di conferma vera e propria (vedi `_save`).
+/// gli eventuali warning del parser regex. Il bottone "Salva" nella barra
+/// flottante in basso resta il meccanismo di conferma vera e propria (vedi
+/// `_save`).
 class _ConfermaBanner extends StatelessWidget {
   final List<String> warnings;
 
