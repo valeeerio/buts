@@ -184,47 +184,6 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
     return SliverMainAxisGroup(
       slivers: [
         if (extra.isNotEmpty) ...[
-          SliverToBoxAdapter(
-            child: CupertinoButton(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.screenHorizontal,
-                AppSpacing.xs,
-                AppSpacing.screenHorizontal,
-                AppSpacing.xs,
-              ),
-              minimumSize: Size.zero,
-              onPressed: () => setState(() {
-                if (espansa) {
-                  _extraEspansi.remove(anno);
-                } else {
-                  _extraEspansi.add(anno);
-                }
-              }),
-              child: Row(
-                children: [
-                  Text(
-                    'Extra',
-                    style: AppTextStyles.cardLabel.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: CupertinoDynamicColor.resolve(
-                          AppColors.labelSecondary, context),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  AnimatedRotation(
-                    turns: espansa ? 0.25 : 0,
-                    duration: const Duration(milliseconds: 200),
-                    child: Icon(
-                      CupertinoIcons.chevron_right,
-                      size: 14,
-                      color: CupertinoDynamicColor.resolve(
-                          AppColors.labelSecondary, context),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
           if (espansa) _bustePagaSliverList(ref, extra),
           if (normali.isNotEmpty)
             const SliverToBoxAdapter(
@@ -233,6 +192,48 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
         ],
         if (normali.isNotEmpty) _bustePagaSliverList(ref, normali),
       ],
+    );
+  }
+
+  /// Toggle "Extra ⌄" (testo + `AnimatedRotation` chevron), ora disegnato
+  /// sulla stessa riga dell'header sticky dell'anno invece che come riga a
+  /// parte sopra l'elenco — stesso comportamento/stato (`_extraEspansi`) di
+  /// prima, solo posizione diversa.
+  Widget _extraToggle(BuildContext context, int anno, bool espansa) {
+    final labelSecondary =
+        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: () => setState(() {
+        if (espansa) {
+          _extraEspansi.remove(anno);
+        } else {
+          _extraEspansi.add(anno);
+        }
+      }),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Extra',
+            style: AppTextStyles.cardLabel.copyWith(
+              fontWeight: FontWeight.w600,
+              color: labelSecondary,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          AnimatedRotation(
+            turns: espansa ? 0.25 : 0,
+            duration: const Duration(milliseconds: 200),
+            child: Icon(
+              CupertinoIcons.chevron_right,
+              size: 14,
+              color: labelSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -339,16 +340,23 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
                             AppSpacing.screenHorizontal,
                             AppSpacing.sm + 2,
                           ),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              '$anno',
-                              style: AppTextStyles.subtitle.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: CupertinoDynamicColor.resolve(
-                                    AppColors.labelPrimary, context),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '$anno',
+                                  style: AppTextStyles.subtitle.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: CupertinoDynamicColor.resolve(
+                                        AppColors.labelPrimary, context),
+                                  ),
+                                ),
                               ),
-                            ),
+                              if (byYear[anno]!.any(
+                                  (b) => b.tipo != TipoBustaPaga.mensile))
+                                _extraToggle(context, anno,
+                                    _extraEspansi.contains(anno)),
+                            ],
                           ),
                         ),
                       ),

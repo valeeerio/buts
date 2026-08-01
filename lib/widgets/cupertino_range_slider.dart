@@ -40,7 +40,7 @@ class _CupertinoRangeSliderState extends State<CupertinoRangeSlider> {
   static const _thumbTouchSize = 44.0;
   static const _thumbVisualSize = 14.0;
   static const _trackHeight = 4.0;
-  static const _minGapMs = 30 * 24 * 60 * 60 * 1000; // ~1 mese
+  static const _minGapMonths = 1;
 
   late double _startFraction;
   late double _endFraction;
@@ -67,23 +67,33 @@ class _CupertinoRangeSliderState extends State<CupertinoRangeSlider> {
     }
   }
 
-  double get _totalMs =>
-      widget.maxDate.difference(widget.minDate).inMilliseconds.toDouble();
+  // Unità del range in mesi interi (non millisecondi): i periodi delle
+  // buste paga sono sempre il 1° del mese (`DateTime(anno, mese)`) — un
+  // fraction→data continuo su millisecondi poteva restituire un giorno a
+  // metà mese (es. 15 marzo) che, pur mostrando l'etichetta "mar '26",
+  // escludeva dal filtro la busta paga di marzo (1° marzo, "prima" del
+  // valore di inizio range). Agganciando ogni posizione del thumb a un
+  // passo mensile, la data risultante coincide sempre con un periodo reale.
+  int get _totalMonths =>
+      (widget.maxDate.year - widget.minDate.year) * 12 +
+      (widget.maxDate.month - widget.minDate.month);
 
   double get _minGapFraction {
-    if (_totalMs <= 0) return 0;
-    return (_minGapMs / _totalMs).clamp(0.0, 0.9);
+    if (_totalMonths <= 0) return 0;
+    return (_minGapMonths / _totalMonths).clamp(0.0, 0.9);
   }
 
   double _fractionFor(DateTime date) {
-    if (_totalMs <= 0) return 0;
-    return (date.difference(widget.minDate).inMilliseconds / _totalMs)
-        .clamp(0.0, 1.0);
+    if (_totalMonths <= 0) return 0;
+    final monthsFromMin = (date.year - widget.minDate.year) * 12 +
+        (date.month - widget.minDate.month);
+    return (monthsFromMin / _totalMonths).clamp(0.0, 1.0);
   }
 
   DateTime _dateFor(double fraction) {
-    final ms = (_totalMs * fraction.clamp(0.0, 1.0)).round();
-    return widget.minDate.add(Duration(milliseconds: ms));
+    final monthsOffset =
+        (_totalMonths * fraction.clamp(0.0, 1.0)).round().clamp(0, _totalMonths);
+    return DateTime(widget.minDate.year, widget.minDate.month + monthsOffset);
   }
 
   void _notify() {

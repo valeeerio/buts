@@ -143,6 +143,11 @@ const _springOvershoot = Cubic(0.34, 1.56, 0.64, 1.0);
 /// ricalcolare/ri-sfocare il `BackdropFilter` ad ogni frame, evitando gli
 /// scatti che avevano motivato la rimozione della scala in precedenza. Il
 /// barrier sfuma sulla stessa curva del fade, invece di apparire "di scatto".
+const _barrierColor = CupertinoDynamicColor.withBrightness(
+  color: Color(0x66000000),
+  darkColor: Color(0x99000000),
+);
+
 Future<T?> showAppAlertDialog<T>({
   required BuildContext context,
   required String title,
@@ -153,24 +158,44 @@ Future<T?> showAppAlertDialog<T>({
     context: context,
     barrierDismissible: false,
     barrierLabel: title,
-    barrierColor: const CupertinoDynamicColor.withBrightness(
-      color: Color(0x66000000),
-      darkColor: Color(0x99000000),
-    ),
+    // Trasparente: il barrier non è più disegnato dal framework (che lo
+    // anima con `Curves.ease` fisso, non configurabile), ma a mano nel
+    // `transitionBuilder` qui sotto, sulla stessa `Animation` del contenuto
+    // — sincronia strutturalmente garantita, non approssimata.
+    barrierColor: const Color(0x00000000),
     transitionDuration: const Duration(milliseconds: 350),
     pageBuilder: (context, animation, secondaryAnimation) {
       return AppAlertDialog(title: title, message: message, actions: actions);
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
-      return ScaleTransition(
-        scale: Tween<double>(begin: 0.85, end: 1.0).animate(
-          CurvedAnimation(parent: animation, curve: _springOvershoot),
-        ),
-        child: FadeTransition(
-          opacity:
-              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-          child: child,
-        ),
+      final fade = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeIn,
+      );
+      final scale = CurvedAnimation(
+        parent: animation,
+        curve: _springOvershoot,
+        reverseCurve: Curves.easeIn,
+      );
+      final resolvedBarrierColor =
+          CupertinoDynamicColor.resolve(_barrierColor, context);
+      return Stack(
+        children: [
+          Positioned.fill(
+            child: FadeTransition(
+              opacity: fade,
+              child: ColoredBox(color: resolvedBarrierColor),
+            ),
+          ),
+          FadeTransition(
+            opacity: fade,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.85, end: 1.0).animate(scale),
+              child: child,
+            ),
+          ),
+        ],
       );
     },
   );

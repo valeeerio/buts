@@ -8,6 +8,8 @@ import '../../services/busta_paga_regex_parser.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
+import '../../utils/busta_paga_formatting.dart';
+import '../../widgets/app_alert_dialog.dart';
 import '../../widgets/glass_form_section.dart';
 import '../../widgets/liquid_glass_button.dart';
 import '../../widgets/liquid_glass_surface.dart';
@@ -252,9 +254,50 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     });
   }
 
+  void _showAlert(String title, String message) {
+    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    showAppAlertDialog<void>(
+      context: context,
+      title: title,
+      message: message,
+      actions: [
+        AppAlertAction(
+          label: 'OK',
+          color: accent,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ],
+    );
+  }
+
   void _save() {
     final isValid = _formKey.currentState?.validate() ?? false;
     if (!isValid) return;
+
+    // Stesso controllo anti-duplicati già usato dal dettaglio
+    // (`busta_paga_detail_screen.dart._save()`): per le mensili anno+mese+
+    // tipo, per 13esima/14esima solo anno+tipo. Qui è sempre un nuovo
+    // inserimento, nessuna esclusione per id necessaria — spostato qui
+    // (invece che nel pre-import) perché l'utente possa correggere prima il
+    // tipo/periodo se il parser li ha dedotti male.
+    final conflitto = ref.read(busteRepositoryProvider).any((b) {
+      if (b.tipo != _tipo) return false;
+      if (_tipo == TipoBustaPaga.mensile) {
+        return b.periodo.year == _periodo.year &&
+            b.periodo.month == _periodo.month;
+      }
+      return b.periodo.year == _periodo.year;
+    });
+    if (conflitto) {
+      _showAlert(
+        'Busta paga già presente',
+        'Hai già una busta paga per '
+            '${periodoDisplayFor(periodo: _periodo, tipo: _tipo)} '
+            'in archivio. Per correggerla, modificala dal dettaglio invece '
+            'di reimportarla.',
+      );
+      return;
+    }
 
     final trattenute = <String, double>{};
     for (final row in _trattenute) {

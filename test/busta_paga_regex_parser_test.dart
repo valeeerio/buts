@@ -1,3 +1,4 @@
+import 'package:buts/models/busta_paga.dart';
 import 'package:buts/services/busta_paga_regex_parser.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -81,6 +82,22 @@ void main() {
       final risultato = parser.parse(testo);
 
       expect(risultato.periodo, '2025-12');
+    });
+
+    test(
+        'deduce il tipo 13esima dal mese di "Mens.supplementare" quando le '
+        'parole esplicite mancano', () {
+      final testo = _testoSintetico.replaceFirst(
+        'MARZO 2026',
+        'Mens.supplementare 12/2025 MARZO 2026',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.tipo, TipoBustaPaga.tredicesima);
+      expect(
+        risultato.warnings.any((w) => w.contains('dedotto dal mese')),
+        isTrue,
+      );
     });
 
     test('testo vuoto o non riconosciuto produce campi nulli/zero e warning', () {

@@ -102,4 +102,22 @@ class PdfImportService {
     await targetFile.writeAsBytes(bytes);
     return targetFile.path;
   }
+
+  /// Rinomina (stessa cartella) il PDF di una mensilità supplementare col
+  /// testo letterale della busta ("Mens.supplementare MM/YYYY"), "/" → "-"
+  /// perché non valido in un nome file — al posto del nome scelto dal
+  /// picker di sistema, spesso poco significativo (screenshot, export
+  /// generico).
+  Future<String> rinominaPerSupplementare(
+    String currentPath, {
+    required int mese,
+    required int anno,
+  }) async {
+    final nuovoPercorso = p.join(
+      p.dirname(currentPath),
+      'Mens.supplementare $mese-$anno.pdf',
+    );
+    final nuovoFile = await File(currentPath).rename(nuovoPercorso);
+    return nuovoFile.path;
+  }
 }

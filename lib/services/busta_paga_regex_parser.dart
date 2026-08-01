@@ -137,6 +137,17 @@ class BustaPagaRegexParser {
   double _toDouble(String raw) =>
       double.parse(raw.replaceAll('.', '').replaceAll(',', '.'));
 
+  /// Deduce il tipo mensilità dal mese di "Mens.supplementare" quando il
+  /// testo non nomina esplicitamente "tredicesima"/"quattordicesima" —
+  /// novembre/dicembre/gennaio sono i mesi tipici di erogazione della
+  /// tredicesima, giugno/luglio della quattordicesima. Mese fuori da questi
+  /// pattern: nessuna deduzione (`null`), resta il fallback mensile.
+  TipoBustaPaga? _tipoDaMeseSupplementare(int mese) {
+    if (mese == 11 || mese == 12 || mese == 1) return TipoBustaPaga.tredicesima;
+    if (mese == 6 || mese == 7) return TipoBustaPaga.quattordicesima;
+    return null;
+  }
+
   BustaPagaEstratti parse(String testo) {
     final warnings = <String>[];
 
@@ -161,12 +172,28 @@ class BustaPagaRegexParser {
     // --- tipo: 13esima/14esima se il testo le nomina esplicitamente,
     // altrimenti mensile. "Quattordicesima" controllata per prima solo per
     // ordine, non per ambiguità: sono parole distinte, nessun rischio di
-    // falsi positivi incrociati. ---
-    final tipo = _quattordicesima.hasMatch(testo)
-        ? TipoBustaPaga.quattordicesima
-        : _tredicesima.hasMatch(testo)
-            ? TipoBustaPaga.tredicesima
-            : TipoBustaPaga.mensile;
+    // falsi positivi incrociati. Se nessuna delle due parole matcha ma il
+    // testo contiene "Mens.supplementare MM/YYYY", il tipo viene dedotto dal
+    // mese (vedi `_tipoDaMeseSupplementare`) con un warning esplicito, dato
+    // che è una deduzione e non una lettura diretta. ---
+    TipoBustaPaga tipo;
+    if (_quattordicesima.hasMatch(testo)) {
+      tipo = TipoBustaPaga.quattordicesima;
+    } else if (_tredicesima.hasMatch(testo)) {
+      tipo = TipoBustaPaga.tredicesima;
+    } else {
+      tipo = TipoBustaPaga.mensile;
+      if (supplementareMatch != null) {
+        final meseSupplementare = int.parse(supplementareMatch.group(1)!);
+        final tipoDedotto = _tipoDaMeseSupplementare(meseSupplementare);
+        if (tipoDedotto != null) {
+          tipo = tipoDedotto;
+          warnings.add(
+            'tipo mensilità dedotto dal mese "Mens.supplementare", verifica',
+          );
+        }
+      }
+    }
 
     // --- lordo: somma degli importi di tutte le righe di competenza ---
     double lordo = 0;

@@ -8,7 +8,6 @@ import '../../services/pdf_import_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
-import '../../utils/busta_paga_formatting.dart';
 import '../../widgets/app_alert_dialog.dart';
 import '../../widgets/cupertino_range_slider.dart';
 import '../../widgets/flat_chip_button.dart';
@@ -133,40 +132,29 @@ class _BustePagaSectionScreenState
       return;
     }
 
-    // Blocca l'import di un periodo+tipo già in archivio, indipendentemente
-    // dallo stato di verifica — non blocca invece tipi diversi nello stesso
-    // mese (es. mensile + 14esima di agosto), che possono legittimamente
-    // coesistere. Per le mensili il confronto è anno+mese (una per mese);
-    // per 13esima/14esima è solo sull'anno, non sul mese esatto — il mese
-    // in cui vengono pagate varia (dicembre, gennaio, a rate...), ma non ne
-    // può esistere più di una dello stesso tipo nello stesso anno.
+    // Il controllo anti-duplicati (periodo+tipo già in archivio) non è più
+    // qui: bloccava l'import basandosi su un `risultato.tipo` non ancora
+    // verificato dall'utente (es. tipo rilevato erroneamente "mensile" per
+    // una 13esima priva delle parole esplicite), impedendo di aprire il
+    // form per correggerlo prima ancora che l'utente potesse intervenire.
+    // Si sposta al salvataggio nel form (`BustaPagaFormScreen._save()`),
+    // stesso pattern già usato dal dettaglio.
     final periodoEstratto = _periodoDaStringa(risultato.periodo);
-    if (periodoEstratto != null) {
-      final duplicato = ref.read(busteRepositoryProvider).any((b) {
-        if (b.tipo != risultato.tipo) return false;
-        if (risultato.tipo == TipoBustaPaga.mensile) {
-          return b.periodo.year == periodoEstratto.year &&
-              b.periodo.month == periodoEstratto.month;
-        }
-        return b.periodo.year == periodoEstratto.year;
-      });
-      if (duplicato) {
-        _showImportError(
-          'Busta paga già presente',
-          'Hai già una busta paga per '
-              '${periodoDisplayFor(periodo: periodoEstratto, tipo: risultato.tipo)} '
-              'in archivio. Per correggerla, modificala dal dettaglio invece '
-              'di reimportarla.',
-        );
-        return;
-      }
+
+    var fileOrigine = result.filePath!;
+    if (risultato.tipo != TipoBustaPaga.mensile && periodoEstratto != null) {
+      fileOrigine = await _pdfImportService.rinominaPerSupplementare(
+        fileOrigine,
+        mese: periodoEstratto.month,
+        anno: periodoEstratto.year,
+      );
     }
 
     if (!mounted) return;
     Navigator.of(context).push(
       CupertinoPageRoute(
         builder: (_) => BustaPagaFormScreen.daImport(
-          fileOrigine: result.filePath!,
+          fileOrigine: fileOrigine,
           estratti: risultato,
         ),
       ),
