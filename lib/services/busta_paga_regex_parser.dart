@@ -24,6 +24,8 @@
 /// per ora, vedi BACKLOG.md.
 library;
 
+import '../models/busta_paga.dart';
+
 class BustaPagaEstratti {
   final String? periodo; // formato YYYY-MM
   final double? lordo;
@@ -38,6 +40,12 @@ class BustaPagaEstratti {
   final double rolResidui;
   final double permessiGoduti;
   final double? oreLavorate;
+
+  /// Tipo mensilità (mensile/13esima/14esima), rilevato cercando le parole
+  /// "tredicesima"/"quattordicesima" nel testo del PDF — sempre valorizzato
+  /// (default `mensile` se non trovate), a differenza degli altri campi che
+  /// possono mancare.
+  final TipoBustaPaga tipo;
 
   /// Campi che il parser non è riuscito a determinare con sufficiente
   /// confidenza (es. "netto", "ore lavorate stimate") — da mostrare
@@ -58,6 +66,7 @@ class BustaPagaEstratti {
     required this.rolResidui,
     required this.permessiGoduti,
     this.oreLavorate,
+    this.tipo = TipoBustaPaga.mensile,
     required this.warnings,
   });
 }
@@ -109,6 +118,10 @@ class BustaPagaRegexParser {
     caseSensitive: false,
   );
 
+  static final _quattordicesima =
+      RegExp(r'quattordicesima', caseSensitive: false);
+  static final _tredicesima = RegExp(r'tredicesima', caseSensitive: false);
+
   double _toDouble(String raw) =>
       double.parse(raw.replaceAll('.', '').replaceAll(',', '.'));
 
@@ -125,6 +138,16 @@ class BustaPagaRegexParser {
     } else {
       warnings.add('periodo non trovato');
     }
+
+    // --- tipo: 13esima/14esima se il testo le nomina esplicitamente,
+    // altrimenti mensile. "Quattordicesima" controllata per prima solo per
+    // ordine, non per ambiguità: sono parole distinte, nessun rischio di
+    // falsi positivi incrociati. ---
+    final tipo = _quattordicesima.hasMatch(testo)
+        ? TipoBustaPaga.quattordicesima
+        : _tredicesima.hasMatch(testo)
+            ? TipoBustaPaga.tredicesima
+            : TipoBustaPaga.mensile;
 
     // --- lordo: somma degli importi di tutte le righe di competenza ---
     double lordo = 0;
@@ -226,6 +249,7 @@ class BustaPagaRegexParser {
       rolResidui: rolResidui,
       permessiGoduti: permessiGoduti,
       oreLavorate: oreLavorate,
+      tipo: tipo,
       warnings: warnings,
     );
   }

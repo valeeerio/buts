@@ -4,6 +4,15 @@
 /// i campi estratti automaticamente prima che entrino in archivio.
 enum StatoVerificaBustaPaga { daConfermare, confermato }
 
+/// Tipo di mensilità rappresentata dalla busta paga. Rilevato automaticamente
+/// dal testo del PDF durante l'import (parole "tredicesima"/"quattordicesima"
+/// — vedi `BustaPagaRegexParser`), correggibile manualmente nel dettaglio.
+/// Le buste con tipo diverso da `mensile` sono escluse dai grafici
+/// Statistiche: netto/lordo/straordinari di una 13esima o 14esima sono
+/// importi anomali rispetto al trend mensile, li distorcerebbero se messi in
+/// linea con le mensilità normali.
+enum TipoBustaPaga { mensile, tredicesima, quattordicesima }
+
 /// Dati ricavabili da una busta paga. Nomi campo allineati 1:1 a
 /// piano_progetto_finanze_personali.md §5 per rendere meccanica la futura
 /// mappatura a tabella Drift (skill drift-migration / agent
@@ -26,6 +35,7 @@ class BustaPaga {
   final double permessiGoduti;
   final double oreLavorate;
   final StatoVerificaBustaPaga statoVerifica;
+  final TipoBustaPaga tipo;
 
   const BustaPaga({
     required this.id,
@@ -44,6 +54,7 @@ class BustaPaga {
     required this.permessiGoduti,
     required this.oreLavorate,
     this.statoVerifica = StatoVerificaBustaPaga.confermato,
+    this.tipo = TipoBustaPaga.mensile,
   });
 
   BustaPaga copyWith({
@@ -63,6 +74,7 @@ class BustaPaga {
     double? permessiGoduti,
     double? oreLavorate,
     StatoVerificaBustaPaga? statoVerifica,
+    TipoBustaPaga? tipo,
   }) {
     return BustaPaga(
       id: id ?? this.id,
@@ -81,6 +93,7 @@ class BustaPaga {
       permessiGoduti: permessiGoduti ?? this.permessiGoduti,
       oreLavorate: oreLavorate ?? this.oreLavorate,
       statoVerifica: statoVerifica ?? this.statoVerifica,
+      tipo: tipo ?? this.tipo,
     );
   }
 }

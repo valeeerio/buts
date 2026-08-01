@@ -56,6 +56,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   final _formKey = GlobalKey<FormState>();
 
   late DateTime _periodo;
+  late TipoBustaPaga _tipo;
 
   late final TextEditingController _lordoController;
   late final TextEditingController _nettoController;
@@ -92,6 +93,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
 
     _periodo = _periodoFromEstratti(estratti.periodo) ??
         DateTime(DateTime.now().year, DateTime.now().month);
+    _tipo = estratti.tipo;
 
     _lordoController =
         TextEditingController(text: _formatNumber(estratti.lordo));
@@ -173,6 +175,33 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     return formatted[0].toUpperCase() + formatted.substring(1);
   }
 
+  static const _tipoLabels = {
+    TipoBustaPaga.mensile: 'Mensile',
+    TipoBustaPaga.tredicesima: '13esima',
+    TipoBustaPaga.quattordicesima: '14esima',
+  };
+
+  Future<void> _pickTipo() async {
+    final scelta = await showCupertinoModalPopup<TipoBustaPaga>(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('Tipo busta paga'),
+        actions: [
+          for (final tipo in TipoBustaPaga.values)
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.of(context).pop(tipo),
+              child: Text(_tipoLabels[tipo]!),
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Annulla'),
+        ),
+      ),
+    );
+    if (scelta != null) setState(() => _tipo = scelta);
+  }
+
   Future<void> _pickPeriodo() async {
     DateTime tempSelection = _periodo;
     await showCupertinoModalPopup<void>(
@@ -250,6 +279,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
       rolResidui: _parse(_rolResiduiController),
       permessiGoduti: _parse(_permessiGodutiController),
       oreLavorate: _parse(_oreLavorateController),
+      tipo: _tipo,
       statoVerifica: _valoriDaConferma
           ? StatoVerificaBustaPaga.daConfermare
           : StatoVerificaBustaPaga.confermato,
@@ -311,6 +341,24 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(_periodoLabel,
+                              style:
+                                  AppTextStyles.subtitle.copyWith(color: accent)),
+                          const SizedBox(width: AppSpacing.xs),
+                          Icon(CupertinoIcons.chevron_down,
+                              size: 14, color: labelSecondary),
+                        ],
+                      ),
+                    ),
+                  ),
+                  CupertinoFormRow(
+                    prefix: const Text('Tipo'),
+                    child: GestureDetector(
+                      onTap: _pickTipo,
+                      behavior: HitTestBehavior.opaque,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(_tipoLabels[_tipo]!,
                               style:
                                   AppTextStyles.subtitle.copyWith(color: accent)),
                           const SizedBox(width: AppSpacing.xs),

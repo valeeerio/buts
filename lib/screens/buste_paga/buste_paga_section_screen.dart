@@ -311,26 +311,27 @@ class _BustePagaSectionScreenState
                               setState(() => _periodoFiltro = range),
                         ),
                       ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.screenHorizontal,
-                        AppSpacing.md,
-                        AppSpacing.screenHorizontal,
-                        AppSpacing.sm,
-                      ),
-                      child: _searchActive
-                          ? _buildSearchField(labelPrimary, labelSecondary)
-                          : Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    'Archivio buste paga',
-                                    style: AppTextStyles.sectionTitle.copyWith(
-                                      color: labelPrimary,
+                    if (_tab == _BustePagaTab.archivio)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.screenHorizontal,
+                          AppSpacing.md,
+                          AppSpacing.screenHorizontal,
+                          AppSpacing.sm,
+                        ),
+                        child: _searchActive
+                            ? _buildSearchField(labelPrimary, labelSecondary)
+                            : Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      'Archivio buste paga',
+                                      style:
+                                          AppTextStyles.sectionTitle.copyWith(
+                                        color: labelPrimary,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                if (_tab == _BustePagaTab.archivio)
                                   CupertinoButton(
                                     padding: EdgeInsets.zero,
                                     minimumSize: const Size(44, 44),
@@ -343,9 +344,9 @@ class _BustePagaSectionScreenState
                                           AppColors.systemBlue, context),
                                     ),
                                   ),
-                              ],
-                            ),
-                    ),
+                                ],
+                              ),
+                      ),
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.only(

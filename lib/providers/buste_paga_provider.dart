@@ -154,12 +154,25 @@ final ultimaBustaPagaProvider = Provider<BustaPaga?>((ref) {
   return sorted.first;
 });
 
-/// Intervallo di periodi coperto dall'archivio (prima/ultima busta paga per
-/// data), usato come estremi min/max del selettore di periodo in
-/// Statistiche (`CupertinoRangeSlider`). `null` con archivio vuoto.
+/// Predicato condiviso "questa busta paga entra nelle Statistiche": solo
+/// buste confermate (un dato non ancora verificato non deve influenzare
+/// medie/trend) e di tipo mensile (13esima/14esima sono importi anomali
+/// rispetto al trend mensile, li distorcerebbero). Usato sia da
+/// [periodoRangeDisponibileProvider] sia dalla schermata Statistiche
+/// (`buste_paga_statistiche_screen.dart`), così lo slider di periodo copre
+/// esattamente lo stesso sottoinsieme di dati che poi i grafici mostrano.
+bool bustaInclusaInStatistiche(BustaPaga b) =>
+    b.statoVerifica == StatoVerificaBustaPaga.confermato &&
+    b.tipo == TipoBustaPaga.mensile;
+
+/// Intervallo di periodi coperto dalle buste paga incluse nelle Statistiche
+/// (vedi [bustaInclusaInStatistiche]), usato come estremi min/max del
+/// selettore di periodo in Statistiche (`CupertinoRangeSlider`). `null` se
+/// nessuna busta paga soddisfa il predicato.
 final periodoRangeDisponibileProvider =
     Provider<({DateTime start, DateTime end})?>((ref) {
-  final buste = ref.watch(busteRepositoryProvider);
+  final buste =
+      ref.watch(busteRepositoryProvider).where(bustaInclusaInStatistiche);
   if (buste.isEmpty) return null;
   final periodi = buste.map((b) => b.periodo).toList()..sort();
   return (start: periodi.first, end: periodi.last);

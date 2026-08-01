@@ -76,6 +76,13 @@ class BustePagaTable extends Table {
         Constant(StatoVerificaBustaPaga.confermato.index),
       )();
 
+  /// Tipo mensilità (mensile/13esima/14esima) — vedi `TipoBustaPaga`.
+  /// Default `mensile` per compatibilità con le righe esistenti create
+  /// prima dell'introduzione di questo campo (v3 -> v4).
+  IntColumn get tipo => intEnum<TipoBustaPaga>().withDefault(
+        Constant(TipoBustaPaga.mensile.index),
+      )();
+
   @override
   Set<Column> get primaryKey => {id};
 }
@@ -106,7 +113,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.connection);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -130,6 +137,13 @@ class AppDatabase extends _$AppDatabase {
             await m.database
                 .customStatement('DROP TABLE IF EXISTS mese_budget_table');
             await m.database.customStatement('DROP TABLE IF EXISTS area_table');
+          }
+          // v3 -> v4: nuova colonna `tipo` (mensile/13esima/14esima, vedi
+          // TipoBustaPaga) — migrazione additiva, le righe esistenti
+          // ricevono il default `mensile` dichiarato sulla colonna, nessun
+          // dato esistente viene toccato o perso.
+          if (from < 4) {
+            await m.addColumn(bustePagaTable, bustePagaTable.tipo);
           }
         },
       );
@@ -157,6 +171,7 @@ extension BustaPagaRowMapping on BustePagaTableData {
       permessiGoduti: permessiGoduti,
       oreLavorate: oreLavorate,
       statoVerifica: statoVerifica,
+      tipo: tipo,
     );
   }
 }
@@ -180,6 +195,7 @@ extension BustaPagaDomainMapping on BustaPaga {
       permessiGoduti: permessiGoduti,
       oreLavorate: oreLavorate,
       statoVerifica: Value(statoVerifica),
+      tipo: Value(tipo),
     );
   }
 }

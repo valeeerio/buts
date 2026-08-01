@@ -39,7 +39,10 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final buste = ref.watch(busteRepositoryProvider);
+    final buste = ref
+        .watch(busteRepositoryProvider)
+        .where(bustaInclusaInStatistiche)
+        .toList();
     final sorted = [...buste]..sort((a, b) => a.periodo.compareTo(b.periodo));
     final filtro = periodoFiltro;
     final filtrati = filtro == null
@@ -101,6 +104,7 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
                 _LegendEntry(label: 'Lordo', color: _lordoColor),
               ],
               chart: _NettoLordoChart(buste: filtrati),
+              stats: _nettoLordoStats(filtrati),
             ),
           ),
         ),
@@ -120,6 +124,7 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
                 _LegendEntry(label: 'Permessi goduti', color: _permessiColor),
               ],
               chart: _FerieRolPermessiChart(buste: filtrati),
+              stats: _ferieRolPermessiStats(filtrati),
             ),
           ),
         ),
@@ -138,6 +143,7 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
                     label: 'Ore straordinario', color: _straordinarioColor),
               ],
               chart: _StraordinarioChart(buste: filtrati),
+              stats: _straordinarioStats(filtrati),
             ),
           ),
         ),
@@ -274,11 +280,13 @@ class _ChartCard extends StatelessWidget {
   final String title;
   final List<_LegendEntry> legend;
   final Widget chart;
+  final List<(String label, String value)> stats;
 
   const _ChartCard({
     required this.title,
     required this.legend,
     required this.chart,
+    this.stats = const [],
   });
 
   @override
@@ -310,11 +318,193 @@ class _ChartCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             SizedBox(height: 180, child: chart),
+            if (stats.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.md),
+              _ChartStatsSummary(righe: stats),
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+/// Riepilogo numerico (media/min/max/totale) sotto un grafico Statistiche —
+/// righe etichetta/valore separate da divisori sottili, **non** un'altra
+/// `LiquidGlassSurface`: vive già dentro il vetro di `_ChartCard`, e più
+/// superfici di vetro annidate/ravvicinate producono l'artefatto di
+/// rendering "cucitura" documentato in CLAUDE.md.
+class _ChartStatsSummary extends StatelessWidget {
+  final List<(String label, String value)> righe;
+
+  const _ChartStatsSummary({required this.righe});
+
+  @override
+  Widget build(BuildContext context) {
+    final labelColor =
+        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+    final valueColor =
+        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
+    final dividerColor =
+        CupertinoDynamicColor.resolve(AppColors.separator, context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < righe.length; i++) ...[
+          if (i > 0) Container(height: 0.5, color: dividerColor),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 100,
+                  child: Text(
+                    righe[i].$1,
+                    style:
+                        AppTextStyles.cardLabel.copyWith(color: labelColor),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    righe[i].$2,
+                    style: AppTextStyles.cardLabel.copyWith(
+                      color: valueColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    textAlign: TextAlign.right,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Trova la busta paga con il valore minimo secondo [selettore]. Richiede
+/// [buste] non vuota.
+BustaPaga _bustaConMinimo(
+    List<BustaPaga> buste, double Function(BustaPaga) selettore) {
+  return buste.reduce(
+      (a, b) => selettore(a) <= selettore(b) ? a : b);
+}
+
+/// Trova la busta paga con il valore massimo secondo [selettore]. Richiede
+/// [buste] non vuota.
+BustaPaga _bustaConMassimo(
+    List<BustaPaga> buste, double Function(BustaPaga) selettore) {
+  return buste.reduce(
+      (a, b) => selettore(a) >= selettore(b) ? a : b);
+}
+
+double _media(List<BustaPaga> buste, double Function(BustaPaga) selettore) {
+  return buste.map(selettore).reduce((a, b) => a + b) / buste.length;
+}
+
+double _totale(List<BustaPaga> buste, double Function(BustaPaga) selettore) {
+  return buste.map(selettore).reduce((a, b) => a + b);
+}
+
+/// Righe del riepilogo sotto il grafico Netto/Lordo. Opera sulle stesse
+/// [buste] già filtrate (confermate, mensili, nel periodo selezionato) che
+/// alimentano il grafico — nessun ricalcolo parallelo del filtro.
+List<(String, String)> _nettoLordoStats(List<BustaPaga> buste) {
+  if (buste.isEmpty) return const [];
+  final minNetto = _bustaConMinimo(buste, (b) => b.netto);
+  final maxNetto = _bustaConMassimo(buste, (b) => b.netto);
+  final minLordo = _bustaConMinimo(buste, (b) => b.lordo);
+  final maxLordo = _bustaConMassimo(buste, (b) => b.lordo);
+  return [
+    (
+      'Media',
+      'Netto € ${formatNumber(_media(buste, (b) => b.netto))} · '
+          'Lordo € ${formatNumber(_media(buste, (b) => b.lordo))}',
+    ),
+    (
+      'Minimo',
+      'Netto € ${formatNumber(minNetto.netto)} '
+          '(${periodoAxisLabel(minNetto.periodo)}) · '
+          'Lordo € ${formatNumber(minLordo.lordo)} '
+          '(${periodoAxisLabel(minLordo.periodo)})',
+    ),
+    (
+      'Massimo',
+      'Netto € ${formatNumber(maxNetto.netto)} '
+          '(${periodoAxisLabel(maxNetto.periodo)}) · '
+          'Lordo € ${formatNumber(maxLordo.lordo)} '
+          '(${periodoAxisLabel(maxLordo.periodo)})',
+    ),
+    (
+      'Totale periodo',
+      'Netto € ${formatNumber(_totale(buste, (b) => b.netto))} · '
+          'Lordo € ${formatNumber(_totale(buste, (b) => b.lordo))}',
+    ),
+  ];
+}
+
+/// Righe del riepilogo sotto il grafico Ferie/ROL/Permessi. Ferie residue e
+/// ROL residui sono saldi puntuali mese per mese (non quantità da sommare),
+/// quindi niente riga "Totale" per loro — solo per i permessi goduti, che
+/// sono una quantità che ha senso cumulare nel periodo.
+List<(String, String)> _ferieRolPermessiStats(List<BustaPaga> buste) {
+  if (buste.isEmpty) return const [];
+  final minFerie = _bustaConMinimo(buste, (b) => b.ferieResidue);
+  final maxFerie = _bustaConMassimo(buste, (b) => b.ferieResidue);
+  final minRol = _bustaConMinimo(buste, (b) => b.rolResidui);
+  final maxRol = _bustaConMassimo(buste, (b) => b.rolResidui);
+  return [
+    (
+      'Media',
+      'Ferie ${formatNumber(_media(buste, (b) => b.ferieResidue))} · '
+          'ROL ${formatNumber(_media(buste, (b) => b.rolResidui))} · '
+          'Permessi ${formatNumber(_media(buste, (b) => b.permessiGoduti))}',
+    ),
+    (
+      'Minimo',
+      'Ferie ${formatNumber(minFerie.ferieResidue)} '
+          '(${periodoAxisLabel(minFerie.periodo)}) · '
+          'ROL ${formatNumber(minRol.rolResidui)} '
+          '(${periodoAxisLabel(minRol.periodo)})',
+    ),
+    (
+      'Massimo',
+      'Ferie ${formatNumber(maxFerie.ferieResidue)} '
+          '(${periodoAxisLabel(maxFerie.periodo)}) · '
+          'ROL ${formatNumber(maxRol.rolResidui)} '
+          '(${periodoAxisLabel(maxRol.periodo)})',
+    ),
+    (
+      'Totale permessi',
+      formatNumber(_totale(buste, (b) => b.permessiGoduti)),
+    ),
+  ];
+}
+
+/// Righe del riepilogo sotto il grafico Straordinario. Calcolate sempre
+/// sulle buste mensili non aggregate (non sui bucket trimestrali usati per
+/// disegnare le barre quando l'aggregazione è attiva in
+/// `_StraordinarioChart`): media e mese di picco devono restare a livello
+/// di mese reale.
+List<(String, String)> _straordinarioStats(List<BustaPaga> buste) {
+  if (buste.isEmpty) return const [];
+  final min = _bustaConMinimo(buste, (b) => b.straordinari);
+  final max = _bustaConMassimo(buste, (b) => b.straordinari);
+  return [
+    ('Media', '${formatNumber(_media(buste, (b) => b.straordinari))} h/mese'),
+    (
+      'Minimo',
+      '${formatNumber(min.straordinari)} h (${periodoAxisLabel(min.periodo)})',
+    ),
+    (
+      'Massimo',
+      '${formatNumber(max.straordinari)} h (${periodoAxisLabel(max.periodo)})',
+    ),
+    ('Totale periodo', '${formatNumber(_totale(buste, (b) => b.straordinari))} h'),
+  ];
 }
 
 class _LegendChip extends StatelessWidget {

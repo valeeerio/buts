@@ -30,6 +30,15 @@ import '../../widgets/swipe_delete_background.dart';
 /// di poterci scorrere sopra come qualunque altra card.
 const double _actionBarReservedHeight = 80;
 
+/// Etichette del tipo busta paga, condivise da hero (sola lettura/modifica)
+/// e dal picker `_pickTipo` — stessa mappa duplicata in
+/// `busta_paga_form_screen.dart` (nessun modulo condiviso per 3 stringhe).
+const _tipoLabels = {
+  TipoBustaPaga.mensile: 'Mensile',
+  TipoBustaPaga.tredicesima: '13esima',
+  TipoBustaPaga.quattordicesima: '14esima',
+};
+
 /// Riga di trattenuta in editing: chiave + importo come controller separati,
 /// stessa forma di `_TrattenutaRow` in `BustaPagaFormScreen`. `id` è una
 /// chiave stabile e univoca per riga (indipendente dall'indice, che cambia
@@ -77,6 +86,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   bool _isEditing = false;
 
   late DateTime _periodoEdit;
+  late TipoBustaPaga _tipoEdit;
 
   late TextEditingController _nettoCtrl;
   late TextEditingController _lordoCtrl;
@@ -108,6 +118,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   /// live mentre l'utente digita nella tabella.
   void _enterEditing(BustaPaga corrente) {
     _periodoEdit = corrente.periodo;
+    _tipoEdit = corrente.tipo;
 
     _nettoCtrl = TextEditingController(text: formatNumber(corrente.netto));
     _lordoCtrl = TextEditingController(text: formatNumber(corrente.lordo));
@@ -227,6 +238,27 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     );
   }
 
+  Future<void> _pickTipo() async {
+    final scelta = await showCupertinoModalPopup<TipoBustaPaga>(
+      context: context,
+      builder: (context) => CupertinoActionSheet(
+        title: const Text('Tipo busta paga'),
+        actions: [
+          for (final tipo in TipoBustaPaga.values)
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.of(context).pop(tipo),
+              child: Text(_tipoLabels[tipo]!),
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Annulla'),
+        ),
+      ),
+    );
+    if (scelta != null) setState(() => _tipoEdit = scelta);
+  }
+
   void _showAlert(String title, String message) {
     showCupertinoDialog<void>(
       context: context,
@@ -266,6 +298,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
 
     final candidato = corrente.copyWith(
       periodo: _periodoEdit,
+      tipo: _tipoEdit,
       netto: _parse(_nettoCtrl),
       lordo: _parse(_lordoCtrl),
       straordinari: _parse(_straordinariCtrl),
@@ -335,6 +368,11 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       diff.add(
         'Periodo: ${_periodoLabelForDate(vecchia.periodo)} → '
         '${_periodoLabelForDate(nuova.periodo)}',
+      );
+    }
+    if (vecchia.tipo != nuova.tipo) {
+      diff.add(
+        'Tipo: ${_tipoLabels[vecchia.tipo]} → ${_tipoLabels[nuova.tipo]}',
       );
     }
     addIfChanged('Netto', vecchia.netto, nuova.netto);
@@ -408,9 +446,11 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                   child: _HeroCard(
                     bustaPaga: corrente,
                     periodoLabel: periodoLabelVista,
+                    tipo: _isEditing ? _tipoEdit : corrente.tipo,
                     isEditing: _isEditing,
                     nettoController: _isEditing ? _nettoCtrl : null,
                     onTapPeriodo: _isEditing ? _pickPeriodo : null,
+                    onTapTipo: _isEditing ? _pickTipo : null,
                   ),
                 ),
                 Expanded(
@@ -765,16 +805,20 @@ Widget _inlineNumberField(
 class _HeroCard extends StatelessWidget {
   final BustaPaga bustaPaga;
   final String periodoLabel;
+  final TipoBustaPaga tipo;
   final bool isEditing;
   final TextEditingController? nettoController;
   final VoidCallback? onTapPeriodo;
+  final VoidCallback? onTapTipo;
 
   const _HeroCard({
     required this.bustaPaga,
     required this.periodoLabel,
+    required this.tipo,
     required this.isEditing,
     this.nettoController,
     this.onTapPeriodo,
+    this.onTapTipo,
   });
 
   @override
@@ -843,6 +887,30 @@ class _HeroCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 2),
+          onTapTipo == null
+              ? Text(
+                  _tipoLabels[tipo]!,
+                  style: AppTextStyles.cardLabel.copyWith(
+                      color: labelSecondary),
+                )
+              : GestureDetector(
+                  onTap: onTapTipo,
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _tipoLabels[tipo]!,
+                        style: AppTextStyles.cardLabel.copyWith(
+                            color: labelSecondary),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(CupertinoIcons.chevron_down,
+                          size: 12, color: labelSecondary),
+                    ],
+                  ),
+                ),
           const SizedBox(height: AppSpacing.sm),
           Text(
             'Netto',
