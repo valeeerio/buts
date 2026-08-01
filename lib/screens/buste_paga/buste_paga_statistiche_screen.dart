@@ -793,18 +793,54 @@ class _FerieRolPermessiChart extends StatelessWidget {
 /// l'asse valori a sinistra tenuto fisso in un `BarChart` "scheletro"
 /// separato — fl_chart non supporta nativamente un asse fisso + plot
 /// scrollabile in un singolo chart.
-class _StraordinarioChart extends StatelessWidget {
+class _StraordinarioChart extends StatefulWidget {
   final List<BustaPaga> buste;
 
   const _StraordinarioChart({required this.buste});
 
+  @override
+  State<_StraordinarioChart> createState() => _StraordinarioChartState();
+}
+
+class _StraordinarioChartState extends State<_StraordinarioChart> {
   static const _barWidth = 16.0;
   static const _groupsSpace = 20.0;
   static const _minGroupSlotWidth = _barWidth + _groupsSpace;
   static const _leftAxisWidth = 40.0;
+  static const _rightFadeWidth = 28.0;
+
+  final _scrollController = ScrollController();
+
+  // true finché non si è scrollato fino in fondo — nasconde la dissolvenza
+  // di bordo destro non appena non c'è più altro da scorrere, invece di
+  // lasciarla sempre visibile come indicatore statico.
+  bool _showRightFade = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_updateRightFade);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_updateRightFade);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _updateRightFade() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final showFade = position.pixels < position.maxScrollExtent - 1;
+    if (showFade != _showRightFade) {
+      setState(() => _showRightFade = showFade);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final buste = widget.buste;
     if (buste.isEmpty) return const _NoDataMessage();
 
     final barColor = CupertinoDynamicColor.resolve(
@@ -940,9 +976,27 @@ class _StraordinarioChart extends StatelessWidget {
           children: [
             buildAxisOnly(),
             Expanded(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: buildPlot(width: contentWidth, showLeftAxis: false),
+              child: ShaderMask(
+                blendMode: BlendMode.dstIn,
+                shaderCallback: (rect) {
+                  final fadeWidth = _showRightFade ? _rightFadeWidth : 0.0;
+                  final stop = 1 - (fadeWidth / rect.width).clamp(0.0, 1.0);
+                  return LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: const [
+                      CupertinoColors.white,
+                      CupertinoColors.white,
+                      CupertinoColors.transparent,
+                    ],
+                    stops: [0.0, stop, 1.0],
+                  ).createShader(rect);
+                },
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  scrollDirection: Axis.horizontal,
+                  child: buildPlot(width: contentWidth, showLeftAxis: false),
+                ),
               ),
             ),
           ],
