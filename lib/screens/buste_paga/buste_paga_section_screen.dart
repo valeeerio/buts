@@ -209,6 +209,18 @@ class _BustePagaSectionScreenState
     final labelSecondary =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
     final now = DateTime.now();
+    // Ogni volta che il range disponibile cambia (nuova busta paga importata
+    // con un periodo più vecchio/recente di quelli già filtrati), un filtro
+    // impostato manualmente in precedenza smette di coprire tutti i dati:
+    // per evitare che l'utente debba riallargare lo slider a mano ogni
+    // volta, il filtro torna a "nessun filtro" (range completo) — vedi
+    // richiesta utente "il range deve sempre comprendere di default il
+    // minimo e il massimo delle date".
+    ref.listen(periodoRangeDisponibileProvider, (previous, next) {
+      if (previous != null && previous != next) {
+        setState(() => _periodoFiltro = null);
+      }
+    });
     final periodoRangeDisponibile = ref.watch(periodoRangeDisponibileProvider);
     final dataLabel = () {
       final formatted = DateFormat('EEEE d MMMM', 'it_IT').format(now);

@@ -649,6 +649,11 @@ class _NettoLordoChart extends StatelessWidget {
   }
 
   LineChartBarData _line(List<double> values, Color color) {
+    // Con un solo dato non c'è una linea da disegnare (serve almeno 2 punti):
+    // senza un pallino esplicito il grafico risulterebbe vuoto per chi ha
+    // appena importato la prima busta paga. Il pallino resta nascosto non
+    // appena c'è più di un punto, per non cambiare lo stile della linea.
+    final showDot = values.length < 2;
     return LineChartBarData(
       spots: [
         for (var i = 0; i < values.length; i++) FlSpot(i.toDouble(), values[i]),
@@ -657,7 +662,14 @@ class _NettoLordoChart extends StatelessWidget {
       curveSmoothness: 0.2,
       color: color,
       barWidth: 2.5,
-      dotData: const FlDotData(show: false),
+      dotData: FlDotData(
+        show: showDot,
+        getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
+          radius: 4,
+          color: color,
+          strokeWidth: 0,
+        ),
+      ),
       belowBarData: BarAreaData(show: false),
     );
   }
@@ -771,6 +783,11 @@ class _FerieRolPermessiChart extends StatelessWidget {
   }
 
   LineChartBarData _line(List<double> values, Color color) {
+    // Con un solo dato non c'è una linea da disegnare (serve almeno 2 punti):
+    // senza un pallino esplicito il grafico risulterebbe vuoto per chi ha
+    // appena importato la prima busta paga. Il pallino resta nascosto non
+    // appena c'è più di un punto, per non cambiare lo stile della linea.
+    final showDot = values.length < 2;
     return LineChartBarData(
       spots: [
         for (var i = 0; i < values.length; i++) FlSpot(i.toDouble(), values[i]),
@@ -779,7 +796,14 @@ class _FerieRolPermessiChart extends StatelessWidget {
       curveSmoothness: 0.2,
       color: color,
       barWidth: 2.5,
-      dotData: const FlDotData(show: false),
+      dotData: FlDotData(
+        show: showDot,
+        getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
+          radius: 4,
+          color: color,
+          strokeWidth: 0,
+        ),
+      ),
       belowBarData: BarAreaData(show: false),
     );
   }
