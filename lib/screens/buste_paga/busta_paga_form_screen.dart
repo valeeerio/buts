@@ -262,6 +262,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
       message: message,
       actions: [
         AppAlertAction(
+          icon: CupertinoIcons.checkmark_alt,
           label: 'OK',
           color: accent,
           onPressed: () => Navigator.of(context).pop(),

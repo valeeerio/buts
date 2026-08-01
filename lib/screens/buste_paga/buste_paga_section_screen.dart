@@ -8,6 +8,7 @@ import '../../services/pdf_import_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
+import '../../utils/busta_paga_formatting.dart';
 import '../../widgets/app_alert_dialog.dart';
 import '../../widgets/cupertino_range_slider.dart';
 import '../../widgets/flat_chip_button.dart';
@@ -132,14 +133,36 @@ class _BustePagaSectionScreenState
       return;
     }
 
-    // Il controllo anti-duplicati (periodo+tipo già in archivio) non è più
-    // qui: bloccava l'import basandosi su un `risultato.tipo` non ancora
-    // verificato dall'utente (es. tipo rilevato erroneamente "mensile" per
-    // una 13esima priva delle parole esplicite), impedendo di aprire il
-    // form per correggerlo prima ancora che l'utente potesse intervenire.
-    // Si sposta al salvataggio nel form (`BustaPagaFormScreen._save()`),
-    // stesso pattern già usato dal dettaglio.
     final periodoEstratto = _periodoDaStringa(risultato.periodo);
+
+    // Controllo anti-duplicati subito dopo la scelta del file, prima di
+    // aprire il form di revisione: per le mensili anno+mese+tipo, per
+    // 13esima/14esima solo anno+tipo, stesso identico controllo già
+    // presente in `BustaPagaFormScreen._save()` (mantenuto lì come difesa
+    // in profondità, per il caso in cui l'utente cambi tipo/periodo mentre
+    // è già nel form). Il fallback del parser sul tipo (da "Mens.
+    // supplementare") rende ora affidabile bloccare qui, prima ancora di
+    // aprire il form.
+    if (periodoEstratto != null) {
+      final conflitto = ref.read(busteRepositoryProvider).any((b) {
+        if (b.tipo != risultato.tipo) return false;
+        if (risultato.tipo == TipoBustaPaga.mensile) {
+          return b.periodo.year == periodoEstratto.year &&
+              b.periodo.month == periodoEstratto.month;
+        }
+        return b.periodo.year == periodoEstratto.year;
+      });
+      if (conflitto) {
+        _showImportError(
+          'Busta paga già presente',
+          'Hai già una busta paga per '
+              '${periodoDisplayFor(periodo: periodoEstratto, tipo: risultato.tipo)} '
+              'in archivio. Per correggerla, modificala dal dettaglio invece '
+              'di reimportarla.',
+        );
+        return;
+      }
+    }
 
     var fileOrigine = result.filePath!;
     if (risultato.tipo != TipoBustaPaga.mensile && periodoEstratto != null) {
@@ -225,6 +248,7 @@ class _BustePagaSectionScreenState
       message: message,
       actions: [
         AppAlertAction(
+          icon: CupertinoIcons.checkmark_alt,
           label: 'OK',
           color: accent,
           onPressed: () => Navigator.of(context).pop(),

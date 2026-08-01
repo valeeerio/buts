@@ -117,11 +117,13 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
           '${periodoLabel(bustaPaga)}?',
       actions: [
         AppAlertAction(
+          icon: CupertinoIcons.xmark,
           label: 'Annulla',
           color: labelSecondary,
           onPressed: () => Navigator.of(context).pop(false),
         ),
         AppAlertAction(
+          icon: CupertinoIcons.trash,
           label: 'Elimina',
           color: destructive,
           onPressed: () => Navigator.of(context).pop(true),

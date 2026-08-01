@@ -268,6 +268,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       message: message,
       actions: [
         AppAlertAction(
+          icon: CupertinoIcons.checkmark_alt,
           label: 'OK',
           color: accent,
           onPressed: () => Navigator.of(context).pop(),
@@ -355,11 +356,13 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
           '${diff.join('\n')}',
       actions: [
         AppAlertAction(
+          icon: CupertinoIcons.xmark,
           label: 'Annulla',
           color: labelSecondary,
           onPressed: () => Navigator.of(context).pop(),
         ),
         AppAlertAction(
+          icon: CupertinoIcons.checkmark_alt,
           label: 'Conferma',
           color: accent,
           onPressed: () {
@@ -625,6 +628,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                       title: 'Dati confermati',
                       actions: [
                         AppAlertAction(
+                          icon: CupertinoIcons.checkmark_alt,
                           label: 'OK',
                           color: CupertinoDynamicColor.resolve(
                               AppColors.systemBlue, context),
