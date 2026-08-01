@@ -350,12 +350,34 @@ class _LegendChip extends StatelessWidget {
 /// di buste paga, ma anche alla larghezza reale disponibile per etichetta —
 /// altrimenti con poche buste (interval sempre 1) le etichette da 6-7
 /// caratteri si sovrappongono quando le barre/punti sono ravvicinati.
-double _bottomTitleInterval({required int count, required double availableWidth}) {
+double _bottomTitleInterval({
+  required int count,
+  required double availableWidth,
+  double estimatedLabelWidth = 34.0,
+}) {
   if (count <= 1) return 1;
-  const estimatedLabelWidth = 34.0; // "mmm 'yy" a fontSize 10, con margine
   final maxLabelsThatFit =
       (availableWidth / estimatedLabelWidth).floor().clamp(1, count);
   return (count / maxLabelsThatFit).ceilToDouble();
+}
+
+/// Oltre questo numero di buste paga nel periodo selezionato, l'asse X passa
+/// da un'etichetta per mese ("gen '24") a una per anno ("'24") — con range
+/// lunghi (es. gen '24 → ago '26) le etichette mensili si sovrappongono
+/// anche dopo il diradamento di `_bottomTitleInterval`.
+const _yearlyLabelsThreshold = 14;
+
+/// Indici della prima busta paga di ogni anno presente in [buste] (assume
+/// [buste] ordinata per periodo crescente) — usati per le etichette asse X
+/// in modalità annuale.
+List<int> _yearBoundaryIndices(List<BustaPaga> buste) {
+  final indices = <int>[];
+  for (var i = 0; i < buste.length; i++) {
+    if (i == 0 || buste[i].periodo.year != buste[i - 1].periodo.year) {
+      indices.add(i);
+    }
+  }
+  return indices;
 }
 
 /// Asse X condiviso dai tre grafici della schermata (etichette periodo
@@ -366,6 +388,39 @@ AxisTitles _periodoBottomAxisTitles({
   required double availableWidth,
   required Color labelColor,
 }) {
+  final textStyle =
+      AppTextStyles.cardLabel.copyWith(color: labelColor, fontSize: 10);
+
+  if (buste.length > _yearlyLabelsThreshold) {
+    final boundaries = _yearBoundaryIndices(buste);
+    final boundaryInterval = _bottomTitleInterval(
+      count: boundaries.length,
+      availableWidth: availableWidth,
+      estimatedLabelWidth: 20.0,
+    ).round();
+    final shown = <int>{
+      for (var i = 0; i < boundaries.length; i += boundaryInterval)
+        boundaries[i],
+    };
+    return AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        reservedSize: 22,
+        interval: 1,
+        getTitlesWidget: (value, meta) {
+          final index = value.round();
+          if (index < 0 || index >= buste.length || !shown.contains(index)) {
+            return const SizedBox.shrink();
+          }
+          return Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(annoAxisLabel(buste[index].periodo), style: textStyle),
+          );
+        },
+      ),
+    );
+  }
+
   final interval =
       _bottomTitleInterval(count: buste.length, availableWidth: availableWidth);
   return AxisTitles(
@@ -380,11 +435,7 @@ AxisTitles _periodoBottomAxisTitles({
         }
         return Padding(
           padding: const EdgeInsets.only(top: 6),
-          child: Text(
-            periodoAxisLabel(buste[index].periodo),
-            style: AppTextStyles.cardLabel.copyWith(
-                color: labelColor, fontSize: 10),
-          ),
+          child: Text(periodoAxisLabel(buste[index].periodo), style: textStyle),
         );
       },
     ),

@@ -26,6 +26,14 @@ String periodoAxisLabel(DateTime periodo) {
   return "$month '$year";
 }
 
+/// Etichetta solo anno (es. "'24"), usata sull'asse X dei grafici Statistiche
+/// quando il periodo selezionato copre molti mesi e mostrare un'etichetta per
+/// ogni mese affollerebbe l'asse — vedi `_periodoBottomAxisTitles` in
+/// `buste_paga_statistiche_screen.dart`.
+String annoAxisLabel(DateTime periodo) {
+  return "'${DateFormat('yy', 'it_IT').format(periodo)}";
+}
+
 /// Formatta un numero troncando a intero se il valore è intero, altrimenti
 /// mostra due cifre decimali — estratta da `_formatNumber` in
 /// `BustaPagaDetailScreen`, riusata anche da `BustaPagaSummaryHero`.
