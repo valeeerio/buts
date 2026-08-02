@@ -34,7 +34,12 @@ avvia direttamente `PdfImportService.pickAndImport()` (`lib/services/
 pdf_import_service.dart`, solo PDF con testo selezionabile, niente OCR per
 scansioni/foto in v1, validazione via `syncfusion_flutter_pdf`, selezione con
 `file_selector`, file copiato in `buste_paga_pdf/` nella application documents
-directory). Se il file non ha testo estraibile, o il parser regex
+directory). Il controllo anti-duplicati (stesso anno+mese+tipo per le
+mensili, stesso anno+tipo per 13a/14a) gira **due volte**: subito dopo la
+selezione del file (prima ancora di aprire il form, così l'alert "busta paga
+già presente" appare appena l'utente sceglie il PDF dall'archivio del
+telefono) e di nuovo al salvataggio del form, come rete di sicurezza. Se il
+file non ha testo estraibile, o il parser regex
 (`lib/services/busta_paga_regex_parser.dart`, mirato al layout del software paghe
 "JOB") non riconosce i dati principali (netto e periodo entrambi assenti), viene
 mostrato un alert bloccante e **il form non si apre** — non esiste più un modo di
@@ -42,11 +47,16 @@ aprire il form vuoto per un inserimento libero da zero. Il form
 (`busta_paga_form_screen.dart`) si apre **solo** per l'import: precompilato dai
 dati estratti da un import riuscito (costruttore `.daImport`, con banner di
 conferma esplicita "dati estratti automaticamente, verifica prima di salvare"
-finché `_valoriDaConferma == true`). Non esiste più una modalità "existing"/di
-modifica di una busta paga già salvata (rimossa il 2026-07-31): la modifica
-avviene interamente nel dettaglio, vedi sotto. Estrazione automatica via AI
-locale on-device resta una fase futura (vedi sotto), oggi la precompilazione è
-solo tramite parser regex.
+finché `_valoriDaConferma == true`), **ricostruito sullo stesso impianto del
+dettaglio in modifica** (vedi sotto): banner di conferma, hero, statistiche,
+tabella maturazioni, chip documento (non tappabile), trattenute con
+swipe-to-delete, barra flottante Salva/Annulla in basso — non più 7
+`GlassFormSection` separate con `CupertinoFormRow`/tasto Salva in nav bar.
+Non esiste più una modalità "existing"/di modifica di una busta paga già
+salvata (rimossa il 2026-07-31): la modifica avviene interamente nel
+dettaglio, vedi sotto. Estrazione automatica via AI locale on-device resta
+una fase futura (vedi sotto), oggi la precompilazione è solo tramite parser
+regex.
 
 **Dettaglio busta paga** (`busta_paga_detail_screen.dart`,
 `ConsumerStatefulWidget` — non più `ConsumerWidget`, serve stato locale per la
@@ -55,25 +65,34 @@ confermare — verde/rosso, stessa semantica del pallino in Archivio — netto i
 evidenza massima) **fissa fuori dall'area scrollabile**, sotto una riga di
 mini-statistiche Ferie residue/ROL residui/Ore lavorate e più sotto una riga
 Lordo/Straordinari, entrambe **un'unica** `LiquidGlassSurface` a scomparti
-(`_StatRow` — mai più superfici di vetro affiancate, vedi nota bug in "Stile
-visivo"), una tabella unica "Ferie, ROL e permessi" (colonne Maturato/Goduto/
-Residuo, `_MaturazioniSection`) al posto di sezioni separate per categoria, chip
-documento PDF tappabile (`_DocumentoChip`) e sezione Trattenute — nessuna di
-queste sezioni ha più un titolo sopra la card (rimossi per pulizia visiva). In
-fondo, una barra flottante (`_ActionBar`, stessa posizione/pattern della
-sidecar) con "Conferma" (visibile solo se lo stato è "Da confermare", aggiorna lo
-stato senza uscire dalla schermata, mostra un popup "Dati confermati") e
-"Modifica" — entrambe `FlatChipButton`. La schermata legge sempre la versione
-corrente della busta paga dal provider (`ref.watch(busteRepositoryProvider)`
-filtrato per id), non il valore statico ricevuto all'apertura, così si aggiorna
-subito dopo "Conferma" o "Salva". Nel dettaglio il PDF si apre via foglio di
-condivisione di sistema (`share_plus`), nessun visualizzatore PDF in-app.
+(mai più superfici di vetro affiancate, vedi nota bug in "Stile visivo"), una
+tabella unica "Ferie, ROL e permessi" (colonne Maturato/Goduto/Residuo) al
+posto di sezioni separate per categoria, chip documento PDF tappabile e
+sezione Trattenute — nessuna di queste sezioni ha più un titolo sopra la card
+(rimossi per pulizia visiva). In fondo, una barra flottante (`_ActionBar`,
+stessa posizione/pattern della sidecar) con "Conferma" (visibile solo se lo
+stato è "Da confermare", aggiorna lo stato senza uscire dalla schermata,
+mostra un popup "Dati confermati") e "Modifica" — entrambe `FlatChipButton`.
+La schermata legge sempre la versione corrente della busta paga dal provider
+(`ref.watch(busteRepositoryProvider)` filtrato per id), non il valore statico
+ricevuto all'apertura, così si aggiorna subito dopo "Conferma" o "Salva". Nel
+dettaglio il PDF si apre via foglio di condivisione di sistema (`share_plus`),
+nessun visualizzatore PDF in-app.
+
+Hero card, riga di statistiche, tabella maturazioni e chip documento sono
+widget pubblici condivisi in `lib/widgets/` — non più classi private di
+questo file — perché riusati identici anche dal form di import (vedi sotto):
+`BustaPagaHeroCard` (badge stato via `isConfermato: bool`, non un
+`BustaPaga` intero), `BustaPagaStatRow` (`items: List<(String label, Widget
+value)>`), `BustaPagaMaturazioniSection`, `BustaPagaDocumentoChip` (`onTap`
+opzionale — `null` nel form, dove il file non è ancora salvato e non ha
+senso condividerlo; valorizzato nel dettaglio con `Share.shareXFiles`).
 
 **Modifica inline (2026-07-31)**: "Modifica" non naviga più verso
 `busta_paga_form_screen.dart` — attiva `_isEditing = true` sulla stessa
 schermata di dettaglio, e le stesse card diventano editabili sul posto (hero
 Netto e periodo tappabile con lo stesso picker mese/anno del vecchio form,
-`_StatRow` Ferie/ROL/Ore e Lordo/Straordinari, tabella Maturazioni, righe
+`BustaPagaStatRow` Ferie/ROL/Ore e Lordo/Straordinari, tabella Maturazioni, righe
 Trattenute con `Dismissible`+`SwipeDeleteBackground` al posto di un bottone
 "meno" per rimuoverle). **Requisito non negoziabile confermato più volte
 dall'utente**: entrare in modifica non deve cambiare NULLA visivamente
@@ -87,7 +106,7 @@ mostra un popup "Hai modificato i seguenti dati, confermi?" con l'elenco
 vecchio → nuovo prima di applicare (`copyWith` con `statoVerifica` che torna
 automaticamente a `daConfermare` se la busta era "Confermata"); se il diff è
 vuoto esce dalla modifica senza popup. "Annulla" scarta tutti i controller e
-torna alla vista di sola lettura. Ferie residue/ROL residui in `_StatRow`
+torna alla vista di sola lettura. Ferie residue/ROL residui in `BustaPagaStatRow`
 restano sempre di sola lettura anche in modifica: rispecchiano live (via
 listener sui controller) il campo "Residuo" della tabella Maturazioni, che è
 l'unico editabile per quei dati (evita due campi indipendenti per lo stesso
@@ -105,8 +124,23 @@ raggruppata (header opzionale, righe con separatori, footer), usata da form e
 dettaglio busta paga. `lib/widgets/flat_chip_button.dart` (`FlatChipButton`) è il
 chip piatto icona+testo **senza vetro** (parametro `filled` per lo stato
 selezionato/non selezionato) usato dalla sotto-navigazione e dalla barra
-Conferma/Modifica — scelta deliberata di rompere col Liquid Glass per queste due
-CTA, vedi nota in "Stile visivo".
+Conferma/Modifica/Salva-Annulla — scelta deliberata di rompere col Liquid Glass
+per queste CTA, vedi nota in "Stile visivo". `lib/widgets/app_alert_dialog.dart`
+(`AppAlertDialog`/`showAppAlertDialog`) applica la stessa scelta ai popup di
+conferma/errore: card piatta (`DecoratedBox` + ombra, niente `BackdropFilter`),
+titolo/messaggio centrati, pulsanti `FlatChipButton` con icona opzionale;
+transizione a fade condivisa da un unico `CurvedAnimation` fra contenuto e
+barrier disegnato a mano (mai affidarsi al `barrierColor` animato di
+`showGeneralDialog`, che usa una curva fissa non configurabile e va facilmente
+fuori sincrono col contenuto). `lib/widgets/busta_paga_hero_card.dart`,
+`busta_paga_stat_row.dart`, `busta_paga_maturazioni_section.dart`,
+`busta_paga_documento_chip.dart`, `trattenuta_edit_row.dart` sono i widget
+condivisi tra dettaglio e form di import descritti sopra.
+`lib/widgets/cupertino_range_slider.dart` è lo slider a doppio cursore del
+filtro periodo in Statistiche: tracking assoluto della posizione del dito
+(non a delta relativo, per evitare che il pallino "sfasi" dal punto di
+presa), thumb che cresce con animazione a molla durante il drag, vibrazione
+(`HapticFeedback.selectionClick()`) ad ogni cambio di mese attraversato.
 
 ## Navigazione
 
@@ -136,31 +170,22 @@ sul pilota Archivio Buste Paga ed estesa a tutta l'app.
   (`glassHighlight`/`glassShadowEdge`) e un'ombra a rilievo (`PhysicalShape`). I CTA
   usano `lib/widgets/liquid_glass_button.dart` (`LiquidGlassButton`), che compone
   `LiquidGlassSurface` con `lib/widgets/spring_button.dart` per la pressione a
-  molla. **Nota implementativa**: `LiquidGlassSurface` applica un `ClipPath`
-  esplicito attorno al `BackdropFilter` (oltre al clip di `PhysicalShape`) — su
-  device reale con Impeller, un `BackdropFilter` senza un clip layer diretto come
-  antenato può sbiancare il resto dello schermo. Non rimuovere quel `ClipPath` se
-  si tocca il widget. **Altra nota implementativa (bug corretto il 2026-07-30)**:
-  il bordo decorativo (`_SpecularBorderPainter`, un `CustomPaint` interno) deve
-  avere `hitTest(Offset position) => false` esplicito — senza quell'override, il
-  default di `RenderCustomPaint.hitTestSelf` è `true`, e quel `CustomPaint`
-  (in cima allo `Stack` interno, quindi il primo testato) intercetta ogni tocco
-  sull'intera superficie prima che raggiunga il contenuto reale sottostante
-  (bottoni, righe, sotto-navigazione). Se si riscrive `LiquidGlassSurface`,
-  mantenere quell'override. **Altra nota implementativa (bug corretto il
-  2026-07-31)**: mai istanziare più `LiquidGlassSurface` affiancate a poca
-  distanza nello stesso `Row`/`Column` (es. card in riga con un gap di pochi
-  `AppSpacing`) — più `BackdropFilter` ravvicinati producono un artefatto di
-  rendering visibile come una "cucitura" netta tra una superficie e l'altra.
-  Per compartimenti multipli in riga (mini-statistiche, tab della
-  sotto-navigazione) usare **una sola** `LiquidGlassSurface`/superficie
-  esterna con scomparti piatti interni separati da un divisore sottile (vedi
-  `_StatRow` in `busta_paga_detail_screen.dart`), oppure — per CTA/tab dove
-  il vetro non è necessario — `FlatChipButton` (nessun vetro). Il
-  riempimento a gradiente di `LiquidGlassSurface` è calcolato in
-  `CustomPaint` sulla `size` reale del widget (mai sulle constraints di
-  `LayoutBuilder`, che possono essere illimitate dentro `ListView`/`Row`):
-  non reintrodurre quel calcolo via `LayoutBuilder` se si tocca il widget.
+  molla. Vincoli implementativi da non violare se si tocca il widget: (1) il
+  `ClipPath` esplicito attorno al `BackdropFilter` (oltre al clip di
+  `PhysicalShape`) è necessario — su device reale con Impeller, un
+  `BackdropFilter` senza un clip layer diretto come antenato sbianca il resto
+  dello schermo; (2) il bordo decorativo interno (`_SpecularBorderPainter`)
+  deve avere `hitTest(Offset position) => false` esplicito, altrimenti
+  intercetta ogni tocco prima che raggiunga il contenuto sottostante; (3) il
+  riempimento a gradiente va calcolato in `CustomPaint` sulla `size` reale del
+  widget, mai sulle constraints di `LayoutBuilder` (illimitate dentro
+  `ListView`/`Row`). Inoltre: mai istanziare più `LiquidGlassSurface`
+  affiancate a poca distanza nello stesso `Row`/`Column` — più
+  `BackdropFilter` ravvicinati producono una "cucitura" di rendering visibile
+  tra le superfici. Per compartimenti multipli in riga (mini-statistiche, tab
+  della sotto-navigazione) usare **una sola** `LiquidGlassSurface` esterna con
+  scomparti piatti interni separati da un divisore sottile (`BustaPagaStatRow`),
+  oppure — per CTA/tab dove il vetro non è necessario — `FlatChipButton`.
 - **Colori**: colori semantici Apple — vedi `lib/theme/app_colors.dart`. systemRed
   riservato ad alert e variazioni sfavorevoli. La palette del vetro (`glassFill`,
   `glassHighlight`, `glassShadowEdge`) resta volutamente sobria/neutra: il colore è
@@ -207,9 +232,11 @@ viewport sottostante è diverso in altezza tra le due schermate.
 
 ## Cosa manca (prossimi passi, in ordine di priorità suggerito)
 
-Nessun redesign aperto al momento (l'ultimo, la modifica inline nel dettaglio
-busta paga, è stato completato il 2026-07-31 — vedi `BACKLOG.md` per il
-dettaglio). Prossimi passi da concordare con l'utente alla prossima sessione.
+Nessun redesign aperto al momento (l'ultimo, il restyle del form di import per
+renderlo strutturalmente identico al dettaglio + fix del tracking dello
+slider di periodo, è stato completato e mergiato in `main` il 2026-08-01).
+Prossimi passi da concordare con l'utente alla prossima sessione — vedi
+`BACKLOG.md` per le voci aperte.
 
 **Nota**: l'estrazione dati via AI locale on-device (`llama_cpp_dart`), valutata
 in una fase precedente, è stata **abbandonata (2026-07-30)** — vedi "Decisioni

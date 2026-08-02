@@ -1,7 +1,8 @@
 # Buts
 
-App personale di gestione delle finanze — Flutter, locale-first, iOS come
-target primario (Cupertino/iOS nativo).
+App mobile personale per tracciare le buste paga — Flutter, locale-first
+(nessun backend, nessun account, dati sul device), iOS come target primario
+con look-and-feel Cupertino nativo.
 
 ## Setup
 
@@ -11,32 +12,36 @@ target primario (Cupertino/iOS nativo).
 
 ## Struttura
 
-L'app ha 2 sezioni principali di pari livello (Buste Paga, sezione di
-apertura predefinita, e Budget con le 4 aree), navigabili via swipe
-orizzontale o freccia nell'header globale. Persistenza Drift (SQLite) attiva
-per l'archivio Buste Paga; le 4 aree Budget sono ancora su dati mock.
+L'app è a sezione singola: si apre direttamente sull'archivio Buste Paga,
+con sotto-navigazione Archivio/Statistiche + import PDF. Persistenza Drift
+(SQLite).
 
 ```
 lib/
   main.dart                    # entry point (ProviderScope, intl 'it_IT')
   theme/                       # design tokens: colori, spaziature, tipografia
-  models/                      # AreaType, DashboardAreaSummary, BustaPaga, dati mock
+  models/                      # BustaPaga, TipoBustaPaga
   data/                        # persistenza Drift (SQLite) — AppDatabase, tabelle
-  providers/                   # provider Riverpod cross-sezione (buste paga)
-  navigation/
-    app_root_scaffold.dart      # scaffold radice: 2 sezioni (Buste Paga + Budget)
-    app_section.dart            # enum sezioni
-    app_section_provider.dart   # stato Riverpod sezione attiva
-    app_tab.dart                 # tab bar interna alla sola sezione Budget
-    root_scaffold.dart           # contenuto sezione Budget (tab bar 5 aree)
+  providers/                   # provider Riverpod (repository buste paga)
+  services/                    # import PDF (file picker, copia file) e parser regex
   screens/
-    buste_paga/                  # sezione Buste Paga: archivio, form, dettaglio
-    dashboard/                   # Dashboard della sezione Budget
-    conto_principale/ ecc.       # da progettare
-    placeholder_screen.dart
-  widgets/                      # componenti riutilizzabili (card, donut, sparkline...)
+    buste_paga/                  # sezione radice: contenitore, archivio, statistiche,
+                                  # form di import, dettaglio
+  widgets/                      # componenti riutilizzabili
 ```
 
-Vedi `CLAUDE.md` per il contesto di progetto completo (logica delle aree, stile,
-decisioni prese, prossimi passi) e `BACKLOG.md` per lo stato di avanzamento
-prima di lavorare su nuove schermate con Claude Code.
+`lib/widgets/` raggruppa per famiglia di stile:
+- **Liquid Glass** (`liquid_glass_surface.dart`, `liquid_glass_button.dart`,
+  `squircle_clipper.dart`, `glass_form_section.dart`) — il materiale in
+  vetro traslucido standard di card/sezioni.
+- **Flat, senza vetro** (`flat_chip_button.dart`, `app_alert_dialog.dart`) —
+  sotto-navigazione, barre di azione e popup.
+- **Specifici busta paga**, condivisi tra dettaglio e form di import
+  (`busta_paga_hero_card.dart`, `busta_paga_stat_row.dart`,
+  `busta_paga_maturazioni_section.dart`, `busta_paga_documento_chip.dart`,
+  `busta_paga_summary_hero.dart`, `busta_paga_list_item.dart`,
+  `trattenuta_edit_row.dart`, `cupertino_range_slider.dart`).
+
+Vedi `CLAUDE.md` per il contesto di progetto completo (decisioni prese,
+regole di stile non negoziabili, cosa manca) e `BACKLOG.md` per lo stato di
+avanzamento prima di lavorare su nuove schermate con Claude Code.
