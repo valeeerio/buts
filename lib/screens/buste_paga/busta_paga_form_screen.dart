@@ -15,13 +15,16 @@ import '../../widgets/busta_paga_maturazioni_section.dart';
 import '../../widgets/busta_paga_stat_row.dart';
 import '../../widgets/flat_chip_button.dart';
 import '../../widgets/glass_form_section.dart';
-import '../../widgets/liquid_glass_surface.dart';
 import '../../widgets/trattenuta_edit_row.dart';
 
 /// Altezza riservata alla barra flottante "Salva/Annulla" in basso, usata
-/// come padding in fondo al contenuto scrollabile perché l'ultima card non
-/// finisca nascosta/tappabile dietro di essa — stesso valore/motivazione di
-/// `_actionBarReservedHeight` in `busta_paga_detail_screen.dart`.
+/// come padding ESTERNO che riduce il viewport scrollabile (non contentPadding
+/// interno) perché l'ultima card non finisca nascosta/tappabile dietro di
+/// essa e perché la dissolvenza (`ShaderMask` in `build()`) coincida con le
+/// ultime righe davvero visibili sopra la barra — stesso ruolo di
+/// `_sidecarReservedHeight` in `buste_paga_section_screen.dart` e stesso
+/// valore/motivazione di `_actionBarReservedHeight` in
+/// `busta_paga_detail_screen.dart`.
 const double _actionBarReservedHeight = 80;
 
 /// Form di revisione di un nuovo import PDF già processato a monte: i campi
@@ -75,20 +78,27 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   late List<TrattenutaEditRow> _trattenute;
 
   late final String _fileOrigine;
-  List<String> _warnings = const [];
 
   /// True quando i campi sono stati popolati dall'estrazione automatica e
   /// non ancora confermati esplicitamente (salvataggio) dall'utente.
   bool _valoriDaConferma = false;
 
+  final _scrollController = ScrollController();
+
+  // true finché non si è scrollato fino in fondo alla lista — nasconde la
+  // dissolvenza di fondo (ShaderMask) non appena non c'è più altro sotto:
+  // stesso meccanismo/motivazione di `_showBottomFade` in
+  // `buste_paga_archivio_view.dart`.
+  bool _showBottomFade = true;
+
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_updateBottomFade);
     final estratti = widget.estratti;
 
     _fileOrigine = widget.fileOrigine;
     _valoriDaConferma = true;
-    _warnings = estratti.warnings;
 
     _periodo = _periodoFromEstratti(estratti.periodo) ??
         DateTime(DateTime.now().year, DateTime.now().month);
@@ -138,6 +148,15 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
 
   void _onResiduiChanged() => setState(() {});
 
+  void _updateBottomFade() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    final showFade = position.pixels < position.maxScrollExtent - 1;
+    if (showFade != _showBottomFade) {
+      setState(() => _showBottomFade = showFade);
+    }
+  }
+
   static DateTime? _periodoFromEstratti(String? periodo) {
     if (periodo == null) return null;
     final parti = periodo.split('-');
@@ -156,6 +175,8 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_updateBottomFade);
+    _scrollController.dispose();
     _lordoController.dispose();
     _nettoController.dispose();
     _straordinariController.dispose();
@@ -351,6 +372,12 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     final secondaryAccent =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
 
+    // Ricontrolla dopo ogni layout (non solo sullo scroll dell'utente): il
+    // contenuto del form può cambiare (aggiunta/rimozione trattenute) e con
+    // esso può cambiare se c'è ancora altro da scorrere sotto — stesso
+    // pattern di `BustePagaArchivioView.build()`.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _updateBottomFade());
+
     return CupertinoPageScaffold(
       backgroundColor:
           CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
@@ -359,93 +386,116 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
       ),
       child: Stack(
         children: [
-          SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.screenHorizontal,
-                AppSpacing.sm,
-                AppSpacing.screenHorizontal,
-                _actionBarReservedHeight,
-              ),
-              children: [
-                if (_valoriDaConferma) _ConfermaBanner(warnings: _warnings),
-                BustaPagaHeroCard(
-                  isConfermato: false,
-                  periodoLabel: _periodoLabel,
-                  tipo: _tipo,
-                  isEditing: true,
-                  nettoDisplay: formatNumber(_parse(_nettoController)),
-                  nettoController: _nettoController,
-                  onTapPeriodo: _pickPeriodo,
-                  onTapTipo: _pickTipo,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                BustaPagaStatRow(items: [
-                  (
-                    'Ferie residue',
-                    Text(
-                      formatNumber(_parse(_ferieResidueController)),
-                      textAlign: TextAlign.center,
-                    ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: _actionBarReservedHeight),
+            child: ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (rect) {
+                final fadeHeight = _showBottomFade ? 120.0 : 0.0;
+                final stop = 1 - (fadeHeight / rect.height).clamp(0.0, 1.0);
+                return LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: const [
+                    CupertinoColors.white,
+                    CupertinoColors.white,
+                    CupertinoColors.transparent,
+                  ],
+                  stops: [0.0, stop, 1.0],
+                ).createShader(rect);
+              },
+              child: SafeArea(
+                child: ListView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.screenHorizontal,
+                    AppSpacing.sm,
+                    AppSpacing.screenHorizontal,
+                    AppSpacing.sm,
                   ),
-                  (
-                    'ROL residui',
-                    Text(
-                      formatNumber(_parse(_rolResiduiController)),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  (
-                    'Ore lavorate',
-                    inlineNumberField(_oreLavorateController),
-                  ),
-                ]),
-                const SizedBox(height: AppSpacing.lg),
-                BustaPagaDocumentoChip(filePath: _fileOrigine),
-                const SizedBox(height: AppSpacing.lg),
-                BustaPagaMaturazioniSection(
-                  isEditing: true,
-                  ferieMaturate:
-                      formatNumber(_parse(_ferieMaturateController)),
-                  ferieGodute: formatNumber(_parse(_ferieGoduteController)),
-                  ferieResidue: formatNumber(_parse(_ferieResidueController)),
-                  rolMaturati: formatNumber(_parse(_rolMaturatiController)),
-                  rolGoduti: formatNumber(_parse(_rolGodutiController)),
-                  rolResidui: formatNumber(_parse(_rolResiduiController)),
-                  permessiGoduti:
-                      formatNumber(_parse(_permessiGodutiController)),
-                  ferieMaturateCtrl: _ferieMaturateController,
-                  ferieGoduteCtrl: _ferieGoduteController,
-                  ferieResidueCtrl: _ferieResidueController,
-                  rolMaturatiCtrl: _rolMaturatiController,
-                  rolGodutiCtrl: _rolGodutiController,
-                  rolResiduiCtrl: _rolResiduiController,
-                  permessiGodutiCtrl: _permessiGodutiController,
-                ),
-                BustaPagaStatRow(items: [
-                  (
-                    'Lordo',
-                    inlineNumberField(_lordoController, prefix: '€ '),
-                  ),
-                  (
-                    'Straordinari',
-                    inlineNumberField(_straordinariController, prefix: '€ '),
-                  ),
-                ]),
-                const SizedBox(height: AppSpacing.lg),
-                GlassFormSection(
-                  footer: 'Aggiungi le voci di trattenuta indicate in busta '
-                      'paga (es. INPS, IRPEF).',
                   children: [
-                    for (var i = 0; i < _trattenute.length; i++)
-                      trattenutaEditRow(
-                        _trattenute[i],
-                        onDismissed: () => _removeTrattenuta(i),
+                    BustaPagaHeroCard(
+                      isConfermato: false,
+                      periodoLabel: _periodoLabel,
+                      tipo: _tipo,
+                      isEditing: true,
+                      nettoDisplay: formatNumber(_parse(_nettoController)),
+                      nettoController: _nettoController,
+                      onTapPeriodo: _pickPeriodo,
+                      onTapTipo: _pickTipo,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    BustaPagaStatRow(items: [
+                      (
+                        'Ferie residue',
+                        Text(
+                          formatNumber(_parse(_ferieResidueController)),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                    _aggiungiVoceButton(accent),
+                      (
+                        'ROL residui',
+                        Text(
+                          formatNumber(_parse(_rolResiduiController)),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      (
+                        'Ore lavorate',
+                        inlineNumberField(_oreLavorateController),
+                      ),
+                    ]),
+                    const SizedBox(height: AppSpacing.lg),
+                    BustaPagaDocumentoChip(filePath: _fileOrigine),
+                    const SizedBox(height: AppSpacing.lg),
+                    BustaPagaMaturazioniSection(
+                      isEditing: true,
+                      ferieMaturate:
+                          formatNumber(_parse(_ferieMaturateController)),
+                      ferieGodute: formatNumber(_parse(_ferieGoduteController)),
+                      ferieResidue:
+                          formatNumber(_parse(_ferieResidueController)),
+                      rolMaturati: formatNumber(_parse(_rolMaturatiController)),
+                      rolGoduti: formatNumber(_parse(_rolGodutiController)),
+                      rolResidui: formatNumber(_parse(_rolResiduiController)),
+                      permessiGoduti:
+                          formatNumber(_parse(_permessiGodutiController)),
+                      ferieMaturateCtrl: _ferieMaturateController,
+                      ferieGoduteCtrl: _ferieGoduteController,
+                      ferieResidueCtrl: _ferieResidueController,
+                      rolMaturatiCtrl: _rolMaturatiController,
+                      rolGodutiCtrl: _rolGodutiController,
+                      rolResiduiCtrl: _rolResiduiController,
+                      permessiGodutiCtrl: _permessiGodutiController,
+                    ),
+                    BustaPagaStatRow(items: [
+                      (
+                        'Lordo',
+                        inlineNumberField(_lordoController, prefix: '€ '),
+                      ),
+                      (
+                        'Straordinari',
+                        inlineNumberField(_straordinariController,
+                            prefix: '€ '),
+                      ),
+                    ]),
+                    const SizedBox(height: AppSpacing.lg),
+                    GlassFormSection(
+                      footer:
+                          'Aggiungi le voci di trattenuta indicate in busta '
+                          'paga (es. INPS, IRPEF).',
+                      children: [
+                        for (var i = 0; i < _trattenute.length; i++)
+                          trattenutaEditRow(
+                            _trattenute[i],
+                            onDismissed: () => _removeTrattenuta(i),
+                          ),
+                        _aggiungiVoceButton(accent),
+                      ],
+                    ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
           Positioned(
@@ -454,28 +504,30 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
             bottom: 0,
             child: SafeArea(
               top: false,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: FlatChipButton(
-                        icon: CupertinoIcons.checkmark_alt,
-                        label: 'Salva',
-                        color: accent,
-                        onPressed: _save,
+              child: _StationaryPushBar(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: FlatChipButton(
+                          icon: CupertinoIcons.checkmark_alt,
+                          label: 'Salva',
+                          color: accent,
+                          onPressed: _save,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: FlatChipButton(
-                        icon: CupertinoIcons.xmark,
-                        label: 'Annulla',
-                        color: secondaryAccent,
-                        onPressed: () => Navigator.of(context).pop(),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: FlatChipButton(
+                          icon: CupertinoIcons.xmark,
+                          label: 'Annulla',
+                          color: secondaryAccent,
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -505,69 +557,58 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   }
 }
 
-/// Banner di conferma esplicita per i dati estratti automaticamente da un
-/// nuovo import PDF: visibile finché `_valoriDaConferma == true`, incorpora
-/// gli eventuali warning del parser regex. Il bottone "Salva" nella barra
-/// flottante in basso resta il meccanismo di conferma vera e propria (vedi
-/// `_save`).
-class _ConfermaBanner extends StatelessWidget {
-  final List<String> warnings;
-
-  const _ConfermaBanner({required this.warnings});
+/// Contro-traslazione della barra "Salva/Annulla" durante le transizioni di
+/// push/pop di `CupertinoPageRoute`: la Row è già dentro un `Positioned`
+/// ancorato in basso, ma la route intera (compresa quella sotto, quando è
+/// una pop) viene traslata orizzontalmente dalla transizione standard iOS —
+/// senza questo wrapper la barra scorrerebbe via insieme al resto della
+/// pagina invece di restare visivamente ferma. La contro-traslazione va
+/// espressa in pixel assoluti (frazione della larghezza schermo), non
+/// frazionale rispetto alla larghezza della barra stessa, perché la barra è
+/// più stretta dello schermo intero (ha margini laterali via
+/// `AppSpacing.screenHorizontal`): usare `FractionalTranslation` o un
+/// offset relativo alla propria larghezza produrrebbe uno spostamento
+/// diverso da quello subito dal resto della pagina e la barra "scivolerebbe"
+/// comunque, solo a una velocità diversa. Durante lo swipe-to-pop interattivo
+/// (`popGestureInProgress`) il valore dell'animazione è già lineare rispetto
+/// al gesto e va usato direttamente; altrimenti si applica la stessa curva
+/// (`Curves.fastEaseInToSlowEaseOut`, quella usata da
+/// `CupertinoPageTransition` in Flutter 3.44) usata dalla transizione di
+/// sistema, così il movimento resta sincronizzato.
+class _StationaryPushBar extends StatelessWidget {
+  final Widget child;
+  const _StationaryPushBar({required this.child});
 
   @override
   Widget build(BuildContext context) {
-    final accent =
-        CupertinoDynamicColor.resolve(AppColors.systemOrange, context);
-    final labelPrimary =
-        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
+    final route = ModalRoute.of(context);
+    final routeAnimation = route?.animation;
+    if (route == null || routeAnimation == null) return child;
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
-      child: LiquidGlassSurface(
-        radius: AppRadius.glass,
-        tint: accent,
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(CupertinoIcons.wand_stars, size: 18, color: accent),
-                const SizedBox(width: AppSpacing.xs),
-                Expanded(
-                  child: Text(
-                    'Dati estratti automaticamente',
-                    style: AppTextStyles.subtitle.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: labelPrimary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Verifica e correggi i campi se necessario: si confermano '
-              'salvando con "Salva".',
-              style: AppTextStyles.cardLabel.copyWith(color: labelPrimary),
-            ),
-            if (warnings.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.sm),
-              for (final warning in warnings)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 2),
-                  child: Text(
-                    '• $warning',
-                    style: AppTextStyles.cardLabel.copyWith(
-                      color: labelPrimary,
-                    ),
-                  ),
-                ),
-            ],
-          ],
-        ),
-      ),
+    return AnimatedBuilder(
+      animation: routeAnimation,
+      builder: (context, builtChild) {
+        final linear = route.popGestureInProgress;
+        final double t;
+        if (linear) {
+          t = routeAnimation.value;
+        } else {
+          final curve = routeAnimation.status == AnimationStatus.reverse
+              ? Curves.fastEaseInToSlowEaseOut.flipped
+              : Curves.fastEaseInToSlowEaseOut;
+          t = curve.transform(routeAnimation.value.clamp(0.0, 1.0));
+        }
+        final dxFraction = (1.0 - t).clamp(0.0, 1.0);
+        final dxPixels = dxFraction * MediaQuery.sizeOf(context).width;
+        return Transform.translate(
+          offset: Offset(-dxPixels, 0),
+          child: Opacity(
+            opacity: (1.0 - dxFraction).clamp(0.0, 1.0),
+            child: builtChild,
+          ),
+        );
+      },
+      child: child,
     );
   }
 }
