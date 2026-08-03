@@ -26,6 +26,8 @@ class BustaPagaSummaryHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final labelPrimary =
         CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
+    final labelSecondary =
+        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
     final isConfermato =
         bustaPaga.statoVerifica == StatoVerificaBustaPaga.confermato;
     final statoColor = CupertinoDynamicColor.resolve(
@@ -65,25 +67,22 @@ class BustaPagaSummaryHero extends StatelessWidget {
                   const SizedBox(width: AppSpacing.sm),
                   Text(
                     'Ferie',
-                    style: AppTextStyles.subtitle.copyWith(
-                      color: labelPrimary,
-                      fontWeight: FontWeight.w700,
+                    style: AppTextStyles.cardLabel.copyWith(
+                      color: labelSecondary,
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
                   Text(
                     'ROL',
-                    style: AppTextStyles.subtitle.copyWith(
-                      color: labelPrimary,
-                      fontWeight: FontWeight.w700,
+                    style: AppTextStyles.cardLabel.copyWith(
+                      color: labelSecondary,
                     ),
                   ),
                   const SizedBox(width: AppSpacing.md),
                   Text(
                     'Ore',
-                    style: AppTextStyles.subtitle.copyWith(
-                      color: labelPrimary,
-                      fontWeight: FontWeight.w700,
+                    style: AppTextStyles.cardLabel.copyWith(
+                      color: labelSecondary,
                     ),
                   ),
                 ],
