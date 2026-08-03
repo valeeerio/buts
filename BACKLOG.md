@@ -9,18 +9,46 @@ Legenda skill: skill di Claude Code da invocare per quel task (vedi
 
 ## Buste Paga
 
-- [ ] **Uniformare stile etichetta "colonna" tra hero Archivio e dettaglio**:
-      le intestazioni Ferie/ROL/Ore nell'hero (`BustaPagaSummaryHero` in
-      `lib/widgets/busta_paga_summary_hero.dart`) usano
-      `AppTextStyles.subtitle` (15px, w700), mentre "Maturato/Goduto/Residuo"
-      nel dettaglio (`_tableHeaderRow` in
-      `lib/widgets/busta_paga_maturazioni_section.dart`) usano
-      `AppTextStyles.cardLabel` (12px, w700) — stesso ruolo semantico
-      (etichetta di colonna sopra un valore), basi tipografiche diverse.
-
 ## Budget
 
 ## Infrastruttura
+
+## Analisi tecnica (2026-08-03)
+
+Note emerse da una revisione dello script di parsing PDF e della schermata
+Statistiche — non sono task spuntabili, solo materiale da cui aprire
+eventuali task in una sessione futura, quando/se l'utente deciderà di
+intervenire.
+
+**Parser regex** (`lib/services/busta_paga_regex_parser.dart`, tarato sul
+solo layout del software paghe "JOB"):
+- Righe multiple "Straordinario"/"Retribuzione ordinaria": il parser
+  prende solo il primo match (`firstMatch`) — buste con più voci
+  straordinario (es. diurno+notturno) perdono dati silenziosamente, senza
+  warning.
+- Straordinari mancanti non generano warning, a differenza di tutti gli
+  altri campi estratti — incoerenza.
+- Nessuna validazione incrociata tra campi (es. netto > lordo, ferie
+  residue negative, somma trattenute non coerente con lordo-netto) —
+  il candidato più concreto per un futuro task leggero di warning
+  aggiuntivi nel parser, se si vorrà aprirlo.
+- Gap di copertura in `test/busta_paga_regex_parser_test.dart`: nessun
+  test con "tredicesima"/"quattordicesima" esplicite nel testo (solo il
+  percorso di deduzione dal mese è testato), nessun test per i warning
+  `periodo`/`lordo`/`INPS`/`netto non trovato` singolarmente, nessun test
+  per il calcolo di "Altre trattenute (IRPEF+varie)", nessun test con
+  righe multiple Straordinario/Ordinario, nessun test di integrazione con
+  un PDF reale (solo testo sintetico).
+
+**Statistiche — campi del modello mai visualizzati** (nessuna decisione
+presa su quali implementare, elenco di candidati per una futura sessione
+dedicata): `trattenute` (mappa INPS + "Altre trattenute IRPEF+varie", mai
+mostrata nel tempo), `ferieMaturate`/`ferieGodute` (solo il residuo è
+mostrato oggi), `rolMaturati`/`rolGoduti` (idem), `oreLavorate` (stimato
+dal parser ma mai graficato). Quando si deciderà di espandere Statistiche,
+l'utente li vuole descritti come task pronti da implementare — stesso
+pattern dei 3 grafici esistenti (LineChart/BarChart + tabella
+riepilogativa sotto) — non come mockup preliminari da validare prima.
 
 ## Fatto
 
