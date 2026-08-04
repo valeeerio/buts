@@ -20,25 +20,20 @@ Statistiche — non sono task spuntabili, solo materiale da cui aprire
 eventuali task in una sessione futura, quando/se l'utente deciderà di
 intervenire.
 
-**Parser regex** (`lib/services/busta_paga_regex_parser.dart`, tarato sul
-solo layout del software paghe "JOB"):
-- Righe multiple "Straordinario"/"Retribuzione ordinaria": il parser
-  prende solo il primo match (`firstMatch`) — buste con più voci
-  straordinario (es. diurno+notturno) perdono dati silenziosamente, senza
-  warning.
-- Straordinari mancanti non generano warning, a differenza di tutti gli
-  altri campi estratti — incoerenza.
-- Nessuna validazione incrociata tra campi (es. netto > lordo, ferie
-  residue negative, somma trattenute non coerente con lordo-netto) —
-  il candidato più concreto per un futuro task leggero di warning
-  aggiuntivi nel parser, se si vorrà aprirlo.
-- Gap di copertura in `test/busta_paga_regex_parser_test.dart`: nessun
-  test con "tredicesima"/"quattordicesima" esplicite nel testo (solo il
-  percorso di deduzione dal mese è testato), nessun test per i warning
-  `periodo`/`lordo`/`INPS`/`netto non trovato` singolarmente, nessun test
-  per il calcolo di "Altre trattenute (IRPEF+varie)", nessun test con
-  righe multiple Straordinario/Ordinario, nessun test di integrazione con
-  un PDF reale (solo testo sintetico).
+**Parser regex — risolto il 2026-08-04** (`lib/services/busta_paga_regex_parser.dart`,
+tarato sul solo layout del software paghe "JOB"): righe multiple
+"Straordinario"/"Retribuzione ordinaria" ora sommate invece di prendere
+solo la prima; aggiunta validazione incrociata `netto > lordo` (unico
+controllo sicuro senza falsi positivi — un controllo ferie/ROL
+residuo-vs-maturato avrebbe prodotto falsi allarmi per via del riporto
+dall'anno precedente, deliberatamente ignorato dal parser); chiusa come
+non-bug la mancanza di warning sugli straordinari a zero (la riga non
+compare nel PDF se non c'è stato straordinario quel mese, zero silenzioso
+è il dato corretto). Copertura test estesa in
+`test/busta_paga_regex_parser_test.dart` con 10 nuovi casi (tipo esplicito
+tredicesima/quattordicesima, warning periodo/lordo/INPS/netto non
+trovati, calcolo "Altre trattenute", righe multiple sommate, nuovo warning
+netto>lordo).
 
 **Statistiche — campi del modello mai visualizzati** (nessuna decisione
 presa su quali implementare, elenco di candidati per una futura sessione

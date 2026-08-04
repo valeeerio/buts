@@ -202,18 +202,23 @@ class BustaPagaRegexParser {
     }
     if (lordo == 0) warnings.add('lordo non trovato (nessuna riga di competenza riconosciuta)');
 
-    // --- straordinari (ore) ---
+    // --- straordinari (ore): somma tutte le righe trovate, non solo la
+    // prima — una busta può avere più voci (es. diurno 30% + notturno
+    // 50%) ---
     double straordinari = 0;
-    final straordinarioMatch = _rigaStraordinario.firstMatch(testo);
-    if (straordinarioMatch != null) {
-      straordinari = _toDouble(straordinarioMatch.group(1)!);
+    for (final m in _rigaStraordinario.allMatches(testo)) {
+      straordinari += _toDouble(m.group(1)!);
     }
 
-    // --- ore lavorate: stima da giorni di "Retribuzione ordinaria" × 8 ---
+    // --- ore lavorate: stima da giorni×8, sommando tutte le righe
+    // "Retribuzione ordinaria" trovate ---
+    double giorniOrdinari = 0;
+    for (final m in _rigaRetribuzioneOrdinaria.allMatches(testo)) {
+      giorniOrdinari += _toDouble(m.group(1)!);
+    }
     double? oreLavorate;
-    final retribOrdinariaMatch = _rigaRetribuzioneOrdinaria.firstMatch(testo);
-    if (retribOrdinariaMatch != null) {
-      oreLavorate = _toDouble(retribOrdinariaMatch.group(1)!) * 8;
+    if (giorniOrdinari > 0) {
+      oreLavorate = giorniOrdinari * 8;
       warnings.add('ore lavorate stimate da giorni×8, non lette direttamente');
     } else {
       warnings.add('ore lavorate non determinabili');
@@ -279,6 +284,10 @@ class BustaPagaRegexParser {
       if (resto > 0.01) {
         trattenute['Altre trattenute (IRPEF + varie)'] = double.parse(resto.toStringAsFixed(2));
       }
+    }
+
+    if (netto != null && lordo > 0 && netto > lordo) {
+      warnings.add('netto superiore al lordo, verifica i dati estratti');
     }
 
     return BustaPagaEstratti(
