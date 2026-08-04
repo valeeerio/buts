@@ -10,10 +10,11 @@ import 'swipe_delete_background.dart';
 /// che sostituisce. Riusato da `BustaPagaStatRow`, `BustaPagaMaturazioniSection`
 /// e da `TrattenutaEditRow` in dettaglio/form busta paga.
 ///
-/// Con `prefix` (es. "€ " nelle statistiche Lordo/Straordinari, "− € " nelle
-/// trattenute), il blocco "prefisso + campo" si dimensiona sul proprio
-/// contenuto (`IntrinsicWidth`, non una larghezza fissa arbitraria): entrare
-/// in modifica non deve introdurre alcun gap visibile tra simbolo e numero
+/// Con `prefix` (es. "€ " nella statistica Lordo, "− € " nelle trattenute) o
+/// `suffix` (es. " h" nella statistica Straordinari, in ore e non in euro),
+/// il blocco "prefisso/suffisso + campo" si dimensiona sul proprio contenuto
+/// (`IntrinsicWidth`, non una larghezza fissa arbitraria): entrare in
+/// modifica non deve introdurre alcun gap visibile tra simbolo e numero
 /// rispetto alla vista di sola lettura (che è un unico `Text` con
 /// spaziatura naturale). `IntrinsicWidth` qui è sicuro: entrambi gli usi
 /// attuali vivono dentro un `Expanded`/`Center` a larghezza già vincolata,
@@ -27,6 +28,7 @@ Widget inlineNumberField(
   TextEditingController controller, {
   TextStyle? style,
   String? prefix,
+  String? suffix,
   MainAxisAlignment rowAlignment = MainAxisAlignment.center,
 }) {
   return Builder(
@@ -47,18 +49,19 @@ Widget inlineNumberField(
         padding: EdgeInsets.zero,
         style: resolvedStyle,
       );
-      if (prefix == null) return field;
+      if (prefix == null && suffix == null) return field;
       // `IntrinsicWidth` invece di una larghezza fissa: il campo si
       // dimensiona sul testo digitato, come farebbe il `Text` di sola
       // lettura che sostituisce. Con `mainAxisSize.min` il blocco
-      // "prefisso + campo" resta un'unica unità di larghezza nota, sicura
-      // da centrare o allineare a destra nella riga ospitante.
+      // "prefisso/suffisso + campo" resta un'unica unità di larghezza nota,
+      // sicura da centrare o allineare a destra nella riga ospitante.
       return Row(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: rowAlignment,
         children: [
-          Text(prefix, style: resolvedStyle),
+          if (prefix != null) Text(prefix, style: resolvedStyle),
           IntrinsicWidth(child: field),
+          if (suffix != null) Text(suffix, style: resolvedStyle),
         ],
       );
     },

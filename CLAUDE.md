@@ -63,8 +63,11 @@ regex.
 modalità modifica): hero card in cima (mese, badge di stato Confermato/Da
 confermare — verde/rosso, stessa semantica del pallino in Archivio — netto in
 evidenza massima) **fissa fuori dall'area scrollabile**, sotto una riga di
-mini-statistiche Ferie residue/ROL residui/Ore lavorate e più sotto una riga
-Lordo/Straordinari, entrambe **un'unica** `LiquidGlassSurface` a scomparti
+mini-statistiche Ferie residue/ROL residui/Lordo e più sotto una riga
+Ore lavorate/Straordinari (raggruppate per unità: la prima riga è in
+euro/giorni, la seconda in ore — Straordinari è ore, non euro, coerente col
+grafico "Ore straordinario" di Statistiche), entrambe **un'unica**
+`LiquidGlassSurface` a scomparti
 (mai più superfici di vetro affiancate, vedi nota bug in "Stile visivo"), una
 tabella unica "Ferie, ROL e permessi" (colonne Maturato/Goduto/Residuo) al
 posto di sezioni separate per categoria, chip documento PDF tappabile e
@@ -92,7 +95,7 @@ senso condividerlo; valorizzato nel dettaglio con `Share.shareXFiles`).
 `busta_paga_form_screen.dart` — attiva `_isEditing = true` sulla stessa
 schermata di dettaglio, e le stesse card diventano editabili sul posto (hero
 Netto e periodo tappabile con lo stesso picker mese/anno del vecchio form,
-`BustaPagaStatRow` Ferie/ROL/Ore e Lordo/Straordinari, tabella Maturazioni, righe
+`BustaPagaStatRow` Ferie/ROL/Lordo e Ore/Straordinari, tabella Maturazioni, righe
 Trattenute con `Dismissible`+`SwipeDeleteBackground` al posto di un bottone
 "meno" per rimuoverle). **Requisito non negoziabile confermato più volte
 dall'utente**: entrare in modifica non deve cambiare NULLA visivamente

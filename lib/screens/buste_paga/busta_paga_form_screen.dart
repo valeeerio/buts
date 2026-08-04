@@ -441,8 +441,8 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                         ),
                       ),
                       (
-                        'Ore lavorate',
-                        inlineNumberField(_oreLavorateController),
+                        'Lordo',
+                        inlineNumberField(_lordoController, prefix: '€ '),
                       ),
                     ]),
                     const SizedBox(height: AppSpacing.lg),
@@ -470,13 +470,13 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                     ),
                     BustaPagaStatRow(items: [
                       (
-                        'Lordo',
-                        inlineNumberField(_lordoController, prefix: '€ '),
+                        'Ore lavorate',
+                        inlineNumberField(_oreLavorateController),
                       ),
                       (
                         'Straordinari',
                         inlineNumberField(_straordinariController,
-                            prefix: '€ '),
+                            suffix: ' h'),
                       ),
                     ]),
                     const SizedBox(height: AppSpacing.lg),

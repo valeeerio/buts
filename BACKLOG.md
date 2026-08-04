@@ -45,6 +45,15 @@ l'utente li vuole descritti come task pronti da implementare — stesso
 pattern dei 3 grafici esistenti (LineChart/BarChart + tabella
 riepilogativa sotto) — non come mockup preliminari da validare prima.
 
+**Permessi R.O.L. — due righe distinte nel PDF, non chiarite** (emerso il
+2026-08-04 fixando la visualizzazione di Straordinari, non risolto): il PDF
+reale ha sia una riga cumulativa "Permessi (R.O.L.)" nei ratei (oggi letta
+dal parser come `rolGoduti`/`permessiGoduti`) sia una riga distinta
+"Permessi riduz. orario goduti" tra le competenze del mese, mai letta dal
+parser. Relazione tra i due valori non confermata (ipotesi più probabile:
+cumulativo da inizio anno vs goduto del mese) — da chiarire con l'utente
+prima di decidere se serve un fix al parser.
+
 ## Fatto
 
 Storico compresso il 2026-08-02 — dettaglio recuperabile dai commit Git su

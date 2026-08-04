@@ -508,10 +508,10 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                               ),
                             ),
                             (
-                              'Ore lavorate',
+                              'Lordo',
                               _isEditing
-                                  ? inlineNumberField(_oreLavorateCtrl)
-                                  : Text(formatNumber(corrente.oreLavorate),
+                                  ? inlineNumberField(_lordoCtrl, prefix: '€ ')
+                                  : Text('€ ${formatNumber(corrente.lordo)}',
                                       textAlign: TextAlign.center),
                             ),
                           ]),
@@ -549,19 +549,19 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                           ),
                           BustaPagaStatRow(items: [
                             (
-                              'Lordo',
+                              'Ore lavorate',
                               _isEditing
-                                  ? inlineNumberField(_lordoCtrl, prefix: '€ ')
-                                  : Text('€ ${formatNumber(corrente.lordo)}',
+                                  ? inlineNumberField(_oreLavorateCtrl)
+                                  : Text(formatNumber(corrente.oreLavorate),
                                       textAlign: TextAlign.center),
                             ),
                             (
                               'Straordinari',
                               _isEditing
                                   ? inlineNumberField(_straordinariCtrl,
-                                      prefix: '€ ')
+                                      suffix: ' h')
                                   : Text(
-                                      '€ ${formatNumber(corrente.straordinari)}',
+                                      '${formatNumber(corrente.straordinari)} h',
                                       textAlign: TextAlign.center),
                             ),
                           ]),
