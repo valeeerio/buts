@@ -79,17 +79,21 @@ mostra un popup "Dati confermati") e "Modifica" — entrambe `FlatChipButton`.
 La schermata legge sempre la versione corrente della busta paga dal provider
 (`ref.watch(busteRepositoryProvider)` filtrato per id), non il valore statico
 ricevuto all'apertura, così si aggiorna subito dopo "Conferma" o "Salva". Nel
-dettaglio il PDF si apre via foglio di condivisione di sistema (`share_plus`),
-nessun visualizzatore PDF in-app.
+dettaglio il PDF si apre nell'anteprima nativa di sistema (Quick Look su
+iOS) tramite `open_filex`, che include già un bottone di condivisione
+nativo — nessun visualizzatore PDF in-app, nessuna azione di condivisione
+separata.
 
 Hero card, riga di statistiche, tabella maturazioni e chip documento sono
 widget pubblici condivisi in `lib/widgets/` — non più classi private di
 questo file — perché riusati identici anche dal form di import (vedi sotto):
 `BustaPagaHeroCard` (badge stato via `isConfermato: bool`, non un
 `BustaPaga` intero), `BustaPagaStatRow` (`items: List<(String label, Widget
-value)>`), `BustaPagaMaturazioniSection`, `BustaPagaDocumentoChip` (`onTap`
-opzionale — `null` nel form, dove il file non è ancora salvato e non ha
-senso condividerlo; valorizzato nel dettaglio con `Share.shareXFiles`).
+value)>`), `BustaPagaMaturazioniSection`, `BustaPagaDocumentoChip` — sempre
+tappabile (dettaglio e form di import: il file è già copiato su disco prima
+ancora che il form sia visibile) con una singola azione "Apri" che mostra
+l'anteprima di sistema via `open_filex`, niente più `onTap` esterno né
+distinzione di condivisione separata.
 
 **Modifica inline (2026-07-31)**: "Modifica" non naviga più verso
 `busta_paga_form_screen.dart` — attiva `_isEditing = true` sulla stessa

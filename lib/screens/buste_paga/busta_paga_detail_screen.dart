@@ -1,7 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../models/busta_paga.dart';
 import '../../providers/buste_paga_provider.dart';
 import '../../theme/app_colors.dart';
@@ -519,8 +518,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                           if (corrente.fileOrigine != null) ...[
                             BustaPagaDocumentoChip(
                               filePath: corrente.fileOrigine!,
-                              onTap: () =>
-                                  Share.shareXFiles([XFile(corrente.fileOrigine!)]),
                             ),
                             const SizedBox(height: AppSpacing.lg),
                           ],

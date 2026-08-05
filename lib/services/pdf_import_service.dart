@@ -5,6 +5,8 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 
+import 'pdf_path_resolver.dart';
+
 enum PdfImportStatus { success, cancelled, noExtractableText, error }
 
 /// Esito della selezione/import di un PDF. In v1 sono supportati solo PDF
@@ -92,7 +94,7 @@ class PdfImportService {
     List<int> bytes,
   ) async {
     final documentsDir = await getApplicationDocumentsDirectory();
-    final targetDir = Directory(p.join(documentsDir.path, 'buste_paga_pdf'));
+    final targetDir = Directory(p.join(documentsDir.path, pdfBusteDirName));
     if (!targetDir.existsSync()) {
       targetDir.createSync(recursive: true);
     }
@@ -100,7 +102,10 @@ class PdfImportService {
         '${DateTime.now().millisecondsSinceEpoch}_${p.basename(sourceFileName)}';
     final targetFile = File(p.join(targetDir.path, fileName));
     await targetFile.writeAsBytes(bytes);
-    return targetFile.path;
+    // Path RELATIVO alla Application Documents Directory (mai il prefisso
+    // assoluto: su iOS include l'UUID del container sandbox, che cambia ad
+    // ogni reinstallazione — vedi `pdf_path_resolver.dart`).
+    return p.join(pdfBusteDirName, fileName);
   }
 
   /// Rinomina (stessa cartella) il PDF di una mensilità supplementare col
@@ -113,11 +118,11 @@ class PdfImportService {
     required int mese,
     required int anno,
   }) async {
-    final nuovoPercorso = p.join(
-      p.dirname(currentPath),
-      'Mens.supplementare $mese-$anno.pdf',
-    );
-    final nuovoFile = await File(currentPath).rename(nuovoPercorso);
-    return nuovoFile.path;
+    final absolutePath = await resolvePdfAbsolutePath(currentPath);
+    final nuovoNomeFile = 'Mens.supplementare $mese-$anno.pdf';
+    final nuovoPercorso = p.join(p.dirname(absolutePath), nuovoNomeFile);
+    await File(absolutePath).rename(nuovoPercorso);
+    // Ritorna il nuovo path RELATIVO, coerente con `_copyToAppDocuments`.
+    return p.join(pdfBusteDirName, nuovoNomeFile);
   }
 }
