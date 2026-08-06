@@ -22,16 +22,25 @@ const _tipoLabels = {
 /// chiamante); il badge di stato resta sempre di sola lettura, non è
 /// modificabile direttamente.
 ///
+/// Layout: la prima riga affianca periodo e tipo inline (es. "Luglio 2026 ·
+/// Mensile") con il badge di stato a destra; sotto, una riga a due colonne
+/// mostra il Lordo (sinistra, sempre di sola lettura — è un valore derivato
+/// da `competenze`, mai un campo editabile diretto, vedi CLAUDE.md) e il
+/// Netto (destra, il valore "hero" vero e proprio, l'unico editabile in
+/// modalità modifica).
+///
 /// Non richiede un `BustaPaga` intero: solo `isConfermato` per il badge
 /// (il form di import, che non ha ancora una busta paga salvata, può così
-/// passare `isConfermato: false` senza fabbricare un modello fittizio) e
-/// `nettoDisplay` (già formattato, senza simbolo "€") per il valore di sola
-/// lettura, mostrato quando `nettoController` è `null`.
+/// passare `isConfermato: false` senza fabbricare un modello fittizio),
+/// `lordoDisplay` e `nettoDisplay` (già formattati, senza simbolo "€") per
+/// i valori di sola lettura — quest'ultimo mostrato solo quando
+/// `nettoController` è `null`.
 class BustaPagaHeroCard extends StatelessWidget {
   final bool isConfermato;
   final String periodoLabel;
   final TipoBustaPaga tipo;
   final bool isEditing;
+  final String lordoDisplay;
   final String nettoDisplay;
   final TextEditingController? nettoController;
   final VoidCallback? onTapPeriodo;
@@ -43,6 +52,7 @@ class BustaPagaHeroCard extends StatelessWidget {
     required this.periodoLabel,
     required this.tipo,
     required this.isEditing,
+    required this.lordoDisplay,
     required this.nettoDisplay,
     this.nettoController,
     this.onTapPeriodo,
@@ -62,6 +72,11 @@ class BustaPagaHeroCard extends StatelessWidget {
     final heroAmountStyle =
         AppTextStyles.heroAmount.copyWith(color: labelPrimary);
 
+    final lordoValueStyle = AppTextStyles.cardAmount.copyWith(
+      color: labelPrimary,
+      fontWeight: FontWeight.w400,
+    );
+
     return LiquidGlassSurface(
       radius: AppRadius.glass,
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -71,31 +86,64 @@ class BustaPagaHeroCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: onTapPeriodo == null
-                    ? Text(
-                        periodoLabel,
-                        style: AppTextStyles.sectionTitle.copyWith(
-                          color: labelPrimary,
-                        ),
-                      )
-                    : GestureDetector(
-                        onTap: onTapPeriodo,
-                        behavior: HitTestBehavior.opaque,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              periodoLabel,
-                              style: AppTextStyles.sectionTitle.copyWith(
-                                color: labelPrimary,
-                              ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    onTapPeriodo == null
+                        ? Text(
+                            periodoLabel,
+                            style: AppTextStyles.sectionTitle.copyWith(
+                              color: labelPrimary,
                             ),
-                            const SizedBox(width: AppSpacing.xs),
-                            Icon(CupertinoIcons.chevron_down,
-                                size: 16, color: labelSecondary),
-                          ],
-                        ),
-                      ),
+                          )
+                        : GestureDetector(
+                            onTap: onTapPeriodo,
+                            behavior: HitTestBehavior.opaque,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  periodoLabel,
+                                  style: AppTextStyles.sectionTitle.copyWith(
+                                    color: labelPrimary,
+                                  ),
+                                ),
+                                const SizedBox(width: AppSpacing.xs),
+                                Icon(CupertinoIcons.chevron_down,
+                                    size: 16, color: labelSecondary),
+                              ],
+                            ),
+                          ),
+                    Text(
+                      ' · ',
+                      style:
+                          AppTextStyles.cardLabel.copyWith(color: labelSecondary),
+                    ),
+                    onTapTipo == null
+                        ? Text(
+                            _tipoLabels[tipo]!,
+                            style: AppTextStyles.cardLabel
+                                .copyWith(color: labelSecondary),
+                          )
+                        : GestureDetector(
+                            onTap: onTapTipo,
+                            behavior: HitTestBehavior.opaque,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _tipoLabels[tipo]!,
+                                  style: AppTextStyles.cardLabel
+                                      .copyWith(color: labelSecondary),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(CupertinoIcons.chevron_down,
+                                    size: 12, color: labelSecondary),
+                              ],
+                            ),
+                          ),
+                  ],
+                ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -113,58 +161,56 @@ class BustaPagaHeroCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 2),
-          onTapTipo == null
-              ? Text(
-                  _tipoLabels[tipo]!,
-                  style:
-                      AppTextStyles.cardLabel.copyWith(color: labelSecondary),
-                )
-              : GestureDetector(
-                  onTap: onTapTipo,
-                  behavior: HitTestBehavior.opaque,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _tipoLabels[tipo]!,
-                        style: AppTextStyles.cardLabel
-                            .copyWith(color: labelSecondary),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Lordo',
+                      style: AppTextStyles.cardLabel
+                          .copyWith(color: labelSecondary),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '€ $lordoDisplay',
+                      style: lordoValueStyle,
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: nettoController == null
+                    ? Text(
+                        '€ $nettoDisplay',
+                        textAlign: TextAlign.right,
+                        style: heroAmountStyle,
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text('€ ', style: heroAmountStyle),
+                          Expanded(
+                            child: CupertinoTextField(
+                              controller: nettoController,
+                              placeholder: '0',
+                              textAlign: TextAlign.right,
+                              keyboardType: const TextInputType.numberWithOptions(
+                                  decimal: true, signed: false),
+                              decoration: const BoxDecoration(),
+                              padding: EdgeInsets.zero,
+                              style: heroAmountStyle,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 4),
-                      Icon(CupertinoIcons.chevron_down,
-                          size: 12, color: labelSecondary),
-                    ],
-                  ),
-                ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'Netto',
-            style: AppTextStyles.cardLabel.copyWith(color: labelSecondary),
+              ),
+            ],
           ),
-          const SizedBox(height: 2),
-          if (nettoController == null)
-            Text(
-              '€ $nettoDisplay',
-              style: heroAmountStyle,
-            )
-          else
-            Row(
-              children: [
-                Text('€ ', style: heroAmountStyle),
-                Expanded(
-                  child: CupertinoTextField(
-                    controller: nettoController,
-                    placeholder: '0',
-                    keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true, signed: false),
-                    decoration: const BoxDecoration(),
-                    padding: EdgeInsets.zero,
-                    style: heroAmountStyle,
-                  ),
-                ),
-              ],
-            ),
         ],
       ),
     );

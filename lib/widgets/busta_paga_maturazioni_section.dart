@@ -6,12 +6,19 @@ import '../theme/app_text_styles.dart';
 import 'glass_form_section.dart';
 import 'trattenuta_edit_row.dart';
 
-/// Tabella unica Ferie/ROL/Permessi con colonne Maturato/Goduto/Residuo:
-/// sostituisce sezioni separate che ripetono la stessa struttura a righe per
-/// ciascuna categoria. In modifica le celle Ferie/ROL diventano campi di
-/// testo numerici; nella riga Permessi solo "Goduto" è editabile
-/// (Maturato/Residuo non esistono come campi nel modello per i permessi,
-/// restano "—" fissi anche in modifica).
+/// Tabella unica Ferie/Permessi/Ex festività/Permessi (mese) con colonne
+/// Maturato/Goduto/Residuo: sostituisce sezioni separate che ripetono la
+/// stessa struttura a righe per ciascuna categoria. In modifica le celle
+/// Ferie/Permessi/Ex festività diventano campi di testo numerici; nella
+/// riga "Permessi (mese)" solo "Goduto" è editabile (Maturato/Residuo non
+/// esistono come campi nel modello per quel dato, restano "—" fissi anche
+/// in modifica).
+///
+/// Ordine righe allineato all'intestazione della tabella ratei nel PDF
+/// (FERIE / PERMESSI (R.O.L.) / EX FESTIVITA'): "Permessi" qui rappresenta
+/// i ROL (rolMaturati/rolGoduti/rolResidui, rinominati da "ROL" per
+/// coerenza con l'etichetta del PDF), distinti dalla riga "Permessi (mese)"
+/// più sotto (permessi riduz. orario goduti nel mese, dato mensile a sé).
 class BustaPagaMaturazioniSection extends StatelessWidget {
   final bool isEditing;
 
@@ -22,6 +29,9 @@ class BustaPagaMaturazioniSection extends StatelessWidget {
   final String rolGoduti;
   final String rolResidui;
   final String permessiGoduti;
+  final String exFestivitaMaturate;
+  final String exFestivitaGodute;
+  final String exFestivitaResidue;
 
   final TextEditingController? ferieMaturateCtrl;
   final TextEditingController? ferieGoduteCtrl;
@@ -30,6 +40,9 @@ class BustaPagaMaturazioniSection extends StatelessWidget {
   final TextEditingController? rolGodutiCtrl;
   final TextEditingController? rolResiduiCtrl;
   final TextEditingController? permessiGodutiCtrl;
+  final TextEditingController? exFestivitaMaturateCtrl;
+  final TextEditingController? exFestivitaGoduteCtrl;
+  final TextEditingController? exFestivitaResidueCtrl;
 
   const BustaPagaMaturazioniSection({
     super.key,
@@ -41,6 +54,9 @@ class BustaPagaMaturazioniSection extends StatelessWidget {
     required this.rolGoduti,
     required this.rolResidui,
     required this.permessiGoduti,
+    required this.exFestivitaMaturate,
+    required this.exFestivitaGodute,
+    required this.exFestivitaResidue,
     this.ferieMaturateCtrl,
     this.ferieGoduteCtrl,
     this.ferieResidueCtrl,
@@ -48,6 +64,9 @@ class BustaPagaMaturazioniSection extends StatelessWidget {
     this.rolGodutiCtrl,
     this.rolResiduiCtrl,
     this.permessiGodutiCtrl,
+    this.exFestivitaMaturateCtrl,
+    this.exFestivitaGoduteCtrl,
+    this.exFestivitaResidueCtrl,
   });
 
   @override
@@ -69,7 +88,7 @@ class BustaPagaMaturazioniSection extends StatelessWidget {
         ),
         _tableDataRow(
           context,
-          label: 'ROL',
+          label: 'Permessi',
           maturato: rolMaturati,
           goduto: rolGoduti,
           residuo: rolResidui,
@@ -79,7 +98,17 @@ class BustaPagaMaturazioniSection extends StatelessWidget {
         ),
         _tableDataRow(
           context,
-          label: 'Permessi',
+          label: 'Ex festività',
+          maturato: exFestivitaMaturate,
+          goduto: exFestivitaGodute,
+          residuo: exFestivitaResidue,
+          maturatoCtrl: exFestivitaMaturateCtrl,
+          godutoCtrl: exFestivitaGoduteCtrl,
+          residuoCtrl: exFestivitaResidueCtrl,
+        ),
+        _tableDataRow(
+          context,
+          label: 'Permessi (mese)',
           maturato: '—',
           goduto: permessiGoduti,
           residuo: '—',

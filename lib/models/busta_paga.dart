@@ -13,6 +13,41 @@ enum StatoVerificaBustaPaga { daConfermare, confermato }
 /// linea con le mensilità normali.
 enum TipoBustaPaga { mensile, tredicesima, quattordicesima }
 
+/// Singola voce di competenza (es. "Retribuzione ordinaria", "Edr
+/// contrattuale", "Straordinario diurno (30%)") estratta dal PDF o inserita
+/// manualmente nel form/dettaglio. `importo` è 0 quando la riga del PDF non
+/// riporta un importo monetario associato (es. righe di sola quantità).
+class VoceCompetenza {
+  final String descrizione;
+  final double quantita;
+  final double importo;
+
+  const VoceCompetenza({
+    required this.descrizione,
+    required this.quantita,
+    required this.importo,
+  });
+}
+
+/// Una voce di competenza è considerata "straordinario" quando la sua
+/// descrizione inizia (case-insensitive) con "straordinario" — usato sia dal
+/// parser sia dalle schermate di editing per calcolare `straordinari` in ore
+/// a partire dalla lista `competenze`, unica fonte di verità.
+bool voceEStraordinaria(String descrizione) =>
+    descrizione.trim().toLowerCase().startsWith('straordinario');
+
+/// Somma degli importi di tutte le voci di competenza: il "lordo" derivato,
+/// da ricalcolare ad ogni salvataggio (vedi CLAUDE.md/istruzioni task) invece
+/// di essere un campo editabile indipendente.
+double computeLordo(List<VoceCompetenza> competenze) =>
+    competenze.fold(0.0, (somma, voce) => somma + voce.importo);
+
+/// Somma delle quantità (ore) delle voci di competenza "straordinario": lo
+/// "straordinari" derivato, stessa logica di [computeLordo].
+double computeStraordinari(List<VoceCompetenza> competenze) => competenze
+    .where((voce) => voceEStraordinaria(voce.descrizione))
+    .fold(0.0, (somma, voce) => somma + voce.quantita);
+
 /// Dati ricavabili da una busta paga. Nomi campo allineati 1:1 a
 /// piano_progetto_finanze_personali.md §5 per rendere meccanica la futura
 /// mappatura a tabella Drift (skill drift-migration / agent
@@ -33,7 +68,32 @@ class BustaPaga {
   final double rolGoduti;
   final double rolResidui;
   final double permessiGoduti;
+
+  /// Permessi riduz. orario goduti nel mese (in ore), distinti dal
+  /// cumulativo annuo [permessiGoduti] (che coincide con i ROL goduti in
+  /// questo layout busta paga). Campo scalare a sé, non fa parte di
+  /// [competenze].
+  final double permessiGodutiMese;
+
+  /// Ex festività maturate/godute/residue (giorni festivi soppressi
+  /// accantonati come banking di ore/giorni, stessa natura di Ferie/ROL —
+  /// terza categoria della tabella ratei del PDF, vedi intestazione "FERIE /
+  /// PERMESSI (R.O.L.) / EX FESTIVITA'"). Default 0 per retrocompatibilità
+  /// con le buste paga salvate prima dell'introduzione di questi campi.
+  final double exFestivitaMaturate;
+  final double exFestivitaGodute;
+  final double exFestivitaResidue;
+
   final double oreLavorate;
+
+  /// Voci di competenza individuali (es. Retribuzione ordinaria, Edr
+  /// contrattuale, Straordinario per fascia). Vuota di default per
+  /// retrocompatibilità con le buste paga salvate prima dell'introduzione di
+  /// questo campo. [lordo]/[straordinari] restano colonne memorizzate,
+  /// ricalcolate da questa lista al momento del salvataggio (vedi
+  /// `computeLordo`/`computeStraordinari`), non getter derivati al volo.
+  final List<VoceCompetenza> competenze;
+
   final StatoVerificaBustaPaga statoVerifica;
   final TipoBustaPaga tipo;
 
@@ -52,7 +112,12 @@ class BustaPaga {
     required this.rolGoduti,
     required this.rolResidui,
     required this.permessiGoduti,
+    this.permessiGodutiMese = 0,
+    this.exFestivitaMaturate = 0,
+    this.exFestivitaGodute = 0,
+    this.exFestivitaResidue = 0,
     required this.oreLavorate,
+    this.competenze = const [],
     this.statoVerifica = StatoVerificaBustaPaga.confermato,
     this.tipo = TipoBustaPaga.mensile,
   });
@@ -72,7 +137,12 @@ class BustaPaga {
     double? rolGoduti,
     double? rolResidui,
     double? permessiGoduti,
+    double? permessiGodutiMese,
+    double? exFestivitaMaturate,
+    double? exFestivitaGodute,
+    double? exFestivitaResidue,
     double? oreLavorate,
+    List<VoceCompetenza>? competenze,
     StatoVerificaBustaPaga? statoVerifica,
     TipoBustaPaga? tipo,
   }) {
@@ -91,7 +161,12 @@ class BustaPaga {
       rolGoduti: rolGoduti ?? this.rolGoduti,
       rolResidui: rolResidui ?? this.rolResidui,
       permessiGoduti: permessiGoduti ?? this.permessiGoduti,
+      permessiGodutiMese: permessiGodutiMese ?? this.permessiGodutiMese,
+      exFestivitaMaturate: exFestivitaMaturate ?? this.exFestivitaMaturate,
+      exFestivitaGodute: exFestivitaGodute ?? this.exFestivitaGodute,
+      exFestivitaResidue: exFestivitaResidue ?? this.exFestivitaResidue,
       oreLavorate: oreLavorate ?? this.oreLavorate,
+      competenze: competenze ?? this.competenze,
       statoVerifica: statoVerifica ?? this.statoVerifica,
       tipo: tipo ?? this.tipo,
     );
