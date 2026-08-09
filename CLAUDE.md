@@ -17,11 +17,17 @@ apre direttamente sull'archivio Buste Paga, che è la schermata radice.
 **Sezione Buste Paga**: `buste_paga_section_screen.dart` è il contenitore radice
 dell'app: barra di benvenuto in cima (saluto dinamico in base all'ora del giorno,
 `greetingFor()`, + data corrente) e sotto-navigazione **Archivio**
-(`buste_paga_archivio_view.dart`, hero ultima busta paga + elenco) / **Statistiche**
-(`buste_paga_statistiche_screen.dart`, grafici `fl_chart`: andamento netto/lordo,
-ferie/ROL/permessi residui, straordinario per mese — mostrati sempre, anche con 0
-o 1 busta paga: ogni grafico senza dati sufficienti mostra il messaggio "Non ci
-sono dati" al posto di bloccare l'intera pagina). La sotto-navigazione non è più
+(`buste_paga_archivio_view.dart`, hero ultima busta paga + elenco — la hero è
+`BustaPagaSummaryHero` in `lib/widgets/busta_paga_summary_hero.dart`: mese
+(pallino di stato + label) e netto in evidenza impilati a sinistra, a destra un
+gruppetto compatto `_StatTrio` con Ferie/Permessi/Ex fest. separati da
+divisori verticali sottili, centrato verticalmente rispetto all'altezza
+combinata di mese+netto — tutto dentro un'unica `LiquidGlassSurface`) /
+**Statistiche** (`buste_paga_statistiche_screen.dart`, grafici `fl_chart`:
+andamento netto/lordo, ferie/ROL/permessi residui, straordinario per mese —
+mostrati sempre, anche con 0 o 1 busta paga: ogni grafico senza dati sufficienti
+mostra il messaggio "Non ci sono dati" al posto di bloccare l'intera pagina). La
+sotto-navigazione non è più
 un tab in alto ma una **sidecar flottante ancorata in basso**, widget privato
 `_BustePagaSidecar`: i due segmenti Archivio/Statistiche sono `FlatChipButton`
 (`lib/widgets/flat_chip_button.dart`, vedi sotto) — solo il segmento attivo ha il
@@ -63,7 +69,7 @@ regex.
 modalità modifica): hero card in cima (mese, badge di stato Confermato/Da
 confermare — verde/rosso, stessa semantica del pallino in Archivio — netto in
 evidenza massima) **fissa fuori dall'area scrollabile**, sotto una riga di
-mini-statistiche Ferie residue/ROL residui/Lordo e più sotto una riga
+mini-statistiche Ferie residue/Permessi residui/Ex festività e più sotto una riga
 Ore lavorate/Straordinari (raggruppate per unità: la prima riga è in
 euro/giorni, la seconda in ore — Straordinari è ore, non euro, coerente col
 grafico "Ore straordinario" di Statistiche), entrambe **un'unica**
