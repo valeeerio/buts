@@ -56,12 +56,20 @@ prima di decidere se serve un fix al parser.
 
 ## Rilascio (obiettivo sessione 2026-08-09)
 
-- [ ] Merge del branch `redesign-schema-busta-paga` in `main` (voci di
-      competenza, permessi mensili, ex festività — codice pronto,
-      `flutter analyze`/`flutter test` verdi, `CLAUDE.md` aggiornato)
-- [ ] Definire e completare il resto del checklist di rilascio (build iOS,
-      icona/nome app, versionamento, eventuale TestFlight/App Store —
-      da discutere con l'utente)
+- [x] Merge del branch `redesign-schema-busta-paga` in `main` (voci di
+      competenza, permessi mensili, ex festività) — mergiato 2026-08-09,
+      branch locale e remoto ripuliti dopo il merge
+- [ ] Build e installazione diretta su iPhone via Xcode/cavo (no
+      TestFlight/App Store per questa prima versione — decisione utente
+      2026-08-09). Serve: iPhone collegato (nessuno rilevato da `flutter
+      devices` in questa sessione, solo simulatore), Apple ID come firma di
+      sviluppo gratuita in Xcode
+- [ ] Icona app: **rimandata** (decisione utente 2026-08-09) — resta il
+      placeholder Flutter di default in
+      `ios/Runner/Assets.xcassets/AppIcon.appiconset/`, da sistemare in una
+      versione successiva
+- [x] `pubspec.yaml` corretto (2026-08-09): descrizione allineata al
+      tracciamento buste paga, versione `1.0.0+1` per la prima release
 
 ## Fatto
 
