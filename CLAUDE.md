@@ -9,10 +9,10 @@ motivo) e cosa manca ancora.
 App mobile Flutter (iOS come target primario, look-and-feel Cupertino/iOS nativo),
 uso personale locale — nessun backend cloud nella v1, nessun account, dati sul device.
 
-**Funzione unica dell'app: tracciare i dati della busta paga** (netto, lordo,
-straordinari, ferie maturate/godute/residue, ROL, permessi, ore lavorate). Non ci
-sono altre sezioni: l'app si apre direttamente sull'archivio Buste Paga, che è la
-schermata radice.
+**Funzione unica dell'app: tracciare i dati della busta paga** (netto, lordo
+derivato dalle voci di competenza, straordinari, ferie maturate/godute/residue,
+ROL, ex festività, permessi, ore lavorate). Non ci sono altre sezioni: l'app si
+apre direttamente sull'archivio Buste Paga, che è la schermata radice.
 
 **Sezione Buste Paga**: `buste_paga_section_screen.dart` è il contenitore radice
 dell'app: barra di benvenuto in cima (saluto dinamico in base all'ora del giorno,
@@ -94,6 +94,38 @@ tappabile (dettaglio e form di import: il file è già copiato su disco prima
 ancora che il form sia visibile) con una singola azione "Apri" che mostra
 l'anteprima di sistema via `open_filex`, niente più `onTap` esterno né
 distinzione di condivisione separata.
+
+**Voci di competenza (2026-08-09)**: il "lordo" non è più un campo scalare
+inserito/modificato direttamente — è derivato da `competenze`, la lista delle
+singole voci del cedolino (es. "Retribuzione ordinaria", "Edr contrattuale",
+"Straordinario diurno (30%)"), modello `VoceCompetenza` (`descrizione`,
+`quantita`, `importo`) in `lib/models/busta_paga.dart`, colonna Drift
+`competenze` serializzata JSON via `VoceCompetenzaListConverter`
+(`lib/data/database.dart`). `computeLordo(competenze)` somma tutti gli
+`importo`; `computeStraordinari(competenze)` somma le `quantita` (ore) delle
+sole voci la cui descrizione inizia (case-insensitive) per "straordinario"
+(`voceEStraordinaria`) — entrambi ricalcolati e scritti nei campi memorizzati
+`lordo`/`straordinari` ad ogni salvataggio, non getter derivati al volo.
+Il parser regex estrae `competenze` riga per riga dal blocco competenze del
+PDF, escludendo esplicitamente "Ferie godute" (già in Maturazioni) e
+"Permessi riduz. orario goduti" (letto invece in `permessiGodutiMese`, vedi
+sotto). Editing: `BustaPagaCompetenzeSection`
+(`lib/widgets/busta_paga_competenze_section.dart`) + riga editabile
+`VoceCompetenzaEditRow` (`lib/widgets/voce_competenza_edit_row.dart`,
+swipe-to-delete come le Trattenute), sostituisce il vecchio campo Lordo
+tappabile in hero sia nel dettaglio in modifica sia nel form di import.
+
+Insieme a `competenze`, il PDF distingue due dati aggiuntivi prima non letti
+dal parser: **`permessiGodutiMese`** (riga "Permessi riduz. orario goduti"
+del mese, in ore — distinta dal cumulativo annuo `permessiGoduti`, che nel
+layout JOB coincide coi ROL goduti) e **`exFestivitaMaturate`/
+`exFestivitaGodute`/`exFestivitaResidue`** (terza categoria di ratei del PDF,
+"EX FESTIVITA'", stessa struttura maturato/goduto/residuo di Ferie/ROL — riga
+in più nella tabella "Ferie, ROL e permessi" di `BustaPagaMaturazioniSection`).
+Migrazione Drift additiva `schemaVersion` 4→6 (v5: `competenze` +
+`permessiGodutiMese`; v6: le tre colonne ex festività), tutte con default
+sulla colonna (`'[]'`/`0`) per compatibilità con le buste paga salvate prima
+di questa modifica — nessun dato esistente toccato o perso.
 
 **Modifica inline (2026-07-31)**: "Modifica" non naviga più verso
 `busta_paga_form_screen.dart` — attiva `_isEditing = true` sulla stessa
@@ -239,11 +271,11 @@ viewport sottostante è diverso in altezza tra le due schermate.
 
 ## Cosa manca (prossimi passi, in ordine di priorità suggerito)
 
-Nessun redesign aperto al momento (l'ultimo, il restyle del form di import per
-renderlo strutturalmente identico al dettaglio + fix del tracking dello
-slider di periodo, è stato completato e mergiato in `main` il 2026-08-01).
-Prossimi passi da concordare con l'utente alla prossima sessione — vedi
-`BACKLOG.md` per le voci aperte.
+Sessione del 2026-08-09: obiettivo dichiarato dall'utente è **completare l'app
+e rilasciarla**. Il lavoro sulle voci di competenza/permessi mensili/ex
+festività (branch `redesign-schema-busta-paga`, vedi sopra) è pronto per il
+merge in `main` — `flutter analyze`/`flutter test` verdi. Vedi `BACKLOG.md`
+per le voci aperte verso il rilascio.
 
 **Nota**: l'estrazione dati via AI locale on-device (`llama_cpp_dart`), valutata
 in una fase precedente, è stata **abbandonata (2026-07-30)** — vedi "Decisioni

@@ -9,6 +9,7 @@ import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/busta_paga_formatting.dart';
 import '../../widgets/app_alert_dialog.dart';
+import '../../widgets/busta_paga_competenze_section.dart';
 import '../../widgets/busta_paga_documento_chip.dart';
 import '../../widgets/busta_paga_hero_card.dart';
 import '../../widgets/busta_paga_maturazioni_section.dart';
@@ -16,6 +17,7 @@ import '../../widgets/busta_paga_stat_row.dart';
 import '../../widgets/flat_chip_button.dart';
 import '../../widgets/glass_form_section.dart';
 import '../../widgets/trattenuta_edit_row.dart';
+import '../../widgets/voce_competenza_edit_row.dart';
 
 /// Altezza riservata alla barra flottante "Salva/Annulla" in basso, usata
 /// come padding ESTERNO che riduce il viewport scrollabile (non contentPadding
@@ -60,9 +62,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   late DateTime _periodo;
   late TipoBustaPaga _tipo;
 
-  late final TextEditingController _lordoController;
   late final TextEditingController _nettoController;
-  late final TextEditingController _straordinariController;
 
   late final TextEditingController _ferieMaturateController;
   late final TextEditingController _ferieGoduteController;
@@ -73,11 +73,18 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   late final TextEditingController _rolResiduiController;
 
   late final TextEditingController _permessiGodutiController;
+  late final TextEditingController _permessiGodutiMeseController;
   late final TextEditingController _oreLavorateController;
 
+  late final TextEditingController _exFestivitaMaturateController;
+  late final TextEditingController _exFestivitaGoduteController;
+  late final TextEditingController _exFestivitaResidueController;
+
   late List<TrattenutaEditRow> _trattenute;
+  late List<VoceCompetenzaEditRow> _competenze;
 
   late final String _fileOrigine;
+  late final List<String> _warnings;
 
   /// True quando i campi sono stati popolati dall'estrazione automatica e
   /// non ancora confermati esplicitamente (salvataggio) dall'utente.
@@ -99,17 +106,14 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
 
     _fileOrigine = widget.fileOrigine;
     _valoriDaConferma = true;
+    _warnings = estratti.warnings;
 
     _periodo = _periodoFromEstratti(estratti.periodo) ??
         DateTime(DateTime.now().year, DateTime.now().month);
     _tipo = estratti.tipo;
 
-    _lordoController =
-        TextEditingController(text: _formatNumero(estratti.lordo));
     _nettoController =
         TextEditingController(text: _formatNumero(estratti.netto));
-    _straordinariController =
-        TextEditingController(text: _formatNumero(estratti.straordinari));
 
     _ferieMaturateController =
         TextEditingController(text: _formatNumero(estratti.ferieMaturate));
@@ -127,8 +131,17 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
 
     _permessiGodutiController =
         TextEditingController(text: _formatNumero(estratti.permessiGoduti));
+    _permessiGodutiMeseController = TextEditingController(
+        text: _formatNumero(estratti.permessiGodutiMese));
     _oreLavorateController =
         TextEditingController(text: _formatNumero(estratti.oreLavorate));
+
+    _exFestivitaMaturateController = TextEditingController(
+        text: _formatNumero(estratti.exFestivitaMaturate));
+    _exFestivitaGoduteController = TextEditingController(
+        text: _formatNumero(estratti.exFestivitaGodute));
+    _exFestivitaResidueController = TextEditingController(
+        text: _formatNumero(estratti.exFestivitaResidue));
 
     final trattenuteIniziali = estratti.trattenute;
     _trattenute = trattenuteIniziali.isEmpty
@@ -138,12 +151,27 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                 chiave: e.key, importo: e.value.toStringAsFixed(2)))
             .toList();
 
+    final competenzeIniziali = estratti.competenze;
+    _competenze = competenzeIniziali.isEmpty
+        ? [VoceCompetenzaEditRow()]
+        : competenzeIniziali
+            .map((v) => VoceCompetenzaEditRow(
+                  descrizione: v.descrizione,
+                  quantita: _formatNumero(v.quantita),
+                  importo: v.importo == 0 ? '' : _formatNumero(v.importo),
+                ))
+            .toList();
+    for (final row in _competenze) {
+      _attachCompetenzaListeners(row);
+    }
+
     // Forza il rebuild della `BustaPagaStatRow` (Ferie/ROL residui) ogni
     // volta che cambia il campo "Residuo" corrispondente nella tabella
     // Maturazioni sottostante — stesso meccanismo `_onResiduiChanged` del
     // dettaglio busta paga.
     _ferieResidueController.addListener(_onResiduiChanged);
     _rolResiduiController.addListener(_onResiduiChanged);
+    _exFestivitaResidueController.addListener(_onResiduiChanged);
   }
 
   void _onResiduiChanged() => setState(() {});
@@ -177,9 +205,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   void dispose() {
     _scrollController.removeListener(_updateBottomFade);
     _scrollController.dispose();
-    _lordoController.dispose();
     _nettoController.dispose();
-    _straordinariController.dispose();
     _ferieMaturateController.dispose();
     _ferieGoduteController.dispose();
     _ferieResidueController.dispose();
@@ -187,8 +213,15 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     _rolGodutiController.dispose();
     _rolResiduiController.dispose();
     _permessiGodutiController.dispose();
+    _permessiGodutiMeseController.dispose();
     _oreLavorateController.dispose();
+    _exFestivitaMaturateController.dispose();
+    _exFestivitaGoduteController.dispose();
+    _exFestivitaResidueController.dispose();
     for (final row in _trattenute) {
+      row.dispose();
+    }
+    for (final row in _competenze) {
       row.dispose();
     }
     super.dispose();
@@ -281,6 +314,40 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     });
   }
 
+  /// Rebuild forzato ogni volta che descrizione/quantità/importo di una voce
+  /// di competenza cambiano, così le celle Lordo/Straordinari (calcolate
+  /// dalla lista competenze, sola lettura anche in editing) restano
+  /// sincronizzate live — stesso meccanismo di `_onResiduiChanged`.
+  void _attachCompetenzaListeners(VoceCompetenzaEditRow row) {
+    row.descrizione.addListener(_onResiduiChanged);
+    row.quantita.addListener(_onResiduiChanged);
+    row.importo.addListener(_onResiduiChanged);
+  }
+
+  void _addCompetenza() {
+    setState(() {
+      final row = VoceCompetenzaEditRow();
+      _attachCompetenzaListeners(row);
+      _competenze.add(row);
+    });
+  }
+
+  void _removeCompetenza(int index) {
+    setState(() {
+      _competenze[index].dispose();
+      _competenze.removeAt(index);
+    });
+  }
+
+  List<VoceCompetenza> get _competenzeCorrenti => _competenze
+      .where((row) => row.descrizione.text.trim().isNotEmpty)
+      .map((row) => VoceCompetenza(
+            descrizione: row.descrizione.text.trim(),
+            quantita: row.quantitaValue,
+            importo: row.importoValue,
+          ))
+      .toList();
+
   void _showAlert(String title, String message) {
     final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
     showAppAlertDialog<void>(
@@ -340,14 +407,20 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
       trattenute[chiave] = _parse(row.importo);
     }
 
+    // Lordo/straordinari sono derivati dalla lista competenze correntemente
+    // in editing (vedi computeLordo/computeStraordinari): per un nuovo
+    // inserimento, se la lista è vuota non c'è un "valore precedente" da
+    // preservare, quindi restano 0.
+    final competenze = _competenzeCorrenti;
+
     final bustaPaga = BustaPaga(
       id: 'bp-${DateTime.now().millisecondsSinceEpoch}',
       periodo: _periodo,
       fileOrigine: _fileOrigine,
-      lordo: _parse(_lordoController),
+      lordo: computeLordo(competenze),
       netto: _parse(_nettoController),
       trattenute: trattenute,
-      straordinari: _parse(_straordinariController),
+      straordinari: computeStraordinari(competenze),
       ferieMaturate: _parse(_ferieMaturateController),
       ferieGodute: _parse(_ferieGoduteController),
       ferieResidue: _parse(_ferieResidueController),
@@ -355,7 +428,12 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
       rolGoduti: _parse(_rolGodutiController),
       rolResidui: _parse(_rolResiduiController),
       permessiGoduti: _parse(_permessiGodutiController),
+      permessiGodutiMese: _parse(_permessiGodutiMeseController),
+      exFestivitaMaturate: _parse(_exFestivitaMaturateController),
+      exFestivitaGodute: _parse(_exFestivitaGoduteController),
+      exFestivitaResidue: _parse(_exFestivitaResidueController),
       oreLavorate: _parse(_oreLavorateController),
+      competenze: competenze,
       tipo: _tipo,
       statoVerifica: _valoriDaConferma
           ? StatoVerificaBustaPaga.daConfermare
@@ -419,11 +497,17 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                       periodoLabel: _periodoLabel,
                       tipo: _tipo,
                       isEditing: true,
+                      lordoDisplay:
+                          formatNumber(computeLordo(_competenzeCorrenti)),
                       nettoDisplay: formatNumber(_parse(_nettoController)),
                       nettoController: _nettoController,
                       onTapPeriodo: _pickPeriodo,
                       onTapTipo: _pickTipo,
                     ),
+                    if (_warnings.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.lg),
+                      _WarningsSection(warnings: _warnings),
+                    ],
                     const SizedBox(height: AppSpacing.lg),
                     BustaPagaStatRow(items: [
                       (
@@ -434,15 +518,18 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                         ),
                       ),
                       (
-                        'ROL residui',
+                        'Permessi residui',
                         Text(
                           formatNumber(_parse(_rolResiduiController)),
                           textAlign: TextAlign.center,
                         ),
                       ),
                       (
-                        'Lordo',
-                        inlineNumberField(_lordoController, prefix: '€ '),
+                        'Ex festività',
+                        Text(
+                          formatNumber(_parse(_exFestivitaResidueController)),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
                     ]),
                     const SizedBox(height: AppSpacing.lg),
@@ -460,6 +547,12 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                       rolResidui: formatNumber(_parse(_rolResiduiController)),
                       permessiGoduti:
                           formatNumber(_parse(_permessiGodutiController)),
+                      exFestivitaMaturate: formatNumber(
+                          _parse(_exFestivitaMaturateController)),
+                      exFestivitaGodute:
+                          formatNumber(_parse(_exFestivitaGoduteController)),
+                      exFestivitaResidue: formatNumber(
+                          _parse(_exFestivitaResidueController)),
                       ferieMaturateCtrl: _ferieMaturateController,
                       ferieGoduteCtrl: _ferieGoduteController,
                       ferieResidueCtrl: _ferieResidueController,
@@ -467,6 +560,9 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                       rolGodutiCtrl: _rolGodutiController,
                       rolResiduiCtrl: _rolResiduiController,
                       permessiGodutiCtrl: _permessiGodutiController,
+                      exFestivitaMaturateCtrl: _exFestivitaMaturateController,
+                      exFestivitaGoduteCtrl: _exFestivitaGoduteController,
+                      exFestivitaResidueCtrl: _exFestivitaResidueController,
                     ),
                     BustaPagaStatRow(items: [
                       (
@@ -475,11 +571,25 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                       ),
                       (
                         'Straordinari',
-                        inlineNumberField(_straordinariController,
+                        Text(
+                          '${formatNumber(computeStraordinari(_competenzeCorrenti))} h',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      (
+                        'Permessi (mese)',
+                        inlineNumberField(_permessiGodutiMeseController,
                             suffix: ' h'),
                       ),
                     ]),
                     const SizedBox(height: AppSpacing.lg),
+                    BustaPagaCompetenzeSection(
+                      isEditing: true,
+                      competenze: const [],
+                      righeEdit: _competenze,
+                      onAggiungi: _addCompetenza,
+                      onRimuovi: _removeCompetenza,
+                    ),
                     GlassFormSection(
                       footer:
                           'Aggiungi le voci di trattenuta indicate in busta '
@@ -609,6 +719,48 @@ class _StationaryPushBar extends StatelessWidget {
         );
       },
       child: child,
+    );
+  }
+}
+
+/// Sezione sola lettura con i warning del parser regex (campi che non è
+/// riuscito a determinare con sufficiente confidenza) — visibile solo
+/// nell'import, non ha equivalente nel dettaglio (concetto legato solo
+/// all'estrazione automatica da PDF). Colore `systemOrange`, non
+/// `systemRed`: quest'ultimo resta riservato agli alert veri (vedi
+/// CLAUDE.md).
+class _WarningsSection extends StatelessWidget {
+  final List<String> warnings;
+
+  const _WarningsSection({required this.warnings});
+
+  @override
+  Widget build(BuildContext context) {
+    final orange = CupertinoDynamicColor.resolve(AppColors.systemOrange, context);
+    final labelPrimary =
+        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
+    return GlassFormSection(
+      header: 'Da verificare',
+      children: [
+        for (final warning in warnings)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(CupertinoIcons.exclamationmark_triangle,
+                    color: orange, size: 18),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    warning,
+                    style: AppTextStyles.subtitle.copyWith(color: labelPrimary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

@@ -54,6 +54,15 @@ parser. Relazione tra i due valori non confermata (ipotesi più probabile:
 cumulativo da inizio anno vs goduto del mese) — da chiarire con l'utente
 prima di decidere se serve un fix al parser.
 
+## Rilascio (obiettivo sessione 2026-08-09)
+
+- [ ] Merge del branch `redesign-schema-busta-paga` in `main` (voci di
+      competenza, permessi mensili, ex festività — codice pronto,
+      `flutter analyze`/`flutter test` verdi, `CLAUDE.md` aggiornato)
+- [ ] Definire e completare il resto del checklist di rilascio (build iOS,
+      icona/nome app, versionamento, eventuale TestFlight/App Store —
+      da discutere con l'utente)
+
 ## Fatto
 
 Storico compresso il 2026-08-02 — dettaglio recuperabile dai commit Git su
@@ -66,6 +75,17 @@ paga da un form separato a editing inline nel dettaglio; estrazione dei
 widget condivisi tra dettaglio e form di import; redesign dei popup in
 stile flat coerente con la sotto-navigazione; fix del tracking dello
 slider di periodo. Vedi `CLAUDE.md` per lo stato architetturale attuale.
+
+Branch `redesign-schema-busta-paga` (2026-08-04 → 2026-08-09, in attesa di
+merge in `main`): parser regex reso più robusto su righe multiple e
+validazione incrociata netto/lordo; fix unità di misura Straordinari (ore,
+non euro) nel dettaglio; il PDF si apre nell'anteprima nativa di sistema
+invece della condivisione; estrazione delle voci di competenza individuali
+(`VoceCompetenza`, lordo/straordinari ora derivati da queste invece che
+campi scalari indipendenti), dei permessi riduz. orario goduti del mese e
+delle ex festività maturate/godute/residue dal PDF, con redesign della hero
+card e nuova sezione Competenze editabile. Vedi `CLAUDE.md` per il dettaglio
+architetturale.
 
 ## Decisioni archiviate (non da rimettere in discussione senza motivo nuovo)
 

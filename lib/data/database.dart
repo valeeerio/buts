@@ -40,6 +40,39 @@ class TrattenuteConverter extends TypeConverter<Map<String, double>, String> {
   String toSql(Map<String, double> value) => jsonEncode(value);
 }
 
+/// Serializza/deserializza la lista `competenze` (voci di competenza
+/// individuali, es. Retribuzione ordinaria/Edr contrattuale/Straordinario)
+/// come JSON in una singola colonna testo. Stessa motivazione architetturale
+/// di [TrattenuteConverter]: bassa cardinalità, nessuna query prevista sulle
+/// singole voci in v1.
+class VoceCompetenzaListConverter
+    extends TypeConverter<List<VoceCompetenza>, String> {
+  const VoceCompetenzaListConverter();
+
+  @override
+  List<VoceCompetenza> fromSql(String fromDb) {
+    if (fromDb.isEmpty) return const [];
+    final decoded = jsonDecode(fromDb) as List<dynamic>;
+    return decoded
+        .map((e) => e as Map<String, dynamic>)
+        .map((e) => VoceCompetenza(
+              descrizione: e['descrizione'] as String,
+              quantita: (e['quantita'] as num).toDouble(),
+              importo: (e['importo'] as num).toDouble(),
+            ))
+        .toList();
+  }
+
+  @override
+  String toSql(List<VoceCompetenza> value) => jsonEncode(value
+      .map((v) => {
+            'descrizione': v.descrizione,
+            'quantita': v.quantita,
+            'importo': v.importo,
+          })
+      .toList());
+}
+
 /// Tabella Drift per l'archivio Buste Paga. Colonne allineate 1:1 al modello
 /// di dominio `BustaPaga` (lib/models/busta_paga.dart) e al modello dati di
 /// piano_progetto_finanze_personali.md §5.
@@ -66,7 +99,31 @@ class BustePagaTable extends Table {
   RealColumn get rolGoduti => real()();
   RealColumn get rolResidui => real()();
   RealColumn get permessiGoduti => real()();
+
+  /// Permessi riduz. orario goduti nel mese (in ore), distinti dal
+  /// cumulativo annuo `permessiGoduti` — vedi `BustaPaga.permessiGodutiMese`.
+  /// Default 0 per compatibilità con le righe esistenti create prima
+  /// dell'introduzione di questo campo (v4 -> v5).
+  RealColumn get permessiGodutiMese => real().withDefault(const Constant(0))();
+
+  /// Ex festività maturate/godute/residue — vedi `BustaPaga.exFestivitaMaturate`
+  /// e affini. Default 0 per compatibilità con le righe esistenti create
+  /// prima dell'introduzione di questi campi (v5 -> v6).
+  RealColumn get exFestivitaMaturate =>
+      real().withDefault(const Constant(0))();
+  RealColumn get exFestivitaGodute => real().withDefault(const Constant(0))();
+  RealColumn get exFestivitaResidue =>
+      real().withDefault(const Constant(0))();
+
   RealColumn get oreLavorate => real()();
+
+  /// Voci di competenza individuali, serializzate come JSON. Vedi
+  /// [VoceCompetenzaListConverter]. Default lista vuota per compatibilità con
+  /// le righe esistenti create prima dell'introduzione di questo campo
+  /// (v4 -> v5).
+  TextColumn get competenze => text()
+      .map(const VoceCompetenzaListConverter())
+      .withDefault(const Constant('[]'))();
 
   /// Stato di verifica (v1: sempre `confermato`, inserimento manuale; il
   /// valore `daConfermare` è predisposto per la Fase 3 AI on-device — vedi
@@ -113,7 +170,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.connection);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -145,6 +202,32 @@ class AppDatabase extends _$AppDatabase {
           if (from < 4) {
             await m.addColumn(bustePagaTable, bustePagaTable.tipo);
           }
+          // v4 -> v5: nuove colonne `competenze` (voci di competenza
+          // individuali, vedi VoceCompetenza/VoceCompetenzaListConverter) e
+          // `permessiGodutiMese` (riga "Permessi riduz. orario goduti" del
+          // mese, distinta dal cumulativo annuo `permessiGoduti`) —
+          // migrazione additiva, le righe esistenti ricevono i default
+          // dichiarati sulle colonne ('[]' e 0), nessun dato esistente viene
+          // toccato o perso.
+          if (from < 5) {
+            await m.addColumn(bustePagaTable, bustePagaTable.competenze);
+            await m.addColumn(
+                bustePagaTable, bustePagaTable.permessiGodutiMese);
+          }
+          // v5 -> v6: nuove colonne `exFestivitaMaturate`/`exFestivitaGodute`/
+          // `exFestivitaResidue` (terza categoria di ratei del PDF, "EX
+          // FESTIVITA'", stessa struttura maturato/goduto/residuo di
+          // Ferie/ROL — vedi BustaPaga.exFestivitaMaturate) — migrazione
+          // additiva, le righe esistenti ricevono il default 0 dichiarato
+          // sulle colonne, nessun dato esistente viene toccato o perso.
+          if (from < 6) {
+            await m.addColumn(
+                bustePagaTable, bustePagaTable.exFestivitaMaturate);
+            await m.addColumn(
+                bustePagaTable, bustePagaTable.exFestivitaGodute);
+            await m.addColumn(
+                bustePagaTable, bustePagaTable.exFestivitaResidue);
+          }
         },
       );
 }
@@ -169,7 +252,12 @@ extension BustaPagaRowMapping on BustePagaTableData {
       rolGoduti: rolGoduti,
       rolResidui: rolResidui,
       permessiGoduti: permessiGoduti,
+      permessiGodutiMese: permessiGodutiMese,
+      exFestivitaMaturate: exFestivitaMaturate,
+      exFestivitaGodute: exFestivitaGodute,
+      exFestivitaResidue: exFestivitaResidue,
       oreLavorate: oreLavorate,
+      competenze: competenze,
       statoVerifica: statoVerifica,
       tipo: tipo,
     );
@@ -193,7 +281,12 @@ extension BustaPagaDomainMapping on BustaPaga {
       rolGoduti: rolGoduti,
       rolResidui: rolResidui,
       permessiGoduti: permessiGoduti,
+      permessiGodutiMese: Value(permessiGodutiMese),
+      exFestivitaMaturate: Value(exFestivitaMaturate),
+      exFestivitaGodute: Value(exFestivitaGodute),
+      exFestivitaResidue: Value(exFestivitaResidue),
       oreLavorate: oreLavorate,
+      competenze: Value(competenze),
       statoVerifica: Value(statoVerifica),
       tipo: Value(tipo),
     );

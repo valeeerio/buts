@@ -49,6 +49,94 @@ void main() {
       expect(risultato.trattenute['INPS'], closeTo(61.32, 0.001));
     });
 
+    test('estrae le voci di competenza individuali', () {
+      final risultato = parser.parse(_testoSintetico);
+
+      final descrizioni =
+          risultato.competenze.map((v) => v.descrizione).toList();
+      expect(descrizioni, contains('Retribuzione ordinaria'));
+      expect(descrizioni, contains('Edr contrattuale - esempio'));
+      expect(descrizioni, contains('Straordinario diurno (30%)'));
+
+      final retribuzione = risultato.competenze
+          .firstWhere((v) => v.descrizione == 'Retribuzione ordinaria');
+      expect(retribuzione.quantita, closeTo(20.000, 0.001));
+      expect(retribuzione.importo, closeTo(1000.00, 0.001));
+
+      final straordinario = risultato.competenze
+          .firstWhere((v) => v.descrizione == 'Straordinario diurno (30%)');
+      expect(straordinario.quantita, closeTo(3.000, 0.001));
+      expect(straordinario.importo, closeTo(30.00, 0.001));
+    });
+
+    test('esclude "Ferie godute" dalle competenze (già modellata nella '
+        'tabella Maturazioni)', () {
+      final risultato = parser.parse(_testoSintetico);
+
+      final descrizioni =
+          risultato.competenze.map((v) => v.descrizione.toLowerCase());
+      expect(descrizioni.any((d) => d.startsWith('ferie godute')), isFalse);
+    });
+
+    test('esclude righe "Permessi riduz. orario goduti" dalle competenze',
+        () {
+      final testo = _testoSintetico.replaceFirst(
+        'Ferie godute',
+        'Permessi riduz. orario goduti\nORE\n4,030\nFerie godute',
+      );
+      final risultato = parser.parse(testo);
+
+      final descrizioni =
+          risultato.competenze.map((v) => v.descrizione.toLowerCase());
+      expect(
+          descrizioni.any((d) => d.startsWith('permessi riduz')), isFalse);
+    });
+
+    test('estrae "Permessi riduz. orario goduti" del mese in permessiGodutiMese',
+        () {
+      final testo = _testoSintetico.replaceFirst(
+        'Ferie godute',
+        'Permessi riduz. orario goduti\nORE\n4,030\nFerie godute',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.permessiGodutiMese, closeTo(4.030, 0.001));
+    });
+
+    test('riconosce una trattenuta nel formato verificato '
+        '("CONTRIBUTO EBILOG0,50 3,50") come chiave nominata', () {
+      final risultato = parser.parse(_testoSintetico);
+
+      expect(risultato.trattenute['CONTRIBUTO EBILOG'], closeTo(3.50, 0.001));
+    });
+
+    test('non riconosce una trattenuta nel formato verificato se è fuori dal '
+        'segmento INPS→Firma per quietanza', () {
+      // Sposta il testo "CONTRIBUTO EBILOG0,50 3,50" fuori dal segmento
+      // INPS->Firma (prima di INPS): non deve produrre una chiave nominata.
+      final testo = _testoSintetico
+          .replaceFirst(' CONTRIBUTO EBILOG0,50 3,50', '')
+          .replaceFirst(
+            'INPS1.050,00',
+            'CONTRIBUTO EBILOG0,50 3,50\nINPS1.050,00',
+          );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.trattenute.containsKey('CONTRIBUTO EBILOG'), isFalse);
+    });
+
+    test('non riconosce una riga di trattenuta non nel formato verificato '
+        '(es. senza aliquota/importo attaccati)', () {
+      final testo = _testoSintetico.replaceFirst(
+        ' CONTRIBUTO EBILOG0,50 3,50',
+        ' RATA ADDIZIONALE REGIONALE 1.200,00',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.trattenute.containsKey('RATA ADDIZIONALE REGIONALE'),
+          isFalse);
+    });
+
     test('estrae ferie, ROL e permessi (goduti = ROL goduti)', () {
       final risultato = parser.parse(_testoSintetico);
 
@@ -59,6 +147,67 @@ void main() {
       expect(risultato.rolGoduti, closeTo(3.00, 0.001));
       expect(risultato.rolResidui, closeTo(12.00, 0.001));
       expect(risultato.permessiGoduti, risultato.rolGoduti);
+    });
+
+    test('estrae ex festività (maturate, godute, residue) dal terzo blocco '
+        'ratei dopo il tag "(ORE)" di chiusura del ROL', () {
+      final risultato = parser.parse(_testoSintetico);
+
+      expect(risultato.exFestivitaMaturate, closeTo(5.00, 0.001));
+      expect(risultato.exFestivitaGodute, closeTo(3.00, 0.001));
+      expect(risultato.exFestivitaResidue, closeTo(8.00, 0.001));
+    });
+
+    test('scarta i dati ferie se il valore "maturato" è implausibile '
+        '(numero residuo anno precedente incollato senza spazio, visto su '
+        'alcuni PDF reali)', () {
+      final testo = _testoSintetico.replaceFirst(
+        '6,00 2,00 9,17 (GIORNI)',
+        '670003,67 2,00 1,67 (GIORNI)',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.ferieMaturate, 0);
+      expect(risultato.ferieGodute, 0);
+      expect(risultato.ferieResidue, 0);
+      expect(
+        risultato.warnings.any((w) => w.contains('dati ferie scartati')),
+        isTrue,
+      );
+    });
+
+    test('scarta i dati ROL se il valore "maturati" è implausibile', () {
+      final testo = _testoSintetico.replaceFirst(
+        '7,00 8,00 3,00 12,00 (ORE)',
+        '7,00 670008,00 3,00 12,00 (ORE)',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.rolMaturati, 0);
+      expect(risultato.rolGoduti, 0);
+      expect(risultato.rolResidui, 0);
+      expect(
+        risultato.warnings.any((w) => w.contains('dati ROL scartati')),
+        isTrue,
+      );
+    });
+
+    test('scarta i dati ex festività se il valore "maturate" è implausibile',
+        () {
+      final testo = _testoSintetico.replaceFirst(
+        '12,00 (ORE)5,00 3,00 8,00 (ORE)',
+        '12,00 (ORE)670005,00 3,00 8,00 (ORE)',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.exFestivitaMaturate, 0);
+      expect(risultato.exFestivitaGodute, 0);
+      expect(risultato.exFestivitaResidue, 0);
+      expect(
+        risultato.warnings
+            .any((w) => w.contains('dati ex festività scartati')),
+        isTrue,
+      );
     });
 
     test('estrae straordinari e stima ore lavorate da giorni×8', () {
@@ -188,11 +337,11 @@ void main() {
     });
 
     test('calcola correttamente "Altre trattenute (IRPEF + varie)" come '
-        'lordo - netto - INPS', () {
+        'lordo - netto - INPS - trattenute nominate extra', () {
       // Nel testo sintetico invariato lordo (1050.00) - netto (988.68) -
-      // INPS (61.32) fa esattamente 0, quindi la voce non viene aggiunta
-      // (soglia > 0.01): qui si abbassa il netto per ottenere un residuo
-      // positivo e verificarne il valore calcolato.
+      // INPS (61.32) - CONTRIBUTO EBILOG (3.50) è negativo, quindi la voce
+      // non viene aggiunta (soglia > 0.01): qui si abbassa il netto per
+      // ottenere un residuo positivo e verificarne il valore calcolato.
       final testo = _testoSintetico.replaceFirst(
         '1.050,00 61,32-988,68',
         '1.050,00 61,32-950,00',
@@ -202,10 +351,12 @@ void main() {
       expect(risultato.lordo, closeTo(1050.00, 0.001));
       expect(risultato.netto, closeTo(950.00, 0.001));
       expect(risultato.trattenute['INPS'], closeTo(61.32, 0.001));
-      // 1050.00 - 950.00 - 61.32
+      expect(
+          risultato.trattenute['CONTRIBUTO EBILOG'], closeTo(3.50, 0.001));
+      // 1050.00 - 950.00 - 61.32 - 3.50
       expect(
         risultato.trattenute['Altre trattenute (IRPEF + varie)'],
-        closeTo(38.68, 0.001),
+        closeTo(35.18, 0.001),
       );
     });
 

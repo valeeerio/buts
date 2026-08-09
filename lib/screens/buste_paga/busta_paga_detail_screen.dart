@@ -8,6 +8,7 @@ import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/busta_paga_formatting.dart';
 import '../../widgets/app_alert_dialog.dart';
+import '../../widgets/busta_paga_competenze_section.dart';
 import '../../widgets/busta_paga_documento_chip.dart';
 import '../../widgets/busta_paga_hero_card.dart';
 import '../../widgets/busta_paga_maturazioni_section.dart';
@@ -15,6 +16,7 @@ import '../../widgets/busta_paga_stat_row.dart';
 import '../../widgets/flat_chip_button.dart';
 import '../../widgets/glass_form_section.dart';
 import '../../widgets/trattenuta_edit_row.dart';
+import '../../widgets/voce_competenza_edit_row.dart';
 
 /// Altezza riservata alla barra flottante "Conferma/Modifica" (o
 /// "Salva/Annulla" in modifica) in basso, usata come padding in fondo al
@@ -67,8 +69,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   late TipoBustaPaga _tipoEdit;
 
   late TextEditingController _nettoCtrl;
-  late TextEditingController _lordoCtrl;
-  late TextEditingController _straordinariCtrl;
   late TextEditingController _oreLavorateCtrl;
 
   late TextEditingController _ferieMaturateCtrl;
@@ -80,8 +80,14 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   late TextEditingController _rolResiduiCtrl;
 
   late TextEditingController _permessiGodutiCtrl;
+  late TextEditingController _permessiGodutiMeseCtrl;
+
+  late TextEditingController _exFestivitaMaturateCtrl;
+  late TextEditingController _exFestivitaGoduteCtrl;
+  late TextEditingController _exFestivitaResidueCtrl;
 
   late List<TrattenutaEditRow> _trattenuteEdit;
+  late List<VoceCompetenzaEditRow> _competenzeEdit;
 
   String _periodoLabelForDate(DateTime data) {
     final formatted = DateFormat('MMMM yyyy', 'it_IT').format(data);
@@ -99,9 +105,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     _tipoEdit = corrente.tipo;
 
     _nettoCtrl = TextEditingController(text: formatNumber(corrente.netto));
-    _lordoCtrl = TextEditingController(text: formatNumber(corrente.lordo));
-    _straordinariCtrl =
-        TextEditingController(text: formatNumber(corrente.straordinari));
     _oreLavorateCtrl =
         TextEditingController(text: formatNumber(corrente.oreLavorate));
 
@@ -121,6 +124,15 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
 
     _permessiGodutiCtrl =
         TextEditingController(text: formatNumber(corrente.permessiGoduti));
+    _permessiGodutiMeseCtrl =
+        TextEditingController(text: formatNumber(corrente.permessiGodutiMese));
+
+    _exFestivitaMaturateCtrl = TextEditingController(
+        text: formatNumber(corrente.exFestivitaMaturate));
+    _exFestivitaGoduteCtrl = TextEditingController(
+        text: formatNumber(corrente.exFestivitaGodute));
+    _exFestivitaResidueCtrl = TextEditingController(
+        text: formatNumber(corrente.exFestivitaResidue));
 
     _trattenuteEdit = corrente.trattenute.isEmpty
         ? [TrattenutaEditRow()]
@@ -129,20 +141,51 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                 chiave: e.key, importo: formatNumber(e.value)))
             .toList();
 
+    _competenzeEdit = corrente.competenze.isEmpty
+        ? [VoceCompetenzaEditRow()]
+        : corrente.competenze
+            .map((v) => VoceCompetenzaEditRow(
+                  descrizione: v.descrizione,
+                  quantita: formatNumber(v.quantita),
+                  importo: v.importo == 0 ? '' : formatNumber(v.importo),
+                ))
+            .toList();
+    for (final row in _competenzeEdit) {
+      _attachCompetenzaListeners(row);
+    }
+
     // Forza il rebuild dello `_StatRow` (Ferie/ROL residui) ogni volta che
     // cambia il campo "Residuo" corrispondente nella tabella sottostante.
     _ferieResidueCtrl.addListener(_onResiduiChanged);
     _rolResiduiCtrl.addListener(_onResiduiChanged);
+    _exFestivitaResidueCtrl.addListener(_onResiduiChanged);
 
     setState(() => _isEditing = true);
   }
+
+  /// Rebuild forzato ogni volta che descrizione/quantità/importo di una voce
+  /// di competenza cambiano, così le celle Lordo/Straordinari (calcolate
+  /// dalla lista competenze, sola lettura anche in editing) restano
+  /// sincronizzate live — stesso meccanismo di `_onResiduiChanged`.
+  void _attachCompetenzaListeners(VoceCompetenzaEditRow row) {
+    row.descrizione.addListener(_onResiduiChanged);
+    row.quantita.addListener(_onResiduiChanged);
+    row.importo.addListener(_onResiduiChanged);
+  }
+
+  List<VoceCompetenza> get _competenzeCorrenti => _competenzeEdit
+      .where((row) => row.descrizione.text.trim().isNotEmpty)
+      .map((row) => VoceCompetenza(
+            descrizione: row.descrizione.text.trim(),
+            quantita: row.quantitaValue,
+            importo: row.importoValue,
+          ))
+      .toList();
 
   void _onResiduiChanged() => setState(() {});
 
   void _disposeEditingControllers() {
     _nettoCtrl.dispose();
-    _lordoCtrl.dispose();
-    _straordinariCtrl.dispose();
     _oreLavorateCtrl.dispose();
     _ferieMaturateCtrl.dispose();
     _ferieGoduteCtrl.dispose();
@@ -151,7 +194,14 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     _rolGodutiCtrl.dispose();
     _rolResiduiCtrl.dispose();
     _permessiGodutiCtrl.dispose();
+    _permessiGodutiMeseCtrl.dispose();
+    _exFestivitaMaturateCtrl.dispose();
+    _exFestivitaGoduteCtrl.dispose();
+    _exFestivitaResidueCtrl.dispose();
     for (final row in _trattenuteEdit) {
+      row.dispose();
+    }
+    for (final row in _competenzeEdit) {
       row.dispose();
     }
   }
@@ -174,6 +224,21 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     setState(() {
       _trattenuteEdit[index].dispose();
       _trattenuteEdit.removeAt(index);
+    });
+  }
+
+  void _addCompetenza() {
+    setState(() {
+      final row = VoceCompetenzaEditRow();
+      _attachCompetenzaListeners(row);
+      _competenzeEdit.add(row);
+    });
+  }
+
+  void _removeCompetenza(int index) {
+    setState(() {
+      _competenzeEdit[index].dispose();
+      _competenzeEdit.removeAt(index);
     });
   }
 
@@ -275,12 +340,24 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       trattenute[chiave] = _parse(row.importo);
     }
 
+    // Lordo/straordinari sono derivati dalla lista competenze correntemente
+    // in editing (vedi computeLordo/computeStraordinari). Se la lista è
+    // vuota (busta paga pre-migrazione mai riaperta in modifica, o utente
+    // che rimuove tutte le righe) si mantiene il valore precedente invece
+    // di azzerarlo — vedi CLAUDE.md/istruzioni task.
+    final competenze = _competenzeCorrenti;
+    final lordo =
+        competenze.isEmpty ? corrente.lordo : computeLordo(competenze);
+    final straordinari = competenze.isEmpty
+        ? corrente.straordinari
+        : computeStraordinari(competenze);
+
     final candidato = corrente.copyWith(
       periodo: _periodoEdit,
       tipo: _tipoEdit,
       netto: _parse(_nettoCtrl),
-      lordo: _parse(_lordoCtrl),
-      straordinari: _parse(_straordinariCtrl),
+      lordo: lordo,
+      straordinari: straordinari,
       oreLavorate: _parse(_oreLavorateCtrl),
       ferieMaturate: _parse(_ferieMaturateCtrl),
       ferieGodute: _parse(_ferieGoduteCtrl),
@@ -289,6 +366,11 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       rolGoduti: _parse(_rolGodutiCtrl),
       rolResidui: _parse(_rolResiduiCtrl),
       permessiGoduti: _parse(_permessiGodutiCtrl),
+      permessiGodutiMese: _parse(_permessiGodutiMeseCtrl),
+      exFestivitaMaturate: _parse(_exFestivitaMaturateCtrl),
+      exFestivitaGodute: _parse(_exFestivitaGoduteCtrl),
+      exFestivitaResidue: _parse(_exFestivitaResidueCtrl),
+      competenze: competenze,
       trattenute: trattenute,
     );
 
@@ -389,6 +471,14 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     addIfChanged('ROL residui', vecchia.rolResidui, nuova.rolResidui);
     addIfChanged(
         'Permessi goduti', vecchia.permessiGoduti, nuova.permessiGoduti);
+    addIfChanged('Permessi (mese)', vecchia.permessiGodutiMese,
+        nuova.permessiGodutiMese);
+    addIfChanged('Ex festività maturate', vecchia.exFestivitaMaturate,
+        nuova.exFestivitaMaturate);
+    addIfChanged('Ex festività godute', vecchia.exFestivitaGodute,
+        nuova.exFestivitaGodute);
+    addIfChanged('Ex festività residue', vecchia.exFestivitaResidue,
+        nuova.exFestivitaResidue);
     addIfChanged('Ore lavorate', vecchia.oreLavorate, nuova.oreLavorate);
 
     final chiavi = {...vecchia.trattenute.keys, ...nuova.trattenute.keys};
@@ -404,6 +494,39 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
           formatNumber(prima) != formatNumber(dopo)) {
         diff.add(
           'Trattenuta $chiave: € ${formatNumber(prima)} → € ${formatNumber(dopo)}',
+        );
+      }
+    }
+
+    // Stesso pattern del diff trattenute, chiave sulla descrizione (unica per
+    // voce nell'uso reale di questo layout busta paga).
+    final vecchieCompetenze = {
+      for (final v in vecchia.competenze) v.descrizione: v
+    };
+    final nuoveCompetenze = {
+      for (final v in nuova.competenze) v.descrizione: v
+    };
+    final descrizioniCompetenze = {
+      ...vecchieCompetenze.keys,
+      ...nuoveCompetenze.keys
+    };
+    for (final descrizione in descrizioniCompetenze) {
+      final prima = vecchieCompetenze[descrizione];
+      final dopo = nuoveCompetenze[descrizione];
+      if (prima == null && dopo != null) {
+        diff.add('Competenza $descrizione: aggiunta '
+            '(${formatNumber(dopo.quantita)}, € ${formatNumber(dopo.importo)})');
+      } else if (prima != null && dopo == null) {
+        diff.add('Competenza $descrizione: rimossa '
+            '(era ${formatNumber(prima.quantita)}, € ${formatNumber(prima.importo)})');
+      } else if (prima != null &&
+          dopo != null &&
+          (formatNumber(prima.quantita) != formatNumber(dopo.quantita) ||
+              formatNumber(prima.importo) != formatNumber(dopo.importo))) {
+        diff.add(
+          'Competenza $descrizione: ${formatNumber(prima.quantita)}, '
+          '€ ${formatNumber(prima.importo)} → ${formatNumber(dopo.quantita)}, '
+          '€ ${formatNumber(dopo.importo)}',
         );
       }
     }
@@ -431,9 +554,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     return CupertinoPageScaffold(
       backgroundColor:
           CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
-      navigationBar: CupertinoNavigationBar(
-        middle: Text(periodoLabelVista),
-      ),
+      navigationBar: const CupertinoNavigationBar(),
       child: Stack(
         children: [
           SafeArea(
@@ -452,6 +573,9 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                     periodoLabel: periodoLabelVista,
                     tipo: _isEditing ? _tipoEdit : corrente.tipo,
                     isEditing: _isEditing,
+                    lordoDisplay: formatNumber(_isEditing
+                        ? computeLordo(_competenzeCorrenti)
+                        : corrente.lordo),
                     nettoDisplay: formatNumber(corrente.netto),
                     nettoController: _isEditing ? _nettoCtrl : null,
                     onTapPeriodo: _isEditing ? _pickPeriodo : null,
@@ -498,7 +622,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                               ),
                             ),
                             (
-                              'ROL residui',
+                              'Permessi residui',
                               Text(
                                 _isEditing
                                     ? formatNumber(_parse(_rolResiduiCtrl))
@@ -507,11 +631,14 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                               ),
                             ),
                             (
-                              'Lordo',
-                              _isEditing
-                                  ? inlineNumberField(_lordoCtrl, prefix: '€ ')
-                                  : Text('€ ${formatNumber(corrente.lordo)}',
-                                      textAlign: TextAlign.center),
+                              'Ex festività',
+                              Text(
+                                _isEditing
+                                    ? formatNumber(
+                                        _parse(_exFestivitaResidueCtrl))
+                                    : formatNumber(corrente.exFestivitaResidue),
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           ]),
                           const SizedBox(height: AppSpacing.lg),
@@ -531,6 +658,12 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                             rolResidui: formatNumber(corrente.rolResidui),
                             permessiGoduti:
                                 formatNumber(corrente.permessiGoduti),
+                            exFestivitaMaturate:
+                                formatNumber(corrente.exFestivitaMaturate),
+                            exFestivitaGodute:
+                                formatNumber(corrente.exFestivitaGodute),
+                            exFestivitaResidue:
+                                formatNumber(corrente.exFestivitaResidue),
                             ferieMaturateCtrl:
                                 _isEditing ? _ferieMaturateCtrl : null,
                             ferieGoduteCtrl:
@@ -543,6 +676,12 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                             rolResiduiCtrl: _isEditing ? _rolResiduiCtrl : null,
                             permessiGodutiCtrl:
                                 _isEditing ? _permessiGodutiCtrl : null,
+                            exFestivitaMaturateCtrl:
+                                _isEditing ? _exFestivitaMaturateCtrl : null,
+                            exFestivitaGoduteCtrl:
+                                _isEditing ? _exFestivitaGoduteCtrl : null,
+                            exFestivitaResidueCtrl:
+                                _isEditing ? _exFestivitaResidueCtrl : null,
                           ),
                           BustaPagaStatRow(items: [
                             (
@@ -554,15 +693,29 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                             ),
                             (
                               'Straordinari',
+                              Text(
+                                '${formatNumber(_isEditing ? computeStraordinari(_competenzeCorrenti) : corrente.straordinari)} h',
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            (
+                              'Permessi (mese)',
                               _isEditing
-                                  ? inlineNumberField(_straordinariCtrl,
+                                  ? inlineNumberField(_permessiGodutiMeseCtrl,
                                       suffix: ' h')
                                   : Text(
-                                      '${formatNumber(corrente.straordinari)} h',
+                                      '${formatNumber(corrente.permessiGodutiMese)} h',
                                       textAlign: TextAlign.center),
                             ),
                           ]),
                           const SizedBox(height: AppSpacing.lg),
+                          BustaPagaCompetenzeSection(
+                            isEditing: _isEditing,
+                            competenze: corrente.competenze,
+                            righeEdit: _isEditing ? _competenzeEdit : null,
+                            onAggiungi: _isEditing ? _addCompetenza : null,
+                            onRimuovi: _isEditing ? _removeCompetenza : null,
+                          ),
                           GlassFormSection(
                             footer: _isEditing
                                 ? 'Aggiungi le voci di trattenuta indicate in busta '
