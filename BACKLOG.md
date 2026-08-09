@@ -64,10 +64,10 @@ prima di decidere se serve un fix al parser.
       2026-08-09). Serve: iPhone collegato (nessuno rilevato da `flutter
       devices` in questa sessione, solo simulatore), Apple ID come firma di
       sviluppo gratuita in Xcode
-- [ ] Icona app: **rimandata** (decisione utente 2026-08-09) — resta il
-      placeholder Flutter di default in
-      `ios/Runner/Assets.xcassets/AppIcon.appiconset/`, da sistemare in una
-      versione successiva
+- [x] Icona app impostata (2026-08-09): sorgente in `assets/icon/app_icon.png`,
+      generata su tutte le dimensioni iOS via `flutter_launcher_icons`
+      (`dart run flutter_launcher_icons`), sostituisce il placeholder Flutter
+      di default
 - [x] `pubspec.yaml` corretto (2026-08-09): descrizione allineata al
       tracciamento buste paga, versione `1.0.0+1` per la prima release
 
