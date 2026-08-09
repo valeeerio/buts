@@ -153,6 +153,8 @@ class _BustePagaSectionScreenState
         return b.periodo.year == periodoEstratto.year;
       });
       if (conflitto) {
+        await _pdfImportService.deleteFile(result.filePath!);
+        if (!mounted) return;
         _showImportError(
           'Busta paga già presente',
           'Hai già una busta paga per '

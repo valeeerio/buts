@@ -358,7 +358,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     );
   }
 
-  void _save() {
+  Future<void> _save() async {
     final nettoText = _nettoController.text.trim();
     if (nettoText.isEmpty ||
         double.tryParse(nettoText.replaceAll('.', '').replaceAll(',', '.')) ==
@@ -435,7 +435,17 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
           : StatoVerificaBustaPaga.confermato,
     );
 
-    ref.read(busteRepositoryProvider.notifier).add(bustaPaga);
+    try {
+      await ref.read(busteRepositoryProvider.notifier).add(bustaPaga);
+    } catch (_) {
+      if (!mounted) return;
+      _showAlert(
+        'Salvataggio non riuscito',
+        'Impossibile salvare la busta paga, riprova.',
+      );
+      return;
+    }
+    if (!mounted) return;
     Navigator.of(context).pop();
   }
 

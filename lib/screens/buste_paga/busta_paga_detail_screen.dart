@@ -424,13 +424,25 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
           icon: CupertinoIcons.checkmark_alt,
           label: 'Conferma',
           color: accent,
-          onPressed: () {
-            ref.read(busteRepositoryProvider.notifier).update(
-                  candidato.copyWith(
-                    statoVerifica: StatoVerificaBustaPaga.daConfermare,
-                  ),
-                );
+          onPressed: () async {
             Navigator.of(context).pop();
+            try {
+              await ref.read(busteRepositoryProvider.notifier).update(
+                    candidato.copyWith(
+                      statoVerifica: StatoVerificaBustaPaga.daConfermare,
+                    ),
+                  );
+            } catch (_) {
+              if (!mounted) return;
+              // Salvataggio fallito: resta in modifica con i dati inseriti,
+              // non perdere il lavoro dell'utente (vedi istruzioni task).
+              _showAlert(
+                'Salvataggio non riuscito',
+                'Impossibile salvare le modifiche, riprova.',
+              );
+              return;
+            }
+            if (!mounted) return;
             _cancelEditing();
           },
         ),
@@ -762,12 +774,22 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                 child: _ActionBar(
                   bustaPaga: corrente,
                   isEditing: _isEditing,
-                  onConferma: () {
-                    ref.read(busteRepositoryProvider.notifier).update(
-                          corrente.copyWith(
-                            statoVerifica: StatoVerificaBustaPaga.confermato,
-                          ),
-                        );
+                  onConferma: () async {
+                    try {
+                      await ref.read(busteRepositoryProvider.notifier).update(
+                            corrente.copyWith(
+                              statoVerifica: StatoVerificaBustaPaga.confermato,
+                            ),
+                          );
+                    } catch (_) {
+                      if (!context.mounted) return;
+                      _showAlert(
+                        'Salvataggio non riuscito',
+                        'Impossibile confermare i dati, riprova.',
+                      );
+                      return;
+                    }
+                    if (!context.mounted) return;
                     showAppAlertDialog<void>(
                       context: context,
                       title: 'Dati confermati',

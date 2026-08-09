@@ -133,6 +133,37 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
     return risultato ?? false;
   }
 
+  /// Rimuove una busta paga gestendo l'eventuale fallimento della scrittura
+  /// Drift: `remove` fa già il revert ottimistico dello stato in caso di
+  /// errore (la busta paga ricompare nell'elenco), qui serve solo avvisare
+  /// l'utente che l'eliminazione non è andata a buon fine.
+  Future<void> _removeBustaPaga(
+    BuildContext context,
+    WidgetRef ref,
+    String id,
+  ) async {
+    try {
+      await ref.read(busteRepositoryProvider.notifier).remove(id);
+    } catch (_) {
+      if (!context.mounted) return;
+      final accent =
+          CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+      showAppAlertDialog<void>(
+        context: context,
+        title: 'Eliminazione non riuscita',
+        message: 'Impossibile eliminare la busta paga, riprova.',
+        actions: [
+          AppAlertAction(
+            icon: CupertinoIcons.checkmark_alt,
+            label: 'OK',
+            color: accent,
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      );
+    }
+  }
+
   /// Righe di un gruppo di buste paga (swipe-to-delete + tap per il
   /// dettaglio), fattorizzato perché sia la sotto-sezione "Extra" sia le
   /// mensilità normali di un anno usano esattamente questo pattern.
@@ -153,8 +184,7 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
             key: ValueKey('row-${bustaPaga.id}'),
             direction: DismissDirection.endToStart,
             confirmDismiss: (_) => _confirmaEliminazione(context, bustaPaga),
-            onDismissed: (_) =>
-                ref.read(busteRepositoryProvider.notifier).remove(bustaPaga.id),
+            onDismissed: (_) => _removeBustaPaga(context, ref, bustaPaga.id),
             background:
                 const SwipeDeleteBackground(radius: AppRadius.glassSmall),
             child: BustaPagaListItem(
@@ -272,10 +302,7 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
               key: ValueKey('hero-${ultima.id}'),
               direction: DismissDirection.endToStart,
               confirmDismiss: (_) => _confirmaEliminazione(context, ultima),
-              onDismissed: (_) =>
-                  ref.read(busteRepositoryProvider.notifier).remove(
-                        ultima.id,
-                      ),
+              onDismissed: (_) => _removeBustaPaga(context, ref, ultima.id),
               background: const SwipeDeleteBackground(radius: AppRadius.glass),
               child: BustaPagaSummaryHero(
                 bustaPaga: ultima,
