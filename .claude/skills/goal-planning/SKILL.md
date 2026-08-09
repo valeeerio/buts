@@ -14,7 +14,7 @@ backlog tramite la skill `backlog`.
    statistiche"), fai le domande di chiarimento necessarie prima di scomporlo —
    non indovinare lo scope.
 2. Scomponi l'obiettivo in **3–7 voci concrete e actionable**: ognuna deve poter
-   diventare un singolo task per `flutter-dev` o `drift-migration` senza bisogno di
+   diventare un singolo task per `dev1`/`dev2` o `drift-migration` senza bisogno di
    ulteriore scomposizione. Evita voci generiche tipo "migliorare X".
 3. Quando possibile, associa ogni voce a un'area coerente con la struttura del
    backlog (Buste Paga / Budget / Infrastruttura).
@@ -22,7 +22,7 @@ backlog tramite la skill `backlog`.
    corretta.
 5. Non implementare nulla in questa skill: il suo compito finisce con l'aggiornamento
    del backlog. Se l'utente vuole procedere subito con l'implementazione di una voce,
-   segnalalo e passa la mano (es. a `flutter-dev`) invece di continuare qui.
+   segnalalo e passa la mano (es. a `dev1`/`dev2`) invece di continuare qui.
 
 ## Output
 

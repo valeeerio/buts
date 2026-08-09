@@ -7,8 +7,8 @@ description: Guida la creazione o modifica di tabelle Drift (SQLite) nel progett
 
 ## Quando una modifica di schema è richiesta
 
-Prima di modificare tabelle Drift, delega la progettazione dello schema all'agent
-`flutter-dev` se la modifica non è banale (nuova tabella, nuova relazione,
+Prima di modificare tabelle Drift, delega la progettazione dello schema a `dev1`
+o `dev2` se la modifica non è banale (nuova tabella, nuova relazione,
 cambio di tipo di colonna con dati esistenti). Per aggiunte semplici (nuova colonna
 nullable, nuovo indice) puoi procedere direttamente seguendo i punti sotto.
 

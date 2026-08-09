@@ -5,8 +5,8 @@ description: Scansiona lib/ del progetto Buts per violazioni delle regole di sti
 
 # design-audit
 
-Invoca l'agent `design-consistency-reviewer` (tool Agent, subagent_type
-`design-consistency-reviewer`) passandogli come scope:
+Invoca l'agent `revisore` (tool Agent, subagent_type `revisore`) passandogli come
+scope:
 
 - Se l'audit è richiesto dopo modifiche recenti: la lista dei file Dart modificati
   (usa `git diff --name-only` se il repo è versionato con git, altrimenti chiedi
