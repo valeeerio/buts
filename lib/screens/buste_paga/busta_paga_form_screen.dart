@@ -112,36 +112,38 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
         DateTime(DateTime.now().year, DateTime.now().month);
     _tipo = estratti.tipo;
 
-    _nettoController =
-        TextEditingController(text: _formatNumero(estratti.netto));
+    _nettoController = TextEditingController(
+        text: estratti.netto == null ? '' : formatNumber(estratti.netto!));
 
     _ferieMaturateController =
-        TextEditingController(text: _formatNumero(estratti.ferieMaturate));
+        TextEditingController(text: formatNumber(estratti.ferieMaturate));
     _ferieGoduteController =
-        TextEditingController(text: _formatNumero(estratti.ferieGodute));
+        TextEditingController(text: formatNumber(estratti.ferieGodute));
     _ferieResidueController =
-        TextEditingController(text: _formatNumero(estratti.ferieResidue));
+        TextEditingController(text: formatNumber(estratti.ferieResidue));
 
     _rolMaturatiController =
-        TextEditingController(text: _formatNumero(estratti.rolMaturati));
+        TextEditingController(text: formatNumber(estratti.rolMaturati));
     _rolGodutiController =
-        TextEditingController(text: _formatNumero(estratti.rolGoduti));
+        TextEditingController(text: formatNumber(estratti.rolGoduti));
     _rolResiduiController =
-        TextEditingController(text: _formatNumero(estratti.rolResidui));
+        TextEditingController(text: formatNumber(estratti.rolResidui));
 
     _permessiGodutiController =
-        TextEditingController(text: _formatNumero(estratti.permessiGoduti));
+        TextEditingController(text: formatNumber(estratti.permessiGoduti));
     _permessiGodutiMeseController = TextEditingController(
-        text: _formatNumero(estratti.permessiGodutiMese));
-    _oreLavorateController =
-        TextEditingController(text: _formatNumero(estratti.oreLavorate));
+        text: formatNumber(estratti.permessiGodutiMese));
+    _oreLavorateController = TextEditingController(
+        text: estratti.oreLavorate == null
+            ? ''
+            : formatNumber(estratti.oreLavorate!));
 
     _exFestivitaMaturateController = TextEditingController(
-        text: _formatNumero(estratti.exFestivitaMaturate));
+        text: formatNumber(estratti.exFestivitaMaturate));
     _exFestivitaGoduteController = TextEditingController(
-        text: _formatNumero(estratti.exFestivitaGodute));
+        text: formatNumber(estratti.exFestivitaGodute));
     _exFestivitaResidueController = TextEditingController(
-        text: _formatNumero(estratti.exFestivitaResidue));
+        text: formatNumber(estratti.exFestivitaResidue));
 
     final trattenuteIniziali = estratti.trattenute;
     _trattenute = trattenuteIniziali.isEmpty
@@ -157,8 +159,8 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
         : competenzeIniziali
             .map((v) => VoceCompetenzaEditRow(
                   descrizione: v.descrizione,
-                  quantita: _formatNumero(v.quantita),
-                  importo: v.importo == 0 ? '' : _formatNumero(v.importo),
+                  quantita: formatNumber(v.quantita),
+                  importo: v.importo == 0 ? '' : formatNumber(v.importo),
                 ))
             .toList();
     for (final row in _competenze) {
@@ -194,13 +196,6 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     return DateTime(anno, mese);
   }
 
-  static String _formatNumero(double? value) {
-    if (value == null) return '';
-    return value == value.roundToDouble()
-        ? value.toStringAsFixed(0)
-        : value.toString();
-  }
-
   @override
   void dispose() {
     _scrollController.removeListener(_updateBottomFade);
@@ -227,10 +222,8 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     super.dispose();
   }
 
-  double _parse(TextEditingController controller) {
-    final text = controller.text.trim().replaceAll(',', '.');
-    return double.tryParse(text) ?? 0;
-  }
+  double _parse(TextEditingController controller) =>
+      parseItalianNumber(controller.text);
 
   String get _periodoLabel {
     final formatted = DateFormat('MMMM yyyy', 'it_IT').format(_periodo);
@@ -366,8 +359,10 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   }
 
   void _save() {
-    final nettoText = _nettoController.text.trim().replaceAll(',', '.');
-    if (nettoText.isEmpty || double.tryParse(nettoText) == null) {
+    final nettoText = _nettoController.text.trim();
+    if (nettoText.isEmpty ||
+        double.tryParse(nettoText.replaceAll('.', '').replaceAll(',', '.')) ==
+            null) {
       _showAlert(
         'Netto non valido',
         'Inserisci un valore numerico per il netto prima di salvare.',

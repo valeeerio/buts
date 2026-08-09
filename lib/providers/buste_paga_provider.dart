@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/database.dart';
 import '../models/busta_paga.dart';
+import '../services/pdf_import_service.dart';
 
 /// Istanza applicativa del database Drift. `keepAlive: true` perché il
 /// database vive per tutta la sessione app (non va ricreato/chiuso tra un
@@ -28,41 +29,90 @@ final databaseProvider = Provider<AppDatabase>((ref) {
 /// `.notifier.add/update`) che il task richiede esplicitamente di non
 /// toccare.
 class BustePagaNotifier extends StateNotifier<List<BustaPaga>> {
-  BustePagaNotifier(this._db) : super(const []) {
+  BustePagaNotifier(this._db, this._pdfImportService) : super(const []) {
     _initialize();
   }
 
   final AppDatabase _db;
+  final PdfImportService _pdfImportService;
 
   Future<void> _initialize() async {
     final righe = await _db.select(_db.bustePagaTable).get();
-    state = righe.map((r) => r.toDomain()).toList();
+    final daDb = righe.map((r) => r.toDomain()).toList();
+    // Guard contro la race condition con scritture ottimistiche già avvenute
+    // (add/update) mentre questa SELECT iniziale era ancora in volo: non
+    // sovrascrivere lo stato con lo snapshot iniziale, ma fondere — le righe
+    // già presenti in `state` (scritte otticamente da add/update prima che
+    // questo await tornasse) restano quelle in memoria, si aggiungono solo
+    // le righe dal DB non ancora rappresentate in `state`.
+    final idGiaInStato = state.map((b) => b.id).toSet();
+    final mancantiDaDb =
+        daDb.where((b) => !idGiaInStato.contains(b.id));
+    state = [...state, ...mancantiDaDb];
   }
 
-  void add(BustaPaga busta) {
+  Future<void> add(BustaPaga busta) async {
+    final precedente = state;
     state = [...state, busta];
-    _db.into(_db.bustePagaTable).insertOnConflictUpdate(busta.toCompanion());
+    try {
+      await _db
+          .into(_db.bustePagaTable)
+          .insertOnConflictUpdate(busta.toCompanion());
+    } catch (e) {
+      state = precedente;
+      rethrow;
+    }
   }
 
-  void update(BustaPaga busta) {
+  Future<void> update(BustaPaga busta) async {
+    final precedente = state;
     state = [
       for (final b in state) if (b.id == busta.id) busta else b,
     ];
-    _db.into(_db.bustePagaTable).insertOnConflictUpdate(busta.toCompanion());
+    try {
+      await _db
+          .into(_db.bustePagaTable)
+          .insertOnConflictUpdate(busta.toCompanion());
+    } catch (e) {
+      state = precedente;
+      rethrow;
+    }
   }
 
   /// Elimina una singola busta paga per id (swipe-to-delete dall'Archivio,
-  /// con conferma già ottenuta dalla UI prima della chiamata).
-  void remove(String id) {
-    state = state.where((b) => b.id != id).toList();
-    (_db.delete(_db.bustePagaTable)..where((t) => t.id.equals(id))).go();
+  /// con conferma già ottenuta dalla UI prima della chiamata). Elimina anche
+  /// il PDF associato su disco (`fileOrigine`), best-effort — non deve mai
+  /// bloccare l'eliminazione della riga se il file è già assente.
+  Future<void> remove(String id) async {
+    final precedente = state;
+    BustaPaga? rimossa;
+    for (final b in precedente) {
+      if (b.id == id) {
+        rimossa = b;
+        break;
+      }
+    }
+    state = precedente.where((b) => b.id != id).toList();
+    try {
+      await (_db.delete(_db.bustePagaTable)..where((t) => t.id.equals(id)))
+          .go();
+    } catch (e) {
+      state = precedente;
+      rethrow;
+    }
+    final fileOrigine = rimossa?.fileOrigine;
+    if (fileOrigine != null && fileOrigine.isNotEmpty) {
+      await _pdfImportService.deleteFile(fileOrigine);
+    }
   }
-
 }
 
 final busteRepositoryProvider =
     StateNotifierProvider<BustePagaNotifier, List<BustaPaga>>(
-  (ref) => BustePagaNotifier(ref.watch(databaseProvider)),
+  (ref) => BustePagaNotifier(
+    ref.watch(databaseProvider),
+    const PdfImportService(),
+  ),
 );
 
 /// Busta paga più recente per periodo — unico punto di lettura del netto

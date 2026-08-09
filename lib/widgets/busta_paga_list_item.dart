@@ -68,7 +68,7 @@ class BustaPagaListItem extends StatelessWidget {
               ),
             ),
             Text(
-              '€ ${bustaPaga.netto.toStringAsFixed(2)}',
+              '€ ${formatNumber(bustaPaga.netto)}',
               style: AppTextStyles.cardAmount.copyWith(
                 color: labelPrimary,
                 fontWeight: FontWeight.w400,

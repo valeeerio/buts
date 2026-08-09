@@ -336,6 +336,32 @@ void main() {
       expect(risultato.warnings, contains('netto non trovato'));
     });
 
+    test('warning sul segno "-" scartato quando il netto lo ha davvero', () {
+      final risultato = parser.parse(_testoSintetico);
+
+      expect(risultato.netto, closeTo(988.68, 0.001));
+      expect(
+        risultato.warnings.any((w) => w.startsWith('netto: segno "-"')),
+        isTrue,
+      );
+    });
+
+    test(
+        'nessun warning sul segno "-" quando il netto non lo ha (nessun '
+        'artefatto da scartare)', () {
+      final testo = _testoSintetico.replaceFirst(
+        '1.050,00 61,32-988,68',
+        '1.050,00 61,32988,68',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.netto, closeTo(988.68, 0.001));
+      expect(
+        risultato.warnings.any((w) => w.startsWith('netto: segno "-"')),
+        isFalse,
+      );
+    });
+
     test('calcola correttamente "Altre trattenute (IRPEF + varie)" come '
         'lordo - netto - INPS - trattenute nominate extra', () {
       // Nel testo sintetico invariato lordo (1050.00) - netto (988.68) -

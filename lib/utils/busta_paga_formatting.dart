@@ -95,3 +95,17 @@ String formatNumber(double value) {
       ? value.toStringAsFixed(0)
       : value.toStringAsFixed(2);
 }
+
+/// Converte un numero in formato italiano digitato dall'utente (punto come
+/// separatore delle migliaia, virgola come separatore decimale — es.
+/// "1.234,56" o "1234,56") in un `double`, tornando `0` se il testo è vuoto o
+/// non valido. Una sostituzione ingenua virgola→punto rompe con l'input
+/// "1.234,56" (diventa "1.234.56", due punti, `tryParse` fallisce e
+/// l'importo viene silenziosamente azzerato): qui si rimuovono prima i punti
+/// delle migliaia, poi si converte la virgola decimale in punto.
+double parseItalianNumber(String text) {
+  final trimmed = text.trim();
+  if (trimmed.isEmpty) return 0;
+  final normalized = trimmed.replaceAll('.', '').replaceAll(',', '.');
+  return double.tryParse(normalized) ?? 0;
+}

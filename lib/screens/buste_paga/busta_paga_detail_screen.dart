@@ -211,10 +211,8 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     setState(() => _isEditing = false);
   }
 
-  double _parse(TextEditingController controller) {
-    final text = controller.text.trim().replaceAll(',', '.');
-    return double.tryParse(text) ?? 0;
-  }
+  double _parse(TextEditingController controller) =>
+      parseItalianNumber(controller.text);
 
   void _addTrattenuta() {
     setState(() => _trattenuteEdit.add(TrattenutaEditRow()));
@@ -324,8 +322,10 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   /// prima di salvare — vedi CLAUDE.md/istruzioni task per il comportamento
   /// dettagliato dei 3 esiti (invariato / conferma / annulla).
   void _save(BustaPaga corrente) {
-    final nettoText = _nettoCtrl.text.trim().replaceAll(',', '.');
-    if (nettoText.isEmpty || double.tryParse(nettoText) == null) {
+    final nettoText = _nettoCtrl.text.trim();
+    if (nettoText.isEmpty ||
+        double.tryParse(nettoText.replaceAll('.', '').replaceAll(',', '.')) ==
+            null) {
       _showAlert(
         'Netto non valido',
         'Inserisci un valore numerico per il netto prima di salvare.',

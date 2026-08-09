@@ -80,6 +80,24 @@ class PdfImportService {
     }
   }
 
+  /// Elimina un PDF copiato in `buste_paga_pdf/` durante un import poi
+  /// scartato — ad es. quando il controllo anti-duplicati blocca il flusso
+  /// subito dopo la copia del file, prima ancora di aprire il form di
+  /// revisione, oppure quando una busta paga viene rimossa dall'archivio.
+  /// Silenzioso se il file è già assente (best-effort, non propaga errori:
+  /// è solo pulizia di un file orfano, non deve mai bloccare il chiamante).
+  Future<void> deleteFile(String relativePath) async {
+    try {
+      final absolutePath = await resolvePdfAbsolutePath(relativePath);
+      final file = File(absolutePath);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // File già assente/non eliminabile: nessun errore da propagare.
+    }
+  }
+
   String? _extractText(List<int> bytes) {
     final document = PdfDocument(inputBytes: bytes);
     try {

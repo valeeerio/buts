@@ -6,19 +6,22 @@ import '../theme/app_text_styles.dart';
 import 'glass_form_section.dart';
 import 'trattenuta_edit_row.dart';
 
-/// Tabella unica Ferie/Permessi/Ex festività/Permessi (mese) con colonne
+/// Tabella unica Ferie/Permessi/Ex festività/Permessi (annuo) con colonne
 /// Maturato/Goduto/Residuo: sostituisce sezioni separate che ripetono la
 /// stessa struttura a righe per ciascuna categoria. In modifica le celle
 /// Ferie/Permessi/Ex festività diventano campi di testo numerici; nella
-/// riga "Permessi (mese)" solo "Goduto" è editabile (Maturato/Residuo non
+/// riga "Permessi (annuo)" solo "Goduto" è editabile (Maturato/Residuo non
 /// esistono come campi nel modello per quel dato, restano "—" fissi anche
 /// in modifica).
 ///
 /// Ordine righe allineato all'intestazione della tabella ratei nel PDF
 /// (FERIE / PERMESSI (R.O.L.) / EX FESTIVITA'): "Permessi" qui rappresenta
 /// i ROL (rolMaturati/rolGoduti/rolResidui, rinominati da "ROL" per
-/// coerenza con l'etichetta del PDF), distinti dalla riga "Permessi (mese)"
-/// più sotto (permessi riduz. orario goduti nel mese, dato mensile a sé).
+/// coerenza con l'etichetta del PDF). La riga "Permessi (annuo)" mostra
+/// invece [permessiGoduti], il cumulativo annuo che in questo layout
+/// coincide coi ROL goduti — distinto dal vero dato mensile in ore mostrato
+/// altrove come "Permessi (mese)" ([permessiGodutiMese], campo a sé non
+/// presente in questa tabella).
 class BustaPagaMaturazioniSection extends StatelessWidget {
   final bool isEditing;
 
@@ -108,7 +111,7 @@ class BustaPagaMaturazioniSection extends StatelessWidget {
         ),
         _tableDataRow(
           context,
-          label: 'Permessi (mese)',
+          label: 'Permessi (annuo)',
           maturato: '—',
           goduto: permessiGoduti,
           residuo: '—',

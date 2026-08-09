@@ -94,7 +94,7 @@ class BustaPagaSummaryHero extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      '€ ${bustaPaga.netto.toStringAsFixed(2)}',
+                      '€ ${formatNumber(bustaPaga.netto)}',
                       style: AppTextStyles.greeting.copyWith(
                         color: labelPrimary,
                         fontWeight: FontWeight.w400,

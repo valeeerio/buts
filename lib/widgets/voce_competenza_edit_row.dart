@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
+import '../utils/busta_paga_formatting.dart';
 import 'swipe_delete_background.dart';
 import 'trattenuta_edit_row.dart' show inlineNumberField;
 
@@ -28,15 +29,9 @@ class VoceCompetenzaEditRow {
         quantita = TextEditingController(text: quantita),
         importo = TextEditingController(text: importo);
 
-  double get quantitaValue {
-    final text = quantita.text.trim().replaceAll(',', '.');
-    return double.tryParse(text) ?? 0;
-  }
+  double get quantitaValue => parseItalianNumber(quantita.text);
 
-  double get importoValue {
-    final text = importo.text.trim().replaceAll(',', '.');
-    return double.tryParse(text) ?? 0;
-  }
+  double get importoValue => parseItalianNumber(importo.text);
 
   void dispose() {
     descrizione.dispose();

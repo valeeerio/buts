@@ -427,8 +427,12 @@ class BustaPagaRegexParser {
           final ultimo = numeri.last.group(0)!;
           // Il "-" davanti all'ultimo numero è quasi sempre un artefatto di
           // estrazione (due celle concatenate), non un netto negativo.
-          netto = _toDouble(ultimo.startsWith('-') ? ultimo.substring(1) : ultimo);
-          warnings.add('netto: segno "-" iniziale scartato come probabile artefatto di estrazione, verificare');
+          if (ultimo.startsWith('-')) {
+            netto = _toDouble(ultimo.substring(1));
+            warnings.add('netto: segno "-" iniziale scartato come probabile artefatto di estrazione, verificare');
+          } else {
+            netto = _toDouble(ultimo);
+          }
         }
       }
     }
