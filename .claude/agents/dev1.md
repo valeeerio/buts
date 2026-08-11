@@ -107,3 +107,13 @@ Vincoli non negoziabili (vedi CLAUDE.md sezione "Stile visivo"):
 
 Se il task richiede decisioni di prodotto o di modello dati non coperte da
 `CLAUDE.md`, segnala il dubbio invece di assumere una direzione arbitraria.
+
+## Git — vietato
+
+Non eseguire mai comandi Git che scrivono stato (`git commit`, `git add`,
+`git push`, `git checkout -b`, `git merge`, `git reset`, ecc.), nemmeno se ti
+sembra il passo logico successivo dopo aver finito un task. Versionare il
+lavoro è una decisione del coordinatore o dell'utente, mai tua — il tuo
+compito finisce con codice funzionante e verificato (`flutter-check`), non
+con un commit. Comandi Git di sola lettura (`git status`, `git diff`, `git
+log`) restano ok se ti servono per orientarti.

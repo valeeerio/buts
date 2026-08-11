@@ -433,7 +433,7 @@ _StatsTableData? _ferieRolPermessiStats(List<BustaPaga> buste) {
         [
           _formatStatNumber(_media(buste, (b) => b.ferieResidue)),
           _formatStatNumber(_media(buste, (b) => b.rolResidui)),
-          _formatStatNumber(_media(buste, (b) => b.permessiGoduti)),
+          _formatStatNumber(_media(buste, (b) => b.permessiGodutiMese)),
           _formatStatNumber(_media(buste, (b) => b.exFestivitaResidue)),
         ],
       ),
@@ -460,7 +460,7 @@ _StatsTableData? _ferieRolPermessiStats(List<BustaPaga> buste) {
         [
           '—',
           '—',
-          _formatStatNumber(_totale(buste, (b) => b.permessiGoduti)),
+          _formatStatNumber(_totale(buste, (b) => b.permessiGodutiMese)),
           '—',
         ],
       ),
@@ -875,7 +875,7 @@ class _FerieRolPermessiChart extends StatelessWidget {
     final valoriMax = [
       ...buste.map((b) => b.ferieResidue),
       ...buste.map((b) => b.rolResidui),
-      ...buste.map((b) => b.permessiGoduti),
+      ...buste.map((b) => b.permessiGodutiMese),
       ...buste.map((b) => b.exFestivitaResidue),
     ].reduce((a, b) => a > b ? a : b);
     final bounds = _niceAxisBounds(0, valoriMax, step: 20);
@@ -926,7 +926,7 @@ class _FerieRolPermessiChart extends StatelessWidget {
               _line(buste.map((b) => b.ferieResidue).toList(), ferieColor),
               _line(buste.map((b) => b.rolResidui).toList(), rolColor),
               _line(
-                  buste.map((b) => b.permessiGoduti).toList(), permessiColor),
+                  buste.map((b) => b.permessiGodutiMese).toList(), permessiColor),
               _line(buste.map((b) => b.exFestivitaResidue).toList(),
                   exFestivitaColor),
             ],

@@ -110,16 +110,21 @@ class BustaPagaRegexParser {
   };
 
   // Riga unificata di una voce di competenza (Retribuzione ordinaria, Edr
-  // contrattuale, Straordinario per fascia, ecc.): descrizione in chiaro su
-  // una riga, seguita dal tag "GIORNI"/"ORE", seguita dalla quantità (3
-  // decimali) ed eventualmente da tariffa (2-5 decimali, scartata) e importo
-  // (2 decimali, con eventuale separatore delle migliaia ".") sulla riga
-  // successiva. Il gruppo descrizione (`[^\n]+`) è generico — cattura
-  // qualunque testo sulla riga precedente al tag — e validato solo sul
-  // campione di PDF reali disponibile: potrebbe richiedere aggiustamenti su
-  // layout mai visti finora.
+  // contrattuale, Straordinario per fascia, ecc.): descrizione in chiaro,
+  // seguita dal tag "GIORNI"/"ORE", seguita dalla quantità (3 decimali) ed
+  // eventualmente da tariffa (2-5 decimali, scartata) e importo (2 decimali,
+  // con eventuale separatore delle migliaia "."). Tollerante a whitespace
+  // generico (spazi O newline, `\s*`/`\s+`) tra questi elementi: verificato
+  // che il testo reale estratto da `syncfusion_flutter_pdf` per questo
+  // layout separa descrizione/tag/quantità con newline (CRLF), ma la
+  // regex non fa più affidamento su un newline letterale per restare
+  // robusta anche se il layout linearizza diversamente in altri casi. Il
+  // gruppo descrizione (`[^\n]+?`, non-greedy) è generico — cattura
+  // qualunque testo fino al tag GIORNI/ORE più vicino sulla stessa riga —
+  // e validato sul campione di PDF reali disponibile: potrebbe richiedere
+  // aggiustamenti su layout mai visti finora.
   static final _rigaVoceCompetenza = RegExp(
-    r'([^\n]+)\n\s*(?:GIORNI|ORE)\s*\n\s*(\d+,\d{3})'
+    r'([^\n]+?)\s*(?:GIORNI|ORE)\s*(\d+,\d{3})'
     r'(?:\s+[\d.]+,\d{2,5}\s+([\d.]+,\d{2}))?',
   );
 
@@ -136,26 +141,56 @@ class BustaPagaRegexParser {
     r'Permessi\s+riduz\.?\s*orario\s+goduti[^\n]*\n\s*(?:ORE|GIORNI)\s*\n\s*(\d+,\d{3})',
   );
 
+  // NOTA (bug noto, non ancora corretto qui): come per `_ratesExFestivita`
+  // sotto, se il "Goduto" del mese è zero il cedolino lascia la cella VUOTA
+  // invece di stampare "0,00" — il blocco avrebbe quindi solo 3 numeri reali
+  // (invece di maturato/goduto/residuo) i cui primi due sarebbero in realtà
+  // [residuo A.P., maturato], con goduto implicito a zero. Non applicato qui
+  // perché non riprodotto su un PDF reale per Ferie in questa sessione (a
+  // differenza di Ex festività) e perché `_ratesRol` richiede una struttura a
+  // 4 numeri fissa (vedi sotto) che renderebbe la disambiguazione più
+  // invasiva da verificare senza un caso reale — da rivedere in una sessione
+  // futura se si osserva lo stesso sintomo.
   static final _ratesFerie = RegExp(
     r'(\d+,\d{2})\s+(\d+,\d{2})\s+(\d+,\d{2})\s*\(GIORNI\)',
   );
 
+  // NOTA (bug noto, non ancora corretto qui): a differenza di `_ratesFerie`
+  // e `_ratesExFestivita`, questa regex assume sempre esattamente 4 numeri
+  // tra "(GIORNI)" e "(ORE)" (il primo, il residuo anno precedente, scartato
+  // senza cattura) — se un mese avesse "Goduto" a zero e quindi cella vuota
+  // (stesso rischio descritto sopra per `_ratesFerie` e in
+  // `_ratesExFestivita`), il blocco avrebbe solo 3 numeri e questa regex non
+  // troverebbe alcun match (nessun dato ROL estratto), non un dato errato.
+  // Non riprodotto su un PDF reale in questa sessione: da rivedere in una
+  // sessione futura se si osserva il sintomo.
   static final _ratesRol = RegExp(
     r'\(GIORNI\)\s*\d+,\d{2}\s+(\d+,\d{2})\s+(\d+,\d{2})\s+(\d+,\d{2})\s*\(ORE\)',
   );
 
   // Terzo blocco ratei "EX FESTIVITA'" (vedi intestazione tabella nel PDF:
   // FERIE / PERMESSI (R.O.L.) / EX FESTIVITA'), stessa struttura
-  // maturato/goduto/residuo di ferie/ROL — come per ferie/ROL, il blocco può
-  // riportare un "residuo anno precedente" incollato davanti ai 3 numeri
-  // reali, quindi catturiamo sempre gli ULTIMI 3 numeri prima del tag
-  // "(ORE)", non i primi (struttura identica a `_ratesFerie`). Cercato SOLO
-  // nel testo subito dopo la fine del match ROL (non con un regex libero su
-  // tutto il documento) per evitare di agganciare tag "(ORE)" di sezioni
-  // successive non correlate — stesso principio di scoping già usato per le
-  // trattenute verificate.
+  // maturato/goduto/residuo di ferie/ROL. Cercato SOLO nel testo subito dopo
+  // la fine del match ROL (non con un regex libero su tutto il documento)
+  // per evitare di agganciare tag "(ORE)" di sezioni successive non
+  // correlate — stesso principio di scoping già usato per le trattenute
+  // verificate.
+  //
+  // Il blocco reale può presentarsi in due forme distinte, entrambe viste su
+  // PDF reali:
+  // - 4 numeri "residuo A.P., maturato, goduto, residuo totale" — il
+  //   gruppo 1 (opzionale) cattura il residuo A.P. che viene scartato, i
+  //   gruppi 2/3/4 sono maturato/goduto/residuo;
+  // - 3 numeri soli quando il cedolino lascia una cella VUOTA invece di
+  //   stampare "0,00" — ambiguo tra due letture (quale cella è vuota), la
+  //   disambiguazione aritmetica è fatta in Dart dopo il match (vedi punto
+  //   di lettura in `parse()`), non qui nella regex.
+  // Il gruppo opzionale è greedy: su un blocco a 4 numeri il primo tentativo
+  // di match (a partire dalla posizione del primo numero) cattura sempre
+  // correttamente tutti e 4, senza bisogno di backtracking sull'euristica
+  // "ultimi 3 prima del tag" usata in precedenza.
   static final _ratesExFestivita = RegExp(
-    r'(\d+,\d{2})\s+(\d+,\d{2})\s+(\d+,\d{2})\s*\(ORE\)',
+    r'(?:(\d+,\d{2})\s+)?(\d+,\d{2})\s+(\d+,\d{2})\s+(\d+,\d{2})\s*\(ORE\)',
   );
 
   // Un valore di rateo (giorni/ore maturati/goduti/residui in un mese)
@@ -169,6 +204,41 @@ class BustaPagaRegexParser {
   // sopra qualunque valore mensile plausibile (giorni/ore sempre < 50) ma
   // ben sotto ai numeri concatenati osservati (dell'ordine di 670000+).
   bool _valoreRateoImplausibile(double v) => v.abs() >= 100;
+
+  // Ore lavorate reali ("ORE LAV.", campo del blocco "Q.T.A." del
+  // cedolino, distinto da "SETT. RETR."/"GG. RETR."/"GG. LAV." sulla
+  // stessa riga) — il testo estratto NON mantiene l'adiacenza fisica con
+  // l'etichetta della colonna, che compare in un'intestazione lontana dal
+  // valore nel documento linearizzato (vedi nota in testa al file). Il
+  // valore vero è però riconoscibile, su un PDF reale, come l'unico numero
+  // a 2 decimali preceduto da un bordo di parola (non un altro numero) e
+  // da un blocco di 2-6 cifre concatenate senza separatore (es. "42623" =
+  // settimane retribuite "4" + giorni retribuiti "26" + giorni lavorati
+  // "23"): quel blocco di cifre pure, mai preceduto da virgola/punto,
+  // distingue questo match dalle cifre dopo la virgola di una tariffa
+  // oraria a 5 decimali altrove nel documento (es. "0,34864" letta come
+  // "34864" se non si richiedesse il bordo di parola prima del blocco).
+  //
+  // NON usata su tutto il documento (vedi `parse()`): questo pattern da
+  // solo NON è ancorato all'etichetta "ORE LAV."/al blocco Q.T.A. — è solo
+  // "un numero a 2 decimali dopo un blocco di 2-6 cifre pure", una forma
+  // che potrebbe ripresentarsi altrove per puro caso su un PDF reale mai
+  // visto, producendo un valore sbagliato senza alcun warning. Per questo
+  // la ricerca in `parse()` è ristretta al segmento di testo tra la fine
+  // della riga INPS e "Firma per quietanza" — lo stesso segmento già usato
+  // per `_rigaTrattenutaVerificata` — perché il valore "ORE LAV." si trova
+  // SEMPRE lì sui PDF reali disponibili (il blocco Q.T.A. con i dati del
+  // rateo viene stampato subito prima di "Firma per quietanza"), un
+  // ancoraggio riutilizzato piuttosto che una ricerca libera su tutto il
+  // documento. Se il segmento non è determinabile (INPS o "Firma per
+  // quietanza" assenti) si ripiega sull'intero testo come rete di
+  // sicurezza. In entrambi i casi, se il pattern matcha più di una volta
+  // nello scope di ricerca, è un segnale che l'ancoraggio è debole per quel
+  // documento: non si prende il primo match in silenzio, si segnala un
+  // warning esplicito e si ricade sulla stima da giorni×8 (vedi `parse()`).
+  static final _oreLavorateDirette = RegExp(
+    r'(?:^|\s)\d{2,6}\s+(\d+,\d{2})',
+  );
 
   static final _inps = RegExp(r'INPS([\d.]+,\d{2})\s+(\d,\d{2})(\d+,\d{2})');
 
@@ -296,20 +366,54 @@ class BustaPagaRegexParser {
       permessiGodutiMese += _toDouble(m.group(1)!);
     }
 
-    // --- ore lavorate: stima da giorni×8, sommando le quantità di tutte le
-    // voci di competenza "Retribuzione ordinaria" ---
-    double giorniOrdinari = 0;
-    for (final voce in competenze) {
-      if (voce.descrizione.trim().toLowerCase().startsWith('retribuzione ordinaria')) {
-        giorniOrdinari += voce.quantita;
+    // --- anticipati qui (usati anche più sotto per le trattenute) per
+    // delimitare lo scope di ricerca di "ore lavorate" subito sotto, vedi
+    // commento su _oreLavorateDirette ---
+    final inpsMatch = _inps.firstMatch(testo);
+    final firmaIndex = testo.indexOf('Firma per quietanza');
+
+    // --- ore lavorate: lette direttamente dal campo "ORE LAV." del blocco
+    // Q.T.A. quando riconoscibile, cercando SOLO nel segmento di testo tra
+    // la fine della riga INPS e "Firma per quietanza" (vedi commento su
+    // _oreLavorateDirette per il perché di questo scoping) — nessun warning
+    // in questo ramo, è un dato letto non stimato. Se il pattern matcha più
+    // di una volta in quello scope, l'ancoraggio è ambiguo per questo
+    // documento: warning esplicito, nessun match preso in silenzio. Un
+    // valore implausibile (fuori dal range plausibile di ore mensili),
+    // un'ambiguità o l'assenza di un match fa scattare il fallback storico:
+    // stima da giorni×8, sommando le quantità di tutte le voci di
+    // competenza "Retribuzione ordinaria", con lo stesso warning esplicito
+    // di sempre. ---
+    double? oreLavorate;
+    final segmentoQta =
+        (inpsMatch != null && firmaIndex != -1 && firmaIndex > inpsMatch.end)
+            ? testo.substring(inpsMatch.end, firmaIndex)
+            : testo;
+    final oreLavorateMatches =
+        _oreLavorateDirette.allMatches(segmentoQta).toList();
+    if (oreLavorateMatches.length > 1) {
+      warnings.add(
+        'ore lavorate: possibile ambiguità nel testo estratto, verifica manualmente',
+      );
+    } else if (oreLavorateMatches.length == 1) {
+      final valore = _toDouble(oreLavorateMatches.first.group(1)!);
+      if (valore > 0 && valore <= 300) {
+        oreLavorate = valore;
       }
     }
-    double? oreLavorate;
-    if (giorniOrdinari > 0) {
-      oreLavorate = giorniOrdinari * 8;
-      warnings.add('ore lavorate stimate da giorni×8, non lette direttamente');
-    } else {
-      warnings.add('ore lavorate non determinabili');
+    if (oreLavorate == null) {
+      double giorniOrdinari = 0;
+      for (final voce in competenze) {
+        if (voce.descrizione.trim().toLowerCase().startsWith('retribuzione ordinaria')) {
+          giorniOrdinari += voce.quantita;
+        }
+      }
+      if (giorniOrdinari > 0) {
+        oreLavorate = giorniOrdinari * 8;
+        warnings.add('ore lavorate stimate da giorni×8, non lette direttamente');
+      } else {
+        warnings.add('ore lavorate non determinabili');
+      }
     }
 
     // --- ferie / ROL (maturati, goduti, residui) ---
@@ -366,9 +470,64 @@ class BustaPagaRegexParser {
       final dopoRol = testo.substring(rolMatch.end);
       final exFestivitaMatch = _ratesExFestivita.firstMatch(dopoRol);
       if (exFestivitaMatch != null) {
-        final maturate = _toDouble(exFestivitaMatch.group(1)!);
-        final godute = _toDouble(exFestivitaMatch.group(2)!);
-        final residue = _toDouble(exFestivitaMatch.group(3)!);
+        double maturate, godute, residue;
+        if (exFestivitaMatch.group(1) != null) {
+          // 4 numeri: residuo A.P. (scartato), maturato, goduto, residuo —
+          // nessuna ambiguità.
+          maturate = _toDouble(exFestivitaMatch.group(2)!);
+          godute = _toDouble(exFestivitaMatch.group(3)!);
+          residue = _toDouble(exFestivitaMatch.group(4)!);
+        } else {
+          // Solo 3 numeri: il cedolino ha lasciato una cella vuota invece di
+          // stampare "0,00", ambiguo tra due letture — disambiguazione
+          // aritmetica (tolleranza per arrotondamenti) tra le due, vedi
+          // commento su _ratesExFestivita.
+          final n1 = _toDouble(exFestivitaMatch.group(2)!);
+          final n2 = _toDouble(exFestivitaMatch.group(3)!);
+          final n3 = _toDouble(exFestivitaMatch.group(4)!);
+          const tolleranza = 0.05;
+          // Bug noto e corretto: quando il "goduto" candidato (n2) è zero,
+          // le due condizioni sotto diventano matematicamente identiche
+          // (entrambe si riducono a "n3 == n1") — non è più possibile
+          // distinguere aritmeticamente quale cella sia realmente vuota
+          // (residuo A.P. o goduto). Verificale entrambe esplicitamente
+          // (non un semplice if/else in cascata) e, se sono entrambe
+          // soddisfatte, non scegliere in silenzio: segnala l'ambiguità.
+          final mancaResiduoAP = (n3 - (n1 - n2)).abs() <= tolleranza;
+          final mancaGoduto = (n3 - (n1 + n2)).abs() <= tolleranza;
+          if (mancaResiduoAP && mancaGoduto) {
+            // Nessun segnale testuale affidabile per disambiguare (a
+            // differenza del caso "3 vs 4 numeri", qui non c'è un'ancora
+            // non numerica da sfruttare): meglio segnalare l'incertezza
+            // che sbagliare in silenzio.
+            maturate = 0;
+            godute = 0;
+            residue = 0;
+            warnings.add(
+              'dati ex festività ambigui: impossibile stabilire quale '
+              'cella sia vuota (residuo anno precedente o goduto) quando '
+              'il "goduto" candidato è zero, verifica manualmente',
+            );
+          } else if (mancaResiduoAP) {
+            // Manca il residuo A.P. (es. neoassunto senza riporto):
+            // [maturato, goduto, residuo].
+            maturate = n1;
+            godute = n2;
+            residue = n3;
+          } else if (mancaGoduto) {
+            // Manca il goduto (cella vuota = 0,00): [residuo A.P.
+            // (scartato), maturato, residuo].
+            maturate = n2;
+            godute = 0;
+            residue = n3;
+          } else {
+            // Nessuna delle due interpretazioni torna aritmeticamente:
+            // tratta come dato implausibile, non indovinare.
+            maturate = double.infinity;
+            godute = 0;
+            residue = 0;
+          }
+        }
         if (_valoreRateoImplausibile(maturate) ||
             _valoreRateoImplausibile(godute) ||
             _valoreRateoImplausibile(residue)) {
@@ -391,9 +550,10 @@ class BustaPagaRegexParser {
     // goduti coincidono con i ROL goduti.
     final permessiGoduti = rolGoduti;
 
-    // --- trattenute: INPS letto direttamente, il resto aggregato ---
+    // --- trattenute: INPS letto direttamente, il resto aggregato
+    // (inpsMatch calcolato più sopra, riusato anche per lo scoping di "ore
+    // lavorate") ---
     final trattenute = <String, double>{};
-    final inpsMatch = _inps.firstMatch(testo);
     double inpsImporto = 0;
     if (inpsMatch != null) {
       inpsImporto = _toDouble(inpsMatch.group(3)!);
@@ -402,9 +562,9 @@ class BustaPagaRegexParser {
       warnings.add('trattenuta INPS non trovata');
     }
 
-    // --- netto: ultimo numero della riga dopo "Firma per quietanza" ---
+    // --- netto: ultimo numero della riga dopo "Firma per quietanza"
+    // (firmaIndex calcolato più sopra) ---
     double? netto;
-    final firmaIndex = testo.indexOf('Firma per quietanza');
 
     // --- trattenute nominate verificate: SOLO nel segmento tra la fine del
     // match INPS e l'inizio di "Firma per quietanza" (vedi

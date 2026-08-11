@@ -67,15 +67,17 @@ regex.
 **Dettaglio busta paga** (`busta_paga_detail_screen.dart`,
 `ConsumerStatefulWidget` — non più `ConsumerWidget`, serve stato locale per la
 modalità modifica): hero card in cima (mese, badge di stato Confermato/Da
-confermare — verde/rosso, stessa semantica del pallino in Archivio — netto in
-evidenza massima) **fissa fuori dall'area scrollabile**, sotto una riga di
-mini-statistiche Ferie residue/Permessi residui/Ex festività e più sotto una riga
-Ore lavorate/Straordinari (raggruppate per unità: la prima riga è in
-euro/giorni, la seconda in ore — Straordinari è ore, non euro, coerente col
-grafico "Ore straordinario" di Statistiche), entrambe **un'unica**
-`LiquidGlassSurface` a scomparti
-(mai più superfici di vetro affiancate, vedi nota bug in "Stile visivo"), una
-tabella unica "Ferie, ROL e permessi" (colonne Maturato/Goduto/Residuo) al
+confermare — verde/rosso, stessa semantica del pallino in Archivio — sotto,
+Lordo e Netto affiancati, separati da un divisore verticale, **visivamente
+identici** in font/dimensione/peso/colore e distinti solo dall'etichetta
+sopra ciascun valore, nessuno dei due più "in evidenza" dell'altro) **fissa
+fuori dall'area scrollabile**, sotto una riga di
+mini-statistiche Ore lavorate/Straordinari (**unica** `LiquidGlassSurface` a
+scomparti, mai più superfici di vetro affiancate, vedi nota bug in "Stile
+visivo" — rimossa il 2026-08-11 l'analoga riga Ferie residue/Permessi
+residui/Ex festività, ridondante con la colonna "Residuo" della tabella
+Maturazioni sottostante), una tabella unica "Ferie, ROL e permessi" (colonne
+Maturato/Goduto/Residuo) al
 posto di sezioni separate per categoria, chip documento PDF tappabile e
 sezione Trattenute — nessuna di queste sezioni ha più un titolo sopra la card
 (rimossi per pulizia visiva). In fondo, una barra flottante (`_ActionBar`,
@@ -137,7 +139,7 @@ di questa modifica — nessun dato esistente toccato o perso.
 `busta_paga_form_screen.dart` — attiva `_isEditing = true` sulla stessa
 schermata di dettaglio, e le stesse card diventano editabili sul posto (hero
 Netto e periodo tappabile con lo stesso picker mese/anno del vecchio form,
-`BustaPagaStatRow` Ferie/ROL/Lordo e Ore/Straordinari, tabella Maturazioni, righe
+`BustaPagaStatRow` Ore/Straordinari, tabella Maturazioni, righe
 Trattenute con `Dismissible`+`SwipeDeleteBackground` al posto di un bottone
 "meno" per rimuoverle). **Requisito non negoziabile confermato più volte
 dall'utente**: entrare in modifica non deve cambiare NULLA visivamente
@@ -151,11 +153,11 @@ mostra un popup "Hai modificato i seguenti dati, confermi?" con l'elenco
 vecchio → nuovo prima di applicare (`copyWith` con `statoVerifica` che torna
 automaticamente a `daConfermare` se la busta era "Confermata"); se il diff è
 vuoto esce dalla modifica senza popup. "Annulla" scarta tutti i controller e
-torna alla vista di sola lettura. Ferie residue/ROL residui in `BustaPagaStatRow`
-restano sempre di sola lettura anche in modifica: rispecchiano live (via
-listener sui controller) il campo "Residuo" della tabella Maturazioni, che è
-l'unico editabile per quei dati (evita due campi indipendenti per lo stesso
-valore).
+torna alla vista di sola lettura. Ferie residue/ROL residui/Ex festività
+residue non hanno più una riga di mini-statistiche dedicata (rimossa il
+2026-08-11, ridondante): il campo "Residuo" della tabella Maturazioni resta
+l'unico punto, di sola lettura o editabile, in cui questi dati sono
+mostrati/modificati.
 
 Componenti di stile riutilizzabili dell'app (Liquid Glass, vedi sezione "Stile
 visivo" sotto): `lib/widgets/liquid_glass_surface.dart` (superficie in vetro

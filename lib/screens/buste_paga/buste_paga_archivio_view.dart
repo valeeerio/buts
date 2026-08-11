@@ -15,6 +15,7 @@ import '../../widgets/busta_paga_list_item.dart';
 import '../../widgets/busta_paga_summary_hero.dart';
 import '../../widgets/liquid_glass_button.dart';
 import '../../widgets/liquid_glass_surface.dart';
+import '../../widgets/spring_button.dart';
 import '../../widgets/swipe_delete_background.dart';
 
 /// Filtra le buste paga per periodo (nome mese e/o anno, case-insensitive).
@@ -234,9 +235,7 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
   Widget _extraToggle(BuildContext context, int anno, bool espansa) {
     final labelSecondary =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      minimumSize: Size.zero,
+    return SpringButton(
       onPressed: () => setState(() {
         if (espansa) {
           _extraEspansi.remove(anno);

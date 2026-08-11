@@ -5,9 +5,47 @@ import 'package:flutter_test/flutter_test.dart';
 /// Testo sintetico (dati fittizi) che riproduce la struttura del layout
 /// "JOB" (Sistemi S.p.A.) su cui sono tarati i pattern regex — non è il
 /// testo di una busta paga reale.
+/// Frammento fedele alla struttura REALE del testo estratto da
+/// `syncfusion_flutter_pdf` per il layout "JOB" (verificato al Passo 0 di
+/// questa sessione su un PDF reale): righe terminate da CRLF (`\r\n`, non
+/// solo `\n`), descrizione/tag unità/quantità-base-importo ciascuno sulla
+/// propria riga, importo seguito da uno spazio finale prima del ritorno a
+/// capo. Dati anagrafici non presenti (non serve, il parser di competenze
+/// non li legge), ma i VALORI NUMERICI sono quelli reali di un cedolino
+/// reale (vedi criterio di accettazione lordo/straordinari nel test sotto).
+const _testoCompetenzeReali = 'Retribuzione ordinaria\r\n'
+    'GIORNI\r\n'
+    '22,000 69,65818 1.532,48 \r\n'
+    '*\r\n'
+    '*\r\n'
+    '*\r\n'
+    '*\r\n'
+    '1\r\n'
+    'Edr contrattuale - ex accordo 18.5.2021\r\n'
+    'GIORNI\r\n'
+    '22,000 0,34864 7,67 \r\n'
+    '*\r\n'
+    '*\r\n'
+    '*\r\n'
+    '*\r\n'
+    '10\r\n'
+    'Straordinario diurno (30%)\r\n'
+    'ORE\r\n'
+    '0,250 11,91783 2,98 \r\n'
+    '*\r\n'
+    '*\r\n'
+    '*\r\n'
+    '210\r\n'
+    'Permessi riduz. orario goduti\r\n'
+    'ORE\r\n'
+    '4,030 828\r\n'
+    'Rata Addizionale Regionale\r\n'
+    '20259,39 \r\n'
+    '*\r\n';
+
 const _testoSintetico = '''
 JOB - Copyright Sistemi S.p.A. - Autorizzazione INAIL   N°  792   del  03/01/20185MARZO 2026
-MINIMOEPA -CCNL 06/12/241.000,0000010,000005,84 6,00 2,00 9,17 (GIORNI)7,00 8,00 3,00 12,00 (ORE)5,00 3,00 8,00 (ORE)9,12
+MINIMOEPA -CCNL 06/12/241.000,0000010,000005,84 6,00 2,00 9,17 (GIORNI)7,00 8,00 3,00 12,00 (ORE)8,00 3,00 5,00 (ORE)9,12
 Retribuzione ordinaria
 GIORNI
 20,000 50,00000 1.000,00
@@ -34,6 +72,169 @@ GIORNI
 INPS1.050,00 5,84061,32 CONTRIBUTO EBILOG0,50 3,50
 Firma per quietanza
 1.050,00 61,32-988,68
+''';
+
+/// Testo REALE (non sintetico, a differenza di [_testoCompetenzeReali] e
+/// [_testoSintetico]) estratto via `syncfusion_flutter_pdf`
+/// (`PdfTextExtractor`, stesso ingresso di `PdfImportService`) da un
+/// cedolino Luglio 2026, layout "JOB" — usato come ground-truth per il
+/// test di non-regressione principale sulla fedeltà del parser ai PDF
+/// reali (vedi gruppo "ground-truth" più sotto). Dati anagrafici (nome,
+/// CF, indirizzo, IBAN, matricola, posizione INPS/INAIL, ragione sociale
+/// e sede del datore di lavoro) sostituiti con placeholder fittizi;
+/// struttura del documento e TUTTI i valori numerici (competenze, ratei,
+/// trattenute, netto) sono quelli reali del cedolino.
+const _testoRealeLuglio2026 = '''
+POS. INPSMESE DI RETRIBUZIONE
+POS. INAILVoci di tariffa
+COD.DIP.
+COGNOME E NOMECODICE FISCALENATO A
+IL
+DESCRIZIONE QUALIFICA
+CONTRATTO DI LAVORO - CNEL
+INDIRIZZO
+ANZ. SERVIZIO
+ASSUNZIONEANZ. CONV.
+SCADENZA CONTR.
+FINE RAPPORTOCENTRO DI COSTOSEDE DI LAVORO
+ANNI
+MESI
+MODALITA' DI PAGAMENTORIFERIMENTI BANCARISCATTI ANZIANITA'
+LIVELLO
+% PART TIME
+DATAPROSSIMO
+N.
+RATEI
+MATURATI
+GODUTI
+RESIDUI A.P.ELEMENTI RETRIBUTIVIRESIDUI TOTALI
+A.P.A.C.
+FERIE
+PERMESSI (R.O.L.)
+EX FESTIVITA'
+RETRIBUZIONE ORARIA
+RETRIBUZIONE GIORNALIERA
+RETRIBUZIONE MENSILE
+Unita' di
+C*
+I*
+T*
+N*VOCEDESCRIZIONEQuantita'BaseTRATTENUTECOMPETENZE* = C - Imponibile contributivo ; I - Imponibile Irpef ; T - Imponibile TFR ; N - Considerato nel netto in bustamisura
+DESCRIZIONE CONTRIBUTOIMPONIBILE% C/DIPC/DIPENDENTEC/DITTA: ASS.SAN-PREV.COMPL.DESCRIZIONE CONTRIBUTOIMPONIBILE% C/DIPC/DIPENDENTEC/DITTA: ASS.SAN-PREV.COMPL.
+QTASETT. RETR.GG. RETR.
+GG. LAV.
+ORE LAV.
+CTRIMPON.CONTRIBUTIVO ANNOCONTRIBUTI ANNOIMPON.CONTRIBUTIVO MESEIMPON.CONTRIB. ARROT. MESETOTALE CONTRIBUTI
+IMPONIBILE FISCALE
+IRPEF LORDA
+DETR. LAV.DIPENDENTEGGDETR. CONIUGEDETR. FIGLIDETR. ALTRI FAMILIARIDETR. ONERIMESE
+IMPOSTA SOSTITUTIVA
+IRPEF NETTAIRPEF + IMP. SOST.
+IMPONIBILE
+IMPOSTA
+IMPONIBILE FISCALE
+IRPEF LORDA
+DETR.LAV.DIPENDENTEGGDETR. CONIUGEDETR. FIGLIDETR. ALTRI FAMILIARIDETR.ONERI/CANONIANNO
+IMPOSTA SOSTITUTIVAIRPEF NETTA
+IRPEF TRATTENUTA
+IRPEF CONGUAGLIO
+CONG.IRPEF+IMP.SOST.
+IMPONIBILE
+IMPOSTA
+IMPOSTA TRATTENUTA
+IMPOSTA CONGUAGLIO
+RETRIBUZIONE UTILE TFR
+CONTR. AGG. TFRTFR MESE
+TFR ANNUO PROGR.
+F.DO TFR 31/12 APANTICIPAZIONI ANNOTFR SPETTANTE AZIENDATFR A F.DO PENSIONETFR
+IMPONIBILE LORDO
+RIDUZIONE
+IMPONIBILE NETTO
+%
+IRPEF
+IRPEF ANT. / ACC.
+TOTALE DETRAZIONIAAP
+IMPONIBILE ARRETRATI AP
+%
+IRPEF TFR / ARR. A.P.
+TABELLAN.COMPON.
+FIGLI MIN.
+LIV.REDDITO
+GIORNI
+IMPORTO ASSEGNO
+TOTALE COMPETENZETOTALE TRATTENUTE
+ARR. PRECED.
+ARR. ATTUALE
+NETTO IN BUSTAANFTOT
+JOB - Copyright Sistemi S.p.A. - Autorizzazione INAIL   N°  792   del  03/01/20185LUGLIO 2026
+0000000000
+ACME SPA
+VIA ROMA 1
+Autorizzazione unica:
+00100  ROMA  (RM)
+00000000/00
+0000
+N°000000
+00000000000
+C.F.: 1/01/2020Del
+00000000000
+P.IVA:01/08/202600:00Stampato ilOra000
+ROSSI MARIO
+RSSMRA80A01H501U
+MILANO  (MI)
+01/01/1980
+VIA VERDI 2
+I000
+N°
+APPR.PROFES.IMPIEG. 10%
+Trasporto e spedizioni merci
+00100  ROMA  (RM)
+00000
+sede di Roma
+ 1/08/2020 1/08/2020
+Amministrazione
+1
+BONIFICO BANCARIO
+IT00 X000 0000 000X X000 0000 000
+ 1/09/2027
+4J
+MINIMOEPA -CCNL 06/12/241.509,8100022,670007,17 12,83 4,00 16,00 (GIORNI)14,87 23,33 11,50 26,70 (ORE)13,33 18,67 32,00 (ORE)9,1219069,658181.532,480
+Retribuzione ordinaria
+GIORNI
+22,000 69,65818 1.532,48
+*
+*
+*
+*
+1
+Edr contrattuale - ex accordo 18.5.2021
+GIORNI
+22,000 0,34864 7,67
+*
+*
+*
+*
+10
+Straordinario diurno (30%)
+ORE
+0,250 11,91783 2,98
+*
+*
+*
+210
+Permessi riduz. orario goduti
+ORE
+4,030 828
+Rata Addizionale Regionale
+20259,39
+*
+Gli elementi variabili della retribuzione sono
+relativi a  6/2026
+INPS1.543,00 5,84090,11 CONTRIBUTO EBILOG0,50 3,50
+FONDO INTEGR. SALARIALE - FIS
+1.543,00 0,2674,12 42623 175,62 12.482,00 762,28 1.543,13 1.543,00 94,73 1.452,40 334,05 84,93 221,40 31U.D.27,72 27,72 11.745,32 580,81 1523,43 212U.D.
+Firma per quietanza
+1.540,15 114,09 907,81 610,72 1.518,53 1.543,13 131,84 0,26 0,03-1.411,00
 ''';
 
 void main() {
@@ -158,9 +359,28 @@ void main() {
         'ratei dopo il tag "(ORE)" di chiusura del ROL', () {
       final risultato = parser.parse(_testoSintetico);
 
-      expect(risultato.exFestivitaMaturate, closeTo(5.00, 0.001));
+      // 8,00/3,00/5,00: aritmeticamente consistenti SOLO con la lettura
+      // diretta (residuo = maturato - goduto, 8-3=5), a differenza del caso
+      // "goduto mancante" testato più sotto (dove vale invece la somma) —
+      // valori scelti apposta per non essere ambigui tra le due letture.
+      expect(risultato.exFestivitaMaturate, closeTo(8.00, 0.001));
       expect(risultato.exFestivitaGodute, closeTo(3.00, 0.001));
-      expect(risultato.exFestivitaResidue, closeTo(8.00, 0.001));
+      expect(risultato.exFestivitaResidue, closeTo(5.00, 0.001));
+    });
+
+    test('disambigua il blocco ex festività a 3 numeri quando il "Goduto" '
+        'del mese è zero e la cella è lasciata vuota invece di stampare '
+        '"0,00" (visto su un PDF reale: residuo = residuo A.P. + maturato, '
+        'non maturato - goduto)', () {
+      final testo = _testoSintetico.replaceFirst(
+        '(ORE)8,00 3,00 5,00 (ORE)',
+        '(ORE)13,33 18,67 32,00 (ORE)',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.exFestivitaMaturate, closeTo(18.67, 0.001));
+      expect(risultato.exFestivitaGodute, 0);
+      expect(risultato.exFestivitaResidue, closeTo(32.00, 0.001));
     });
 
     test('scarta i dati ferie se il valore "maturato" è implausibile '
@@ -200,8 +420,8 @@ void main() {
     test('scarta i dati ex festività se il valore "maturate" è implausibile',
         () {
       final testo = _testoSintetico.replaceFirst(
-        '12,00 (ORE)5,00 3,00 8,00 (ORE)',
-        '12,00 (ORE)670005,00 3,00 8,00 (ORE)',
+        '12,00 (ORE)8,00 3,00 5,00 (ORE)',
+        '12,00 (ORE)670008,00 3,00 5,00 (ORE)',
       );
       final risultato = parser.parse(testo);
 
@@ -219,7 +439,7 @@ void main() {
         '"residuo anno precedente" davanti (con spazio, non concatenato)',
         () {
       final testo = _testoSintetico.replaceFirst(
-        '12,00 (ORE)5,00 3,00 8,00 (ORE)',
+        '12,00 (ORE)8,00 3,00 5,00 (ORE)',
         '12,00 (ORE)1,50 5,00 3,00 8,00 (ORE)',
       );
       final risultato = parser.parse(testo);
@@ -449,6 +669,320 @@ void main() {
       expect(
         risultato.warnings,
         contains('netto superiore al lordo, verifica i dati estratti'),
+      );
+    });
+  });
+
+  group(
+      'BustaPagaRegexParser - competenze su testo fedele a un PDF reale '
+      '(CRLF, dati fittizi ma valori numerici reali)', () {
+    const parser = BustaPagaRegexParser();
+
+    test(
+        'riconosce le 3 voci di competenza reali e calcola lordo/'
+        'straordinari corretti (criterio di accettazione: lordo 1.543,13, '
+        'straordinari 0,25)', () {
+      final risultato = parser.parse(_testoCompetenzeReali);
+
+      final descrizioni =
+          risultato.competenze.map((v) => v.descrizione).toList();
+      expect(
+        descrizioni,
+        containsAll([
+          'Retribuzione ordinaria',
+          'Edr contrattuale - ex accordo 18.5.2021',
+          'Straordinario diurno (30%)',
+        ]),
+      );
+
+      // Lordo = 1.532,48 + 7,67 + 2,98 = 1.543,13 (valore reale mostrato
+      // nell'app per la busta paga da cui è tratto questo campione).
+      expect(risultato.lordo, closeTo(1543.13, 0.001));
+      // Straordinari = 0,250 ore della voce "Straordinario diurno (30%)".
+      expect(risultato.straordinari, closeTo(0.25, 0.001));
+    });
+
+    test('esclude "Permessi riduz. orario goduti" dalle competenze anche su '
+        'questo testo fedele al layout reale', () {
+      final risultato = parser.parse(_testoCompetenzeReali);
+
+      final descrizioni =
+          risultato.competenze.map((v) => v.descrizione.toLowerCase());
+      expect(
+        descrizioni.any((d) => d.startsWith('permessi riduz')),
+        isFalse,
+      );
+    });
+
+    test('non riconosce una riga di trattenuta senza tag GIORNI/ORE come '
+        'voce di competenza (es. "Rata Addizionale Regionale")', () {
+      final risultato = parser.parse(_testoCompetenzeReali);
+
+      final descrizioni =
+          risultato.competenze.map((v) => v.descrizione.toLowerCase());
+      expect(
+        descrizioni.any((d) => d.contains('rata addizionale')),
+        isFalse,
+      );
+    });
+  });
+
+  group('BustaPagaRegexParser - ore lavorate lette direttamente dal blocco '
+      'Q.T.A. ("ORE LAV.")', () {
+    const parser = BustaPagaRegexParser();
+
+    test(
+        'legge il valore reale "ORE LAV." (175,62) invece di stimarlo da '
+        'giorni×8 (che darebbe 22×8=176, un valore diverso e non quello '
+        'vero) quando il blocco Q.T.A. è riconoscibile', () {
+      final risultato = parser.parse(_testoRealeLuglio2026);
+
+      expect(risultato.oreLavorate, closeTo(175.62, 0.001));
+      expect(
+        risultato.warnings
+            .any((w) => w.contains('ore lavorate stimate da giorni')),
+        isFalse,
+      );
+    });
+
+    test('usa il fallback (stima giorni×8) con il warning esplicito quando '
+        'il blocco Q.T.A. non è riconoscibile nel testo', () {
+      final risultato = parser.parse(_testoSintetico);
+
+      expect(risultato.oreLavorate, closeTo(160, 0.001)); // 20 giorni × 8
+      expect(
+        risultato.warnings,
+        contains('ore lavorate stimate da giorni×8, non lette direttamente'),
+      );
+    });
+
+    test(
+        'ignora un falso positivo plausibile (blocco di cifre pure + numero '
+        'a 2 decimali) inserito PRIMA della riga INPS, fuori dallo scope di '
+        'ricerca ristretto al segmento INPS→"Firma per quietanza": legge '
+        'comunque correttamente il valore reale (175,62)', () {
+      // "12345 88,40" ha esattamente la forma che il pattern riconosce, ma
+      // è inserito nel blocco anagrafico/intestazione, ben prima di INPS:
+      // con lo scoping al segmento INPS→Firma non viene nemmeno considerato.
+      final testo = _testoRealeLuglio2026.replaceFirst(
+        'ROSSI MARIO',
+        'ROSSI MARIO 12345 88,40',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.oreLavorate, closeTo(175.62, 0.001));
+      expect(
+        risultato.warnings
+            .any((w) => w.contains('ore lavorate') && w.contains('ambiguità')),
+        isFalse,
+      );
+    });
+
+    test(
+        'segnala un warning di ambiguità (invece di prendere in silenzio il '
+        'primo match) e ricade sulla stima giorni×8 quando il pattern '
+        'matcha più di una volta dentro lo scope di ricerca ristretto '
+        '(segmento INPS→"Firma per quietanza")', () {
+      // Un secondo falso positivo plausibile ("54321 12,34") inserito
+      // ANCHE dentro il segmento INPS→Firma, subito prima del valore reale:
+      // ora ci sono 2 match nello stesso scope, l'ancoraggio diventa
+      // ambiguo per questo documento.
+      final testo = _testoRealeLuglio2026.replaceFirst(
+        '1.543,00 0,2674,12 42623 175,62',
+        '1.543,00 0,2674,12 54321 12,34 42623 175,62',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(
+        risultato.warnings.any(
+          (w) => w.contains('ore lavorate') && w.contains('ambiguità'),
+        ),
+        isTrue,
+      );
+      // Fallback: stima da giorni×8 (22 giorni × 8 = 176), non uno dei due
+      // valori ambigui letti direttamente.
+      expect(risultato.oreLavorate, closeTo(176, 0.001));
+      expect(
+        risultato.warnings,
+        contains('ore lavorate stimate da giorni×8, non lette direttamente'),
+      );
+    });
+  });
+
+  group('BustaPagaRegexParser - ambiguità ex festività quando il "goduto" '
+      'candidato è zero (bug corretto)', () {
+    const parser = BustaPagaRegexParser();
+
+    test(
+        'segnala un warning esplicito invece di scegliere in silenzio '
+        'un\'interpretazione arbitraria quando le due condizioni di '
+        'disambiguazione sono entrambe soddisfatte (n2 = 0, quindi '
+        '"n3 == n1 - n2" e "n3 == n1 + n2" diventano identiche)', () {
+      final testo = _testoSintetico.replaceFirst(
+        '(ORE)8,00 3,00 5,00 (ORE)',
+        '(ORE)5,00 0,00 5,00 (ORE)',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.exFestivitaMaturate, 0);
+      expect(risultato.exFestivitaGodute, 0);
+      expect(risultato.exFestivitaResidue, 0);
+      expect(
+        risultato.warnings.any((w) => w.contains('dati ex festività ambigui')),
+        isTrue,
+      );
+      // Non deve anche scattare il warning generico "scartati" (implausibile):
+      // è un caso distinto, con un messaggio dedicato più informativo.
+      expect(
+        risultato.warnings.any((w) => w.contains('dati ex festività scartati')),
+        isFalse,
+      );
+    });
+
+    test('non ambiguo (comportamento invariato) quando il "goduto" '
+        'candidato non è zero, anche se la struttura del blocco è la '
+        'stessa (3 numeri dopo il tag ROL)', () {
+      final risultato = parser.parse(_testoSintetico);
+
+      // Caso già coperto sopra ("estrae ex festività..."): nessuna
+      // ambiguità, nessun warning.
+      expect(
+        risultato.warnings.any((w) => w.contains('dati ex festività ambigui')),
+        isFalse,
+      );
+    });
+  });
+
+  group(
+      'BustaPagaRegexParser - trattenute individuali su testo reale (Luglio '
+      '2026)', () {
+    const parser = BustaPagaRegexParser();
+
+    test('estrae INPS come trattenuta nominata con l\'importo mensile '
+        'corretto (90,11)', () {
+      final risultato = parser.parse(_testoRealeLuglio2026);
+
+      expect(risultato.trattenute['INPS'], closeTo(90.11, 0.001));
+    });
+
+    test('estrae "CONTRIBUTO EBILOG" come trattenuta nominata con l\'importo '
+        'corretto (3,50)', () {
+      final risultato = parser.parse(_testoRealeLuglio2026);
+
+      expect(
+        risultato.trattenute['CONTRIBUTO EBILOG'],
+        closeTo(3.50, 0.001),
+      );
+    });
+
+    test(
+        '"FONDO INTEGR. SALARIALE - FIS" non produce una chiave nominata '
+        'pulita (il nome è seguito da un ritorno a capo prima dei numeri, '
+        'a differenza di CONTRIBUTO EBILOG, e i numeri della riga '
+        'successiva sono ambigui — "0,2674,12" — perché condivisi col '
+        'blocco Q.T.A.): resta aggregata nel residuo "Altre trattenute", '
+        'la matematica del netto finale resta comunque corretta (vedi test '
+        'ground-truth)', () {
+      final risultato = parser.parse(_testoRealeLuglio2026);
+
+      expect(
+        risultato.trattenute.keys
+            .any((k) => k.toUpperCase().contains('FIS')),
+        isFalse,
+      );
+    });
+
+    test('non produce falsi positivi dai blocchi Q.T.A./IRPEF/TFR tra INPS '
+        'e "Firma per quietanza" (es. nessuna chiave "U.D." o sigle simili '
+        'da quel segmento)', () {
+      final risultato = parser.parse(_testoRealeLuglio2026);
+
+      // Solo le due trattenute nominate attese, nessun'altra chiave oltre
+      // a INPS/CONTRIBUTO EBILOG/il residuo aggregato.
+      expect(
+        risultato.trattenute.keys.toSet(),
+        {'INPS', 'CONTRIBUTO EBILOG', 'Altre trattenute (IRPEF + varie)'},
+      );
+    });
+  });
+
+  group(
+      'BustaPagaRegexParser - ground-truth su PDF reale (Luglio 2026): test '
+      'di non-regressione principale per la fedeltà del parser ai PDF '
+      'reali — dati anagrafici fittizi, struttura e valori numerici reali, '
+      'vedi doc su _testoRealeLuglio2026', () {
+    const parser = BustaPagaRegexParser();
+
+    test('estrae correttamente OGNI campo di BustaPagaEstratti dal testo '
+        'reale', () {
+      final risultato = parser.parse(_testoRealeLuglio2026);
+
+      expect(risultato.periodo, '2026-07');
+      expect(risultato.tipo, TipoBustaPaga.mensile);
+
+      expect(risultato.lordo, closeTo(1543.13, 0.001));
+      expect(risultato.straordinari, closeTo(0.25, 0.001));
+
+      final descrizioni =
+          risultato.competenze.map((v) => v.descrizione).toList();
+      expect(
+        descrizioni,
+        containsAll([
+          'Retribuzione ordinaria',
+          'Edr contrattuale - ex accordo 18.5.2021',
+          'Straordinario diurno (30%)',
+        ]),
+      );
+      final retribuzione = risultato.competenze
+          .firstWhere((v) => v.descrizione == 'Retribuzione ordinaria');
+      expect(retribuzione.importo, closeTo(1532.48, 0.001));
+      final edr = risultato.competenze
+          .firstWhere((v) => v.descrizione.startsWith('Edr contrattuale'));
+      expect(edr.importo, closeTo(7.67, 0.001));
+      final straordinario = risultato.competenze
+          .firstWhere((v) => v.descrizione == 'Straordinario diurno (30%)');
+      expect(straordinario.importo, closeTo(2.98, 0.001));
+
+      expect(risultato.ferieMaturate, closeTo(12.83, 0.001));
+      expect(risultato.ferieGodute, closeTo(4.00, 0.001));
+      expect(risultato.ferieResidue, closeTo(16.00, 0.001));
+
+      expect(risultato.rolMaturati, closeTo(23.33, 0.001));
+      expect(risultato.rolGoduti, closeTo(11.50, 0.001));
+      expect(risultato.rolResidui, closeTo(26.70, 0.001));
+
+      expect(risultato.exFestivitaMaturate, closeTo(18.67, 0.001));
+      expect(risultato.exFestivitaGodute, 0);
+      expect(risultato.exFestivitaResidue, closeTo(32.00, 0.001));
+
+      // Mai testato finora contro un estratto REALE (solo contro fixture
+      // sintetico): riga "210 Permessi riduz. orario goduti ORE 4,030".
+      expect(risultato.permessiGodutiMese, closeTo(4.03, 0.001));
+
+      // Letto direttamente dal blocco Q.T.A. ("ORE LAV."), non stimato:
+      // vedi anche il gruppo dedicato sopra.
+      expect(risultato.oreLavorate, closeTo(175.62, 0.001));
+
+      expect(risultato.trattenute['INPS'], closeTo(90.11, 0.001));
+      expect(
+        risultato.trattenute['CONTRIBUTO EBILOG'],
+        closeTo(3.50, 0.001),
+      );
+
+      // Netto derivato (lordo - trattenute, incluso il residuo "Altre
+      // trattenute" che assorbe IRPEF/FIS/arrotondamenti non modellati
+      // individualmente dal parser). Tolleranza 0,01 (non un intervallo
+      // ampio): il residuo è calcolato per costruzione come
+      // "lordo - netto grezzo - INPS - trattenute nominate", quindi il
+      // netto derivato torna a coincidere esattamente col netto grezzo
+      // letto dal PDF (1.411,00) quando quel netto grezzo è corretto — non
+      // c'è nessun arretrato/conguaglio non modellato su questo cedolino
+      // specifico che introduca uno scarto strutturale.
+      expect(risultato.netto, closeTo(1411.00, 0.01));
+
+      expect(
+        risultato.warnings.any((w) => w.startsWith('netto: segno "-"')),
+        isTrue,
       );
     });
   });

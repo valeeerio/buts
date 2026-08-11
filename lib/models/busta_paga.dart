@@ -33,6 +33,12 @@ class VoceCompetenza {
 /// descrizione inizia (case-insensitive) con "straordinario" — usato sia dal
 /// parser sia dalle schermate di editing per calcolare `straordinari` in ore
 /// a partire dalla lista `competenze`, unica fonte di verità.
+/// Sentinella privata usata da [BustaPaga.copyWith] per distinguere "il
+/// chiamante non ha passato [BustaPaga.copyWith.fileOrigine]" da "il
+/// chiamante vuole azzerarlo esplicitamente a `null`" — il pattern
+/// `fileOrigine ?? this.fileOrigine` non permette quest'ultimo caso.
+const _unset = Object();
+
 bool voceEStraordinaria(String descrizione) =>
     descrizione.trim().toLowerCase().startsWith('straordinario');
 
@@ -134,7 +140,7 @@ class BustaPaga {
   BustaPaga copyWith({
     String? id,
     DateTime? periodo,
-    String? fileOrigine,
+    Object? fileOrigine = _unset,
     double? lordo,
     double? netto,
     Map<String, double>? trattenute,
@@ -158,7 +164,9 @@ class BustaPaga {
     return BustaPaga(
       id: id ?? this.id,
       periodo: periodo ?? this.periodo,
-      fileOrigine: fileOrigine ?? this.fileOrigine,
+      fileOrigine: identical(fileOrigine, _unset)
+          ? this.fileOrigine
+          : fileOrigine as String?,
       lordo: lordo ?? this.lordo,
       netto: netto ?? this.netto,
       trattenute: trattenute ?? this.trattenute,

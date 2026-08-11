@@ -349,11 +349,20 @@ class _RangeThumb extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent =
         CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    // `CupertinoColors.white` letterale invece di un token `AppColors`: il
+    // thumb va risolto esplicitamente comunque tramite
+    // `CupertinoDynamicColor.resolve` (convenzione di progetto per ogni
+    // colore), anche se qui il valore risultante coincide nei due temi —
+    // nessun token "superficie chiara" pertinente esiste in `AppColors` per
+    // questo caso (il bordo/ombra sopra un accent colorato, non una
+    // superficie di vetro).
+    final thumbFill =
+        CupertinoDynamicColor.resolve(CupertinoColors.white, context);
     return Container(
       width: _CupertinoRangeSliderState._thumbVisualSize,
       height: _CupertinoRangeSliderState._thumbVisualSize,
       decoration: BoxDecoration(
-        color: CupertinoColors.white,
+        color: thumbFill,
         shape: BoxShape.circle,
         border: Border.all(color: accent, width: 2),
         boxShadow: [

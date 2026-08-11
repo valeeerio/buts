@@ -6,6 +6,7 @@ import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/busta_paga_formatting.dart';
 import 'glass_form_section.dart';
+import 'spring_button.dart';
 import 'voce_competenza_edit_row.dart';
 
 /// Tabella delle voci di competenza individuali (Retribuzione ordinaria, Edr
@@ -153,9 +154,8 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
   Widget _aggiungiVoceButton(Color accent) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-      child: CupertinoButton(
-        padding: EdgeInsets.zero,
-        onPressed: onAggiungi,
+      child: SpringButton(
+        onPressed: onAggiungi ?? () {},
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

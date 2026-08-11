@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -13,6 +15,7 @@ import '../../widgets/app_alert_dialog.dart';
 import '../../widgets/cupertino_range_slider.dart';
 import '../../widgets/flat_chip_button.dart';
 import '../../widgets/spring_button.dart';
+import '../../widgets/squircle_clipper.dart';
 import 'busta_paga_detail_screen.dart';
 import 'busta_paga_form_screen.dart';
 import 'buste_paga_archivio_view.dart';
@@ -168,11 +171,20 @@ class _BustePagaSectionScreenState
 
     var fileOrigine = result.filePath!;
     if (risultato.tipo != TipoBustaPaga.mensile && periodoEstratto != null) {
-      fileOrigine = await _pdfImportService.rinominaPerSupplementare(
-        fileOrigine,
-        mese: periodoEstratto.month,
-        anno: periodoEstratto.year,
-      );
+      try {
+        fileOrigine = await _pdfImportService.rinominaPerSupplementare(
+          fileOrigine,
+          mese: periodoEstratto.month,
+          anno: periodoEstratto.year,
+        );
+      } catch (_) {
+        if (!mounted) return;
+        _showImportError(
+          'Import non riuscito',
+          'Impossibile preparare il file del documento, riprova.',
+        );
+        return;
+      }
     }
 
     if (!mounted) return;
@@ -194,14 +206,17 @@ class _BustePagaSectionScreenState
     final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
     return Row(
       children: [
-        CupertinoButton(
-          padding: EdgeInsets.zero,
-          minimumSize: const Size(44, 44),
+        SpringButton(
           onPressed: () => setState(_closeSearch),
-          child: Icon(
-            CupertinoIcons.search,
-            size: 20,
-            color: accent,
+          child: Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            child: Icon(
+              CupertinoIcons.search,
+              size: 20,
+              color: accent,
+            ),
           ),
         ),
         Expanded(
@@ -217,13 +232,16 @@ class _BustePagaSectionScreenState
             onChanged: (_) => setState(() {}),
           ),
         ),
-        CupertinoButton(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-          minimumSize: const Size(0, 44),
+        SpringButton(
           onPressed: () => setState(_closeSearch),
-          child: Text(
-            'Annulla',
-            style: AppTextStyles.subtitle.copyWith(color: accent),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+            height: 44,
+            alignment: Alignment.center,
+            child: Text(
+              'Annulla',
+              style: AppTextStyles.subtitle.copyWith(color: accent),
+            ),
           ),
         ),
       ],
@@ -402,16 +420,19 @@ class _BustePagaSectionScreenState
                                       ),
                                     ),
                                   ),
-                                  CupertinoButton(
-                                    padding: EdgeInsets.zero,
-                                    minimumSize: const Size(44, 44),
+                                  SpringButton(
                                     onPressed: () =>
                                         setState(() => _searchActive = true),
-                                    child: Icon(
-                                      CupertinoIcons.search,
-                                      size: 22,
-                                      color: CupertinoDynamicColor.resolve(
-                                          AppColors.systemBlue, context),
+                                    child: Container(
+                                      width: 44,
+                                      height: 44,
+                                      alignment: Alignment.center,
+                                      child: Icon(
+                                        CupertinoIcons.search,
+                                        size: 22,
+                                        color: CupertinoDynamicColor.resolve(
+                                            AppColors.systemBlue, context),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -491,51 +512,80 @@ class _BustePagaSidecar extends StatelessWidget {
     // Chip piatti senza superficie di vetro dietro (stessa resa di
     // "Conferma"/"Modifica" nel dettaglio busta paga, vedi
     // `FlatChipButton`): solo il tab attivo ha il riempimento colorato, il
-    // tab non attivo resta icona+testo grigi senza sfondo.
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    // tab non attivo resta icona+testo grigi senza sfondo. Il blur di sfondo
+    // (`_floatingBarBackground`) resta comunque dietro l'intera fascia, non
+    // solo dietro ai singoli chip.
+    return Stack(
       children: [
-        Expanded(
-          child: FlatChipButton(
-            icon: CupertinoIcons.archivebox,
-            label: 'Archivio',
-            color: tab == _BustePagaTab.archivio ? plusAccent : labelSecondary,
-            filled: tab == _BustePagaTab.archivio,
-            onPressed: () => onTabChanged(_BustePagaTab.archivio),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: FlatChipButton(
-            icon: CupertinoIcons.chart_bar_alt_fill,
-            label: 'Statistiche',
-            color:
-                tab == _BustePagaTab.statistiche ? plusAccent : labelSecondary,
-            filled: tab == _BustePagaTab.statistiche,
-            onPressed: () => onTabChanged(_BustePagaTab.statistiche),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        SpringButton(
-          onPressed: onAdd ?? () {},
-          child: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: plusAccent.withValues(alpha: 0.16),
-              shape: BoxShape.circle,
+        Positioned.fill(child: _floatingBarBackground(context)),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: FlatChipButton(
+                icon: CupertinoIcons.archivebox,
+                label: 'Archivio',
+                color:
+                    tab == _BustePagaTab.archivio ? plusAccent : labelSecondary,
+                filled: tab == _BustePagaTab.archivio,
+                onPressed: () => onTabChanged(_BustePagaTab.archivio),
+              ),
             ),
-            alignment: Alignment.center,
-            child: importing
-                ? CupertinoActivityIndicator(color: plusAccent)
-                : Icon(
-                    CupertinoIcons.add,
-                    size: 24,
-                    color: plusAccent,
-                  ),
-          ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: FlatChipButton(
+                icon: CupertinoIcons.chart_bar_alt_fill,
+                label: 'Statistiche',
+                color: tab == _BustePagaTab.statistiche
+                    ? plusAccent
+                    : labelSecondary,
+                filled: tab == _BustePagaTab.statistiche,
+                onPressed: () => onTabChanged(_BustePagaTab.statistiche),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            SpringButton(
+              onPressed: onAdd ?? () {},
+              child: ClipPath(
+                clipper: const SquircleClipper(radius: AppRadius.glassSmall),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  color: plusAccent.withValues(alpha: 0.16),
+                  alignment: Alignment.center,
+                  child: importing
+                      ? CupertinoActivityIndicator(color: plusAccent)
+                      : Icon(
+                          CupertinoIcons.add,
+                          size: 24,
+                          color: plusAccent,
+                        ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
+}
+
+/// Sfondo "chrome" traslucido/sfocato dietro le barre flottanti in basso
+/// (sidecar, `_ActionBar` del dettaglio, barra Salva/Annulla del form
+/// import): stesso `BackdropFilter` di `_pinnedBackground` in
+/// `buste_paga_archivio_view.dart` (stesso raggio di blur, stesso fill di
+/// opacità, stesso `ClipRect` come antenato diretto del `BackdropFilter` —
+/// vincolo critico per Impeller su device reale, vedi CLAUDE.md), copre
+/// l'intera fascia della barra e non solo i singoli chip sopra di essa.
+Widget _floatingBarBackground(BuildContext context) {
+  final fill =
+      CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context);
+  return ClipRect(
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+      child: DecoratedBox(
+        decoration: BoxDecoration(color: fill.withValues(alpha: 0.8)),
+      ),
+    ),
+  );
 }

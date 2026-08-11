@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -15,6 +17,8 @@ import '../../widgets/busta_paga_maturazioni_section.dart';
 import '../../widgets/busta_paga_stat_row.dart';
 import '../../widgets/flat_chip_button.dart';
 import '../../widgets/glass_form_section.dart';
+import '../../widgets/liquid_glass_surface.dart';
+import '../../widgets/spring_button.dart';
 import '../../widgets/trattenuta_edit_row.dart';
 import '../../widgets/voce_competenza_edit_row.dart';
 
@@ -78,8 +82,11 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   late TextEditingController _rolGodutiCtrl;
   late TextEditingController _rolResiduiCtrl;
 
-  late TextEditingController _permessiGodutiCtrl;
-  late TextEditingController _permessiGodutiMeseCtrl;
+  // Nessun campo di editing collegato (sezioni UI rimosse perché ridondanti/
+  // mai popolate, vedi CLAUDE.md): valori portati staticamente dal modello
+  // fino al salvataggio, senza `TextEditingController` fantasma.
+  late double _permessiGoduti;
+  late double _permessiGodutiMese;
 
   late TextEditingController _exFestivitaMaturateCtrl;
   late TextEditingController _exFestivitaGoduteCtrl;
@@ -94,11 +101,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   }
 
   /// Popola tutti i controller di editing dai valori correnti (letti dal
-  /// provider) e attiva la modalità modifica. I controller di
-  /// `ferieResidue`/`rolResidui` hanno anche un listener che forza un
-  /// rebuild, così `_StatRow` (che li mostra in sola lettura, riflettendo lo
-  /// stesso dato della tabella Maturato/Goduto/Residuo) resta sincronizzato
-  /// live mentre l'utente digita nella tabella.
+  /// provider) e attiva la modalità modifica.
   void _enterEditing(BustaPaga corrente) {
     _periodoEdit = corrente.periodo;
     _tipoEdit = corrente.tipo;
@@ -120,10 +123,8 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     _rolResiduiCtrl =
         TextEditingController(text: formatNumber(corrente.rolResidui));
 
-    _permessiGodutiCtrl =
-        TextEditingController(text: formatNumber(corrente.permessiGoduti));
-    _permessiGodutiMeseCtrl =
-        TextEditingController(text: formatNumber(corrente.permessiGodutiMese));
+    _permessiGoduti = corrente.permessiGoduti;
+    _permessiGodutiMese = corrente.permessiGodutiMese;
 
     _exFestivitaMaturateCtrl = TextEditingController(
         text: formatNumber(corrente.exFestivitaMaturate));
@@ -154,12 +155,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     for (final row in _competenzeEdit) {
       _attachCompetenzaListeners(row);
     }
-
-    // Forza il rebuild dello `_StatRow` (Ferie/ROL residui) ogni volta che
-    // cambia il campo "Residuo" corrispondente nella tabella sottostante.
-    _ferieResidueCtrl.addListener(_onResiduiChanged);
-    _rolResiduiCtrl.addListener(_onResiduiChanged);
-    _exFestivitaResidueCtrl.addListener(_onResiduiChanged);
 
     setState(() => _isEditing = true);
   }
@@ -213,8 +208,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     _rolMaturatiCtrl.dispose();
     _rolGodutiCtrl.dispose();
     _rolResiduiCtrl.dispose();
-    _permessiGodutiCtrl.dispose();
-    _permessiGodutiMeseCtrl.dispose();
     _exFestivitaMaturateCtrl.dispose();
     _exFestivitaGoduteCtrl.dispose();
     _exFestivitaResidueCtrl.dispose();
@@ -269,33 +262,54 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     await showCupertinoModalPopup<void>(
       context: context,
       builder: (context) {
-        return Container(
-          height: 280,
-          color: CupertinoDynamicColor.resolve(AppColors.surface, context),
+        final accent =
+            CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.screenHorizontal,
+            0,
+            AppSpacing.screenHorizontal,
+            AppSpacing.sm,
+          ),
           child: SafeArea(
             top: false,
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+            child: SizedBox(
+              height: 280,
+              child: LiquidGlassSurface(
+                radius: AppRadius.glass,
+                child: Column(
                   children: [
-                    CupertinoButton(
-                      child: const Text('Fatto'),
-                      onPressed: () {
-                        setState(() => _periodoEdit = tempSelection);
-                        Navigator.of(context).pop();
-                      },
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        SpringButton(
+                          onPressed: () {
+                            setState(() => _periodoEdit = tempSelection);
+                            Navigator.of(context).pop();
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.sm),
+                            child: Text(
+                              'Fatto',
+                              style: AppTextStyles.subtitle.copyWith(
+                                color: accent,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Expanded(
+                      child: CupertinoDatePicker(
+                        mode: CupertinoDatePickerMode.monthYear,
+                        initialDateTime: _periodoEdit,
+                        onDateTimeChanged: (value) => tempSelection = value,
+                      ),
                     ),
                   ],
                 ),
-                Expanded(
-                  child: CupertinoDatePicker(
-                    mode: CupertinoDatePickerMode.monthYear,
-                    initialDateTime: _periodoEdit,
-                    onDateTimeChanged: (value) => tempSelection = value,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         );
@@ -345,34 +359,41 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   /// rispetto a [corrente] e, se non vuoto, chiede conferma esplicita
   /// prima di salvare — vedi CLAUDE.md/istruzioni task per il comportamento
   /// dettagliato dei 3 esiti (invariato / conferma / annulla).
-  void _save(BustaPaga corrente) {
-    final trattenute = _trattenuteCorrenti;
-
-    // Lordo/straordinari sono derivati dalla lista competenze correntemente
-    // in editing (vedi computeLordo/computeStraordinari). Se la lista è
-    // vuota (busta paga pre-migrazione mai riaperta in modifica, o utente
-    // che rimuove tutte le righe) si mantiene il valore precedente invece
-    // di azzerarlo — vedi CLAUDE.md/istruzioni task.
+  /// Lordo/straordinari/netto derivati dalle competenze/trattenute
+  /// correntemente in editing, con lo stesso fallback usato sia dal valore
+  /// mostrato live nell'hero (`build()`) sia dal salvataggio (`_save`): se le
+  /// competenze sono vuote (busta paga pre-migrazione mai riaperta in
+  /// modifica, o utente che rimuove tutte le righe) si mantiene il lordo/
+  /// straordinari precedente invece di azzerarlo; se sia competenze sia
+  /// trattenute sono vuote si mantiene anche il netto precedente. Unica
+  /// fonte di verità: evita che il valore mostrato live diverga da quello
+  /// effettivamente salvabile (vedi istruzioni task).
+  ({double lordo, double straordinari, double netto}) _valoriDerivatiEditing(
+      BustaPaga corrente) {
     final competenze = _competenzeCorrenti;
+    final trattenute = _trattenuteCorrenti;
     final lordo =
         competenze.isEmpty ? corrente.lordo : computeLordo(competenze);
     final straordinari = competenze.isEmpty
         ? corrente.straordinari
         : computeStraordinari(competenze);
-    // Stesso criterio di fallback di lordo/straordinari, applicato al netto
-    // derivato: se sia le competenze sia le trattenute sono vuote (nessun
-    // dato reale da cui derivare), si mantiene il netto precedente invece di
-    // azzerarlo.
     final netto = (competenze.isEmpty && trattenute.isEmpty)
         ? corrente.netto
         : computeNetto(lordo, trattenute);
+    return (lordo: lordo, straordinari: straordinari, netto: netto);
+  }
+
+  void _save(BustaPaga corrente) {
+    final trattenute = _trattenuteCorrenti;
+    final competenze = _competenzeCorrenti;
+    final valori = _valoriDerivatiEditing(corrente);
 
     final candidato = corrente.copyWith(
       periodo: _periodoEdit,
       tipo: _tipoEdit,
-      netto: netto,
-      lordo: lordo,
-      straordinari: straordinari,
+      netto: valori.netto,
+      lordo: valori.lordo,
+      straordinari: valori.straordinari,
       oreLavorate: _parse(_oreLavorateCtrl),
       ferieMaturate: _parse(_ferieMaturateCtrl),
       ferieGodute: _parse(_ferieGoduteCtrl),
@@ -380,8 +401,8 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       rolMaturati: _parse(_rolMaturatiCtrl),
       rolGoduti: _parse(_rolGodutiCtrl),
       rolResidui: _parse(_rolResiduiCtrl),
-      permessiGoduti: _parse(_permessiGodutiCtrl),
-      permessiGodutiMese: _parse(_permessiGodutiMeseCtrl),
+      permessiGoduti: _permessiGoduti,
+      permessiGodutiMese: _permessiGodutiMese,
       exFestivitaMaturate: _parse(_exFestivitaMaturateCtrl),
       exFestivitaGodute: _parse(_exFestivitaGoduteCtrl),
       exFestivitaResidue: _parse(_exFestivitaResidueCtrl),
@@ -598,16 +619,12 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                     isConfermato: corrente.statoVerifica ==
                         StatoVerificaBustaPaga.confermato,
                     periodoLabel: periodoLabelVista,
-                    tipo: _isEditing ? _tipoEdit : corrente.tipo,
                     isEditing: _isEditing,
                     lordoDisplay: formatEuro(_isEditing
-                        ? computeLordo(_competenzeCorrenti)
+                        ? _valoriDerivatiEditing(corrente).lordo
                         : corrente.lordo),
                     nettoDisplay: formatEuro(_isEditing
-                        ? computeNetto(
-                            computeLordo(_competenzeCorrenti),
-                            _trattenuteCorrenti,
-                          )
+                        ? _valoriDerivatiEditing(corrente).netto
                         : corrente.netto),
                     onTapPeriodo: _isEditing ? _pickPeriodo : null,
                     onTapTipo: _isEditing ? _pickTipo : null,
@@ -642,37 +659,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                           AppSpacing.xl,
                         ),
                         children: [
-                          BustaPagaStatRow(items: [
-                            (
-                              'Ferie residue',
-                              Text(
-                                _isEditing
-                                    ? formatNumber(_parse(_ferieResidueCtrl))
-                                    : formatNumber(corrente.ferieResidue),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                            (
-                              'Permessi residui',
-                              Text(
-                                _isEditing
-                                    ? formatNumber(_parse(_rolResiduiCtrl))
-                                    : formatNumber(corrente.rolResidui),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                            (
-                              'Ex festività',
-                              Text(
-                                _isEditing
-                                    ? formatNumber(
-                                        _parse(_exFestivitaResidueCtrl))
-                                    : formatNumber(corrente.exFestivitaResidue),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ]),
-                          const SizedBox(height: AppSpacing.lg),
                           if (corrente.fileOrigine != null) ...[
                             BustaPagaDocumentoChip(
                               filePath: corrente.fileOrigine!,
@@ -687,8 +673,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                             rolMaturati: formatNumber(corrente.rolMaturati),
                             rolGoduti: formatNumber(corrente.rolGoduti),
                             rolResidui: formatNumber(corrente.rolResidui),
-                            permessiGoduti:
-                                formatNumber(corrente.permessiGoduti),
                             exFestivitaMaturate:
                                 formatNumber(corrente.exFestivitaMaturate),
                             exFestivitaGodute:
@@ -705,8 +689,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                                 _isEditing ? _rolMaturatiCtrl : null,
                             rolGodutiCtrl: _isEditing ? _rolGodutiCtrl : null,
                             rolResiduiCtrl: _isEditing ? _rolResiduiCtrl : null,
-                            permessiGodutiCtrl:
-                                _isEditing ? _permessiGodutiCtrl : null,
                             exFestivitaMaturateCtrl:
                                 _isEditing ? _exFestivitaMaturateCtrl : null,
                             exFestivitaGoduteCtrl:
@@ -725,18 +707,9 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                             (
                               'Straordinari',
                               Text(
-                                '${formatNumber(_isEditing ? computeStraordinari(_competenzeCorrenti) : corrente.straordinari)} h',
+                                '${formatNumber(_isEditing ? _valoriDerivatiEditing(corrente).straordinari : corrente.straordinari)} h',
                                 textAlign: TextAlign.center,
                               ),
-                            ),
-                            (
-                              'Permessi (mese)',
-                              _isEditing
-                                  ? inlineNumberField(_permessiGodutiMeseCtrl,
-                                      suffix: ' h')
-                                  : Text(
-                                      '${formatNumber(corrente.permessiGodutiMese)} h',
-                                      textAlign: TextAlign.center),
                             ),
                           ]),
                           const SizedBox(height: AppSpacing.lg),
@@ -839,8 +812,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-      child: CupertinoButton(
-        padding: EdgeInsets.zero,
+      child: SpringButton(
         onPressed: _addTrattenuta,
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -926,8 +898,9 @@ class _ActionBar extends StatelessWidget {
     final secondaryAccent =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
 
+    final Widget content;
     if (isEditing) {
-      return Row(
+      content = Row(
         children: [
           Expanded(
             child: FlatChipButton(
@@ -948,43 +921,72 @@ class _ActionBar extends StatelessWidget {
           ),
         ],
       );
+    } else {
+      final daConfermare =
+          bustaPaga.statoVerifica == StatoVerificaBustaPaga.daConfermare;
+
+      content = Row(
+        children: [
+          if (daConfermare) ...[
+            Expanded(
+              flex: 7,
+              child: FlatChipButton(
+                icon: CupertinoIcons.checkmark_alt,
+                label: 'Conferma',
+                color: greenAccent,
+                onPressed: onConferma,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              flex: 3,
+              child: FlatChipButton(
+                icon: CupertinoIcons.pencil,
+                label: 'Modifica',
+                color: accent,
+                onPressed: onModifica,
+              ),
+            ),
+          ] else
+            Expanded(
+              child: FlatChipButton(
+                icon: CupertinoIcons.pencil,
+                label: 'Modifica',
+                color: accent,
+                onPressed: onModifica,
+              ),
+            ),
+        ],
+      );
     }
 
-    final daConfermare =
-        bustaPaga.statoVerifica == StatoVerificaBustaPaga.daConfermare;
-
-    return Row(
+    // Blur di sfondo dietro l'intera fascia della barra (non solo dietro ai
+    // singoli chip), stesso pattern di `_pinnedBackground` nell'Archivio —
+    // vedi `_floatingBarBackground` in `buste_paga_section_screen.dart`.
+    return Stack(
       children: [
-        if (daConfermare) ...[
-          Expanded(
-            flex: 7,
-            child: FlatChipButton(
-              icon: CupertinoIcons.checkmark_alt,
-              label: 'Conferma',
-              color: greenAccent,
-              onPressed: onConferma,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            flex: 3,
-            child: FlatChipButton(
-              icon: CupertinoIcons.pencil,
-              label: 'Modifica',
-              color: accent,
-              onPressed: onModifica,
-            ),
-          ),
-        ] else
-          Expanded(
-            child: FlatChipButton(
-              icon: CupertinoIcons.pencil,
-              label: 'Modifica',
-              color: accent,
-              onPressed: onModifica,
-            ),
-          ),
+        Positioned.fill(child: _floatingBarBackground(context)),
+        content,
       ],
     );
   }
+}
+
+/// Sfondo "chrome" traslucido/sfocato dietro la barra flottante
+/// "Conferma/Modifica"/"Salva/Annulla": stesso `BackdropFilter` di
+/// `_pinnedBackground` in `buste_paga_archivio_view.dart` (stesso raggio di
+/// blur, stesso fill di opacità, stesso `ClipRect` come antenato diretto del
+/// `BackdropFilter` — vincolo critico per Impeller su device reale, vedi
+/// CLAUDE.md), copre l'intera fascia della barra.
+Widget _floatingBarBackground(BuildContext context) {
+  final fill =
+      CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context);
+  return ClipRect(
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+      child: DecoratedBox(
+        decoration: BoxDecoration(color: fill.withValues(alpha: 0.8)),
+      ),
+    ),
+  );
 }

@@ -44,15 +44,15 @@ String annoAxisLabel(DateTime periodo) {
   return "'${DateFormat('yy', 'it_IT').format(periodo)}";
 }
 
-/// Etichetta "13esima mensilità"/"14esima mensilità" per i tipi non
-/// mensili, `null` per `TipoBustaPaga.mensile` (nessuna label da mostrare al
-/// posto del mese in quel caso).
+/// Etichetta "13esima"/"14esima" per i tipi non mensili, `null` per
+/// `TipoBustaPaga.mensile` (nessuna label da mostrare al posto del mese in
+/// quel caso).
 String? tipoMensilitaLabel(TipoBustaPaga tipo) {
   switch (tipo) {
     case TipoBustaPaga.tredicesima:
-      return '13esima mensilità';
+      return '13esima';
     case TipoBustaPaga.quattordicesima:
-      return '14esima mensilità';
+      return '14esima';
     case TipoBustaPaga.mensile:
       return null;
   }
@@ -67,7 +67,7 @@ String bustaPagaMeseDisplay(BustaPaga bustaPaga) {
 }
 
 /// Label da mostrare al posto di mese+anno (es. "Agosto 2026") quando la
-/// busta paga è una 13esima/14esima (es. "14esima mensilità 2026"). Ricade
+/// busta paga è una 13esima/14esima (es. "14esima 2026"). Ricade
 /// su [periodoLabel] per le buste mensili normali.
 String bustaPagaPeriodoDisplay(BustaPaga bustaPaga) =>
     periodoDisplayFor(periodo: bustaPaga.periodo, tipo: bustaPaga.tipo);
