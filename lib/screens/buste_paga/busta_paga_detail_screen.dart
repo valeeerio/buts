@@ -68,7 +68,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   late DateTime _periodoEdit;
   late TipoBustaPaga _tipoEdit;
 
-  late TextEditingController _nettoCtrl;
   late TextEditingController _oreLavorateCtrl;
 
   late TextEditingController _ferieMaturateCtrl;
@@ -104,7 +103,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     _periodoEdit = corrente.periodo;
     _tipoEdit = corrente.tipo;
 
-    _nettoCtrl = TextEditingController(text: formatNumber(corrente.netto));
     _oreLavorateCtrl =
         TextEditingController(text: formatNumber(corrente.oreLavorate));
 
@@ -138,8 +136,11 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
         ? [TrattenutaEditRow()]
         : corrente.trattenute.entries
             .map((e) => TrattenutaEditRow(
-                chiave: e.key, importo: formatNumber(e.value)))
+                chiave: e.key, importo: formatEuro(e.value)))
             .toList();
+    for (final row in _trattenuteEdit) {
+      _attachTrattenutaListeners(row);
+    }
 
     _competenzeEdit = corrente.competenze.isEmpty
         ? [VoceCompetenzaEditRow()]
@@ -147,7 +148,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
             .map((v) => VoceCompetenzaEditRow(
                   descrizione: v.descrizione,
                   quantita: formatNumber(v.quantita),
-                  importo: v.importo == 0 ? '' : formatNumber(v.importo),
+                  importo: v.importo == 0 ? '' : formatEuro(v.importo),
                 ))
             .toList();
     for (final row in _competenzeEdit) {
@@ -173,6 +174,13 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     row.importo.addListener(_onResiduiChanged);
   }
 
+  /// Rebuild forzato ogni volta che l'importo di una trattenuta cambia, così
+  /// il Netto mostrato in hero (derivato da Lordo - trattenute) resta
+  /// sincronizzato live — stesso meccanismo di `_attachCompetenzaListeners`.
+  void _attachTrattenutaListeners(TrattenutaEditRow row) {
+    row.importo.addListener(_onResiduiChanged);
+  }
+
   List<VoceCompetenza> get _competenzeCorrenti => _competenzeEdit
       .where((row) => row.descrizione.text.trim().isNotEmpty)
       .map((row) => VoceCompetenza(
@@ -182,10 +190,22 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
           ))
       .toList();
 
+  /// Mappa trattenute correnti da `_trattenuteEdit`, filtrando le righe con
+  /// chiave vuota — stesso filtro già usato al salvataggio (`_save`), estratto
+  /// qui perché riusato anche per il Netto mostrato live in `build`.
+  Map<String, double> get _trattenuteCorrenti {
+    final trattenute = <String, double>{};
+    for (final row in _trattenuteEdit) {
+      final chiave = row.chiave.text.trim();
+      if (chiave.isEmpty) continue;
+      trattenute[chiave] = _parse(row.importo);
+    }
+    return trattenute;
+  }
+
   void _onResiduiChanged() => setState(() {});
 
   void _disposeEditingControllers() {
-    _nettoCtrl.dispose();
     _oreLavorateCtrl.dispose();
     _ferieMaturateCtrl.dispose();
     _ferieGoduteCtrl.dispose();
@@ -215,7 +235,11 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       parseItalianNumber(controller.text);
 
   void _addTrattenuta() {
-    setState(() => _trattenuteEdit.add(TrattenutaEditRow()));
+    setState(() {
+      final row = TrattenutaEditRow();
+      _attachTrattenutaListeners(row);
+      _trattenuteEdit.add(row);
+    });
   }
 
   void _removeTrattenuta(int index) {
@@ -322,23 +346,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   /// prima di salvare — vedi CLAUDE.md/istruzioni task per il comportamento
   /// dettagliato dei 3 esiti (invariato / conferma / annulla).
   void _save(BustaPaga corrente) {
-    final nettoText = _nettoCtrl.text.trim();
-    if (nettoText.isEmpty ||
-        double.tryParse(nettoText.replaceAll('.', '').replaceAll(',', '.')) ==
-            null) {
-      _showAlert(
-        'Netto non valido',
-        'Inserisci un valore numerico per il netto prima di salvare.',
-      );
-      return;
-    }
-
-    final trattenute = <String, double>{};
-    for (final row in _trattenuteEdit) {
-      final chiave = row.chiave.text.trim();
-      if (chiave.isEmpty) continue;
-      trattenute[chiave] = _parse(row.importo);
-    }
+    final trattenute = _trattenuteCorrenti;
 
     // Lordo/straordinari sono derivati dalla lista competenze correntemente
     // in editing (vedi computeLordo/computeStraordinari). Se la lista è
@@ -351,11 +359,18 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     final straordinari = competenze.isEmpty
         ? corrente.straordinari
         : computeStraordinari(competenze);
+    // Stesso criterio di fallback di lordo/straordinari, applicato al netto
+    // derivato: se sia le competenze sia le trattenute sono vuote (nessun
+    // dato reale da cui derivare), si mantiene il netto precedente invece di
+    // azzerarlo.
+    final netto = (competenze.isEmpty && trattenute.isEmpty)
+        ? corrente.netto
+        : computeNetto(lordo, trattenute);
 
     final candidato = corrente.copyWith(
       periodo: _periodoEdit,
       tipo: _tipoEdit,
-      netto: _parse(_nettoCtrl),
+      netto: netto,
       lordo: lordo,
       straordinari: straordinari,
       oreLavorate: _parse(_oreLavorateCtrl),
@@ -453,10 +468,10 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   List<String> _buildDiff(BustaPaga vecchia, BustaPaga nuova) {
     final diff = <String>[];
 
-    void addIfChanged(String label, double oldValue, double newValue) {
-      if (formatNumber(oldValue) != formatNumber(newValue)) {
-        diff.add(
-            '$label: ${formatNumber(oldValue)} → ${formatNumber(newValue)}');
+    void addIfChanged(String label, double oldValue, double newValue,
+        {String Function(double) format = formatNumber}) {
+      if (format(oldValue) != format(newValue)) {
+        diff.add('$label: ${format(oldValue)} → ${format(newValue)}');
       }
     }
 
@@ -472,8 +487,8 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
         'Tipo: ${_tipoLabels[vecchia.tipo]} → ${_tipoLabels[nuova.tipo]}',
       );
     }
-    addIfChanged('Netto', vecchia.netto, nuova.netto);
-    addIfChanged('Lordo', vecchia.lordo, nuova.lordo);
+    addIfChanged('Netto', vecchia.netto, nuova.netto, format: formatEuro);
+    addIfChanged('Lordo', vecchia.lordo, nuova.lordo, format: formatEuro);
     addIfChanged('Straordinari', vecchia.straordinari, nuova.straordinari);
     addIfChanged('Ferie maturate', vecchia.ferieMaturate, nuova.ferieMaturate);
     addIfChanged('Ferie godute', vecchia.ferieGodute, nuova.ferieGodute);
@@ -498,14 +513,14 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       final prima = vecchia.trattenute[chiave];
       final dopo = nuova.trattenute[chiave];
       if (prima == null && dopo != null) {
-        diff.add('Trattenuta $chiave: aggiunta (€ ${formatNumber(dopo)})');
+        diff.add('Trattenuta $chiave: aggiunta (€ ${formatEuro(dopo)})');
       } else if (prima != null && dopo == null) {
-        diff.add('Trattenuta $chiave: rimossa (era € ${formatNumber(prima)})');
+        diff.add('Trattenuta $chiave: rimossa (era € ${formatEuro(prima)})');
       } else if (prima != null &&
           dopo != null &&
-          formatNumber(prima) != formatNumber(dopo)) {
+          formatEuro(prima) != formatEuro(dopo)) {
         diff.add(
-          'Trattenuta $chiave: € ${formatNumber(prima)} → € ${formatNumber(dopo)}',
+          'Trattenuta $chiave: € ${formatEuro(prima)} → € ${formatEuro(dopo)}',
         );
       }
     }
@@ -527,18 +542,18 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       final dopo = nuoveCompetenze[descrizione];
       if (prima == null && dopo != null) {
         diff.add('Competenza $descrizione: aggiunta '
-            '(${formatNumber(dopo.quantita)}, € ${formatNumber(dopo.importo)})');
+            '(${formatNumber(dopo.quantita)}, € ${formatEuro(dopo.importo)})');
       } else if (prima != null && dopo == null) {
         diff.add('Competenza $descrizione: rimossa '
-            '(era ${formatNumber(prima.quantita)}, € ${formatNumber(prima.importo)})');
+            '(era ${formatNumber(prima.quantita)}, € ${formatEuro(prima.importo)})');
       } else if (prima != null &&
           dopo != null &&
           (formatNumber(prima.quantita) != formatNumber(dopo.quantita) ||
-              formatNumber(prima.importo) != formatNumber(dopo.importo))) {
+              formatEuro(prima.importo) != formatEuro(dopo.importo))) {
         diff.add(
           'Competenza $descrizione: ${formatNumber(prima.quantita)}, '
-          '€ ${formatNumber(prima.importo)} → ${formatNumber(dopo.quantita)}, '
-          '€ ${formatNumber(dopo.importo)}',
+          '€ ${formatEuro(prima.importo)} → ${formatNumber(dopo.quantita)}, '
+          '€ ${formatEuro(dopo.importo)}',
         );
       }
     }
@@ -585,11 +600,15 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                     periodoLabel: periodoLabelVista,
                     tipo: _isEditing ? _tipoEdit : corrente.tipo,
                     isEditing: _isEditing,
-                    lordoDisplay: formatNumber(_isEditing
+                    lordoDisplay: formatEuro(_isEditing
                         ? computeLordo(_competenzeCorrenti)
                         : corrente.lordo),
-                    nettoDisplay: formatNumber(corrente.netto),
-                    nettoController: _isEditing ? _nettoCtrl : null,
+                    nettoDisplay: formatEuro(_isEditing
+                        ? computeNetto(
+                            computeLordo(_competenzeCorrenti),
+                            _trattenuteCorrenti,
+                          )
+                        : corrente.netto),
                     onTapPeriodo: _isEditing ? _pickPeriodo : null,
                     onTapTipo: _isEditing ? _pickTipo : null,
                   ),
@@ -752,7 +771,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                                       ]
                                     : corrente.trattenute.entries
                                         .map((e) => _trattenutaRow(e.key,
-                                            '− € ${formatNumber(e.value)}'))
+                                            '− € ${formatEuro(e.value)}'))
                                         .toList(),
                           ),
                         ],

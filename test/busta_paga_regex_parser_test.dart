@@ -45,7 +45,12 @@ void main() {
 
       expect(risultato.periodo, '2026-03');
       expect(risultato.lordo, closeTo(1050.00, 0.001));
-      expect(risultato.netto, closeTo(988.68, 0.001));
+      // Netto derivato (lordo - trattenute): 1050.00 - 61.32 (INPS) - 3.50
+      // (CONTRIBUTO EBILOG) = 985.18. Diverso dal netto grezzo letto dal PDF
+      // (988.68) perché nel testo sintetico il residuo "Altre trattenute"
+      // risulterebbe negativo e non viene aggiunto (vedi test dedicato più
+      // sotto sul calcolo di quella voce).
+      expect(risultato.netto, closeTo(985.18, 0.001));
       expect(risultato.trattenute['INPS'], closeTo(61.32, 0.001));
     });
 
@@ -210,6 +215,20 @@ void main() {
       );
     });
 
+    test('legge gli ultimi 3 numeri del blocco ex festività anche con un '
+        '"residuo anno precedente" davanti (con spazio, non concatenato)',
+        () {
+      final testo = _testoSintetico.replaceFirst(
+        '12,00 (ORE)5,00 3,00 8,00 (ORE)',
+        '12,00 (ORE)1,50 5,00 3,00 8,00 (ORE)',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.exFestivitaMaturate, closeTo(5.00, 0.001));
+      expect(risultato.exFestivitaGodute, closeTo(3.00, 0.001));
+      expect(risultato.exFestivitaResidue, closeTo(8.00, 0.001));
+    });
+
     test('estrae straordinari e stima ore lavorate da giorni×8', () {
       final risultato = parser.parse(_testoSintetico);
 
@@ -339,7 +358,9 @@ void main() {
     test('warning sul segno "-" scartato quando il netto lo ha davvero', () {
       final risultato = parser.parse(_testoSintetico);
 
-      expect(risultato.netto, closeTo(988.68, 0.001));
+      // Netto derivato, vedi commento nel test "estrae correttamente
+      // periodo, lordo, netto e trattenute".
+      expect(risultato.netto, closeTo(985.18, 0.001));
       expect(
         risultato.warnings.any((w) => w.startsWith('netto: segno "-"')),
         isTrue,
@@ -355,7 +376,7 @@ void main() {
       );
       final risultato = parser.parse(testo);
 
-      expect(risultato.netto, closeTo(988.68, 0.001));
+      expect(risultato.netto, closeTo(985.18, 0.001));
       expect(
         risultato.warnings.any((w) => w.startsWith('netto: segno "-"')),
         isFalse,
@@ -420,7 +441,11 @@ void main() {
       final risultato = parser.parse(testo);
 
       expect(risultato.lordo, closeTo(1050.00, 0.001));
-      expect(risultato.netto, closeTo(1500.00, 0.001));
+      // Il warning si basa sul netto grezzo letto dal PDF (1500.00, > lordo)
+      // ma il valore restituito resta il netto derivato (lordo - trattenute:
+      // qui il residuo "Altre trattenute" risulterebbe negativo e non viene
+      // aggiunto, quindi 1050.00 - 61.32 - 3.50 = 985.18).
+      expect(risultato.netto, closeTo(985.18, 0.001));
       expect(
         risultato.warnings,
         contains('netto superiore al lordo, verifica i dati estratti'),

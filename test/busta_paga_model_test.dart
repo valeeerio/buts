@@ -76,4 +76,23 @@ void main() {
       expect(computeStraordinari(const []), 0);
     });
   });
+
+  group('computeNetto', () {
+    test('sottrae la somma delle trattenute dal lordo', () {
+      const trattenute = {'INPS': 61.32, 'IRPEF': 150.0};
+
+      expect(computeNetto(1050.0, trattenute), closeTo(838.68, 0.001));
+    });
+
+    test('mappa trattenute vuota produce netto = lordo', () {
+      expect(computeNetto(1050.0, const {}), closeTo(1050.0, 0.001));
+    });
+
+    test('trattenute che superano il lordo producono un netto negativo, '
+        'senza clamp', () {
+      const trattenute = {'INPS': 600.0, 'IRPEF': 600.0};
+
+      expect(computeNetto(1000.0, trattenute), closeTo(-200.0, 0.001));
+    });
+  });
 }

@@ -146,13 +146,16 @@ class BustaPagaRegexParser {
 
   // Terzo blocco ratei "EX FESTIVITA'" (vedi intestazione tabella nel PDF:
   // FERIE / PERMESSI (R.O.L.) / EX FESTIVITA'), stessa struttura
-  // maturato/goduto/residuo di ferie/ROL ma SENZA un numero "residuo anno
-  // precedente" da scartare in testa. Cercato SOLO nel testo subito dopo la
-  // fine del match ROL (non con un regex libero su tutto il documento) per
-  // evitare di agganciare tag "(ORE)" di sezioni successive non correlate —
-  // stesso principio di scoping già usato per le trattenute verificate.
+  // maturato/goduto/residuo di ferie/ROL — come per ferie/ROL, il blocco può
+  // riportare un "residuo anno precedente" incollato davanti ai 3 numeri
+  // reali, quindi catturiamo sempre gli ULTIMI 3 numeri prima del tag
+  // "(ORE)", non i primi (struttura identica a `_ratesFerie`). Cercato SOLO
+  // nel testo subito dopo la fine del match ROL (non con un regex libero su
+  // tutto il documento) per evitare di agganciare tag "(ORE)" di sezioni
+  // successive non correlate — stesso principio di scoping già usato per le
+  // trattenute verificate.
   static final _ratesExFestivita = RegExp(
-    r'^\s*(\d+,\d{2})\s+(\d+,\d{2})\s+(\d+,\d{2})\s*\(ORE\)',
+    r'(\d+,\d{2})\s+(\d+,\d{2})\s+(\d+,\d{2})\s*\(ORE\)',
   );
 
   // Un valore di rateo (giorni/ore maturati/goduti/residui in un mese)
@@ -449,10 +452,18 @@ class BustaPagaRegexParser {
       warnings.add('netto superiore al lordo, verifica i dati estratti');
     }
 
+    // Il valore finale di `netto` è sempre quello derivato (lordo -
+    // trattenute, incluso l'eventuale residuo "Altre trattenute" appena
+    // calcolato sopra) — non il valore grezzo letto dal PDF, che resta usato
+    // solo come input intermedio per calcolare quel residuo e per il
+    // controllo di coerenza "netto superiore al lordo" appena sopra.
+    final nettoDerivato =
+        netto != null ? computeNetto(lordo, trattenute) : null;
+
     return BustaPagaEstratti(
       periodo: periodo,
       lordo: lordo > 0 ? lordo : null,
-      netto: netto,
+      netto: nettoDerivato,
       trattenute: trattenute,
       straordinari: straordinari,
       ferieMaturate: ferieMaturate,

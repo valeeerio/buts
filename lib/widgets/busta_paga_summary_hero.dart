@@ -75,7 +75,7 @@ class BustaPagaSummaryHero extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      '€ ${formatNumber(bustaPaga.netto)}',
+                      '€ ${formatEuro(bustaPaga.netto)}',
                       style: AppTextStyles.greeting.copyWith(
                         color: labelPrimary,
                         fontWeight: FontWeight.w400,

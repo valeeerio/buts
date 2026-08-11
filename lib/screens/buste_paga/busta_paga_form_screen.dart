@@ -62,8 +62,6 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   late DateTime _periodo;
   late TipoBustaPaga _tipo;
 
-  late final TextEditingController _nettoController;
-
   late final TextEditingController _ferieMaturateController;
   late final TextEditingController _ferieGoduteController;
   late final TextEditingController _ferieResidueController;
@@ -112,9 +110,6 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
         DateTime(DateTime.now().year, DateTime.now().month);
     _tipo = estratti.tipo;
 
-    _nettoController = TextEditingController(
-        text: estratti.netto == null ? '' : formatNumber(estratti.netto!));
-
     _ferieMaturateController =
         TextEditingController(text: formatNumber(estratti.ferieMaturate));
     _ferieGoduteController =
@@ -152,6 +147,9 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
             .map((e) => TrattenutaEditRow(
                 chiave: e.key, importo: e.value.toStringAsFixed(2)))
             .toList();
+    for (final row in _trattenute) {
+      _attachTrattenutaListeners(row);
+    }
 
     final competenzeIniziali = estratti.competenze;
     _competenze = competenzeIniziali.isEmpty
@@ -160,7 +158,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
             .map((v) => VoceCompetenzaEditRow(
                   descrizione: v.descrizione,
                   quantita: formatNumber(v.quantita),
-                  importo: v.importo == 0 ? '' : formatNumber(v.importo),
+                  importo: v.importo == 0 ? '' : formatEuro(v.importo),
                 ))
             .toList();
     for (final row in _competenze) {
@@ -200,7 +198,6 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   void dispose() {
     _scrollController.removeListener(_updateBottomFade);
     _scrollController.dispose();
-    _nettoController.dispose();
     _ferieMaturateController.dispose();
     _ferieGoduteController.dispose();
     _ferieResidueController.dispose();
@@ -296,8 +293,32 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     );
   }
 
+  /// Rebuild forzato ogni volta che l'importo di una trattenuta cambia, così
+  /// il Netto mostrato in hero (derivato da Lordo - trattenute) resta
+  /// sincronizzato live — stesso meccanismo di `_attachCompetenzaListeners`.
+  void _attachTrattenutaListeners(TrattenutaEditRow row) {
+    row.importo.addListener(_onResiduiChanged);
+  }
+
+  /// Mappa trattenute correnti da `_trattenute`, filtrando le righe con
+  /// chiave vuota — stesso filtro già usato al salvataggio (`_save`), estratto
+  /// qui perché riusato anche per il Netto mostrato live in `build`.
+  Map<String, double> get _trattenuteCorrenti {
+    final trattenute = <String, double>{};
+    for (final row in _trattenute) {
+      final chiave = row.chiave.text.trim();
+      if (chiave.isEmpty) continue;
+      trattenute[chiave] = _parse(row.importo);
+    }
+    return trattenute;
+  }
+
   void _addTrattenuta() {
-    setState(() => _trattenute.add(TrattenutaEditRow()));
+    setState(() {
+      final row = TrattenutaEditRow();
+      _attachTrattenutaListeners(row);
+      _trattenute.add(row);
+    });
   }
 
   void _removeTrattenuta(int index) {
@@ -359,17 +380,6 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   }
 
   Future<void> _save() async {
-    final nettoText = _nettoController.text.trim();
-    if (nettoText.isEmpty ||
-        double.tryParse(nettoText.replaceAll('.', '').replaceAll(',', '.')) ==
-            null) {
-      _showAlert(
-        'Netto non valido',
-        'Inserisci un valore numerico per il netto prima di salvare.',
-      );
-      return;
-    }
-
     // Stesso controllo anti-duplicati già usato dal dettaglio
     // (`busta_paga_detail_screen.dart._save()`): per le mensili anno+mese+
     // tipo, per 13esima/14esima solo anno+tipo. Qui è sempre un nuovo
@@ -395,25 +405,22 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
       return;
     }
 
-    final trattenute = <String, double>{};
-    for (final row in _trattenute) {
-      final chiave = row.chiave.text.trim();
-      if (chiave.isEmpty) continue;
-      trattenute[chiave] = _parse(row.importo);
-    }
+    final trattenute = _trattenuteCorrenti;
 
-    // Lordo/straordinari sono derivati dalla lista competenze correntemente
-    // in editing (vedi computeLordo/computeStraordinari): per un nuovo
-    // inserimento, se la lista è vuota non c'è un "valore precedente" da
+    // Lordo/straordinari/netto sono derivati dalla lista competenze/
+    // trattenute correntemente in editing (vedi
+    // computeLordo/computeStraordinari/computeNetto): per un nuovo
+    // inserimento, se le liste sono vuote non c'è un "valore precedente" da
     // preservare, quindi restano 0.
     final competenze = _competenzeCorrenti;
+    final lordo = computeLordo(competenze);
 
     final bustaPaga = BustaPaga(
       id: 'bp-${DateTime.now().millisecondsSinceEpoch}',
       periodo: _periodo,
       fileOrigine: _fileOrigine,
-      lordo: computeLordo(competenze),
-      netto: _parse(_nettoController),
+      lordo: lordo,
+      netto: computeNetto(lordo, trattenute),
       trattenute: trattenute,
       straordinari: computeStraordinari(competenze),
       ferieMaturate: _parse(_ferieMaturateController),
@@ -503,9 +510,11 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                       tipo: _tipo,
                       isEditing: true,
                       lordoDisplay:
-                          formatNumber(computeLordo(_competenzeCorrenti)),
-                      nettoDisplay: formatNumber(_parse(_nettoController)),
-                      nettoController: _nettoController,
+                          formatEuro(computeLordo(_competenzeCorrenti)),
+                      nettoDisplay: formatEuro(computeNetto(
+                        computeLordo(_competenzeCorrenti),
+                        _trattenuteCorrenti,
+                      )),
                       onTapPeriodo: _pickPeriodo,
                       onTapTipo: _pickTipo,
                     ),

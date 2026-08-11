@@ -90,10 +90,27 @@ String periodoDisplayFor({required DateTime periodo, required TipoBustaPaga tipo
 /// Formatta un numero troncando a intero se il valore è intero, altrimenti
 /// mostra due cifre decimali — estratta da `_formatNumber` in
 /// `BustaPagaDetailScreen`, riusata anche da `BustaPagaSummaryHero`.
+///
+/// Usata per quantità NON monetarie (ferie, ROL, permessi, ore lavorate,
+/// straordinari, quantità delle voci di competenza) — per importi in euro
+/// usare invece [formatEuro].
 String formatNumber(double value) {
   return value == value.roundToDouble()
       ? value.toStringAsFixed(0)
       : value.toStringAsFixed(2);
+}
+
+final NumberFormat _euroFormat = NumberFormat('#,##0.00', 'it_IT');
+
+/// Formatta un importo in EURO nel formato italiano: punto come separatore
+/// delle migliaia, virgola come separatore decimale, sempre esattamente due
+/// cifre decimali (es. "1.483,54", "1.411,00") — a differenza di
+/// [formatNumber], che omette i decimali per i valori interi e non
+/// raggruppa le migliaia, e va usata solo per quantità non monetarie.
+/// Riservata a netto, lordo, importi di competenze/trattenute e ogni altro
+/// valore espresso in euro.
+String formatEuro(double value) {
+  return _euroFormat.format(value);
 }
 
 /// Converte un numero in formato italiano digitato dall'utente (punto come

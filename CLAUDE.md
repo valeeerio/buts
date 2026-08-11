@@ -295,3 +295,54 @@ precompilazione dati da PDF, nessun piano di sostituirlo.
 - Componenti riutilizzabili in `lib/widgets/`, non dentro le singole schermate.
 - Preferire `CupertinoDynamicColor.resolve(context)` per ogni colore, per garantire
   che light/dark mode funzionino automaticamente.
+
+## Come collaborare su questo progetto (regole del coordinatore)
+
+Queste regole valgono per l'assistente che coordina il lavoro su Buts, non solo
+per uno specifico agente dev — governano come si distribuisce il lavoro tra
+coordinatore, agenti dev1/dev2, agente `revisore` e utente.
+
+- **Sviluppo sempre delegato**: il coordinatore non scrive mai direttamente
+  codice di feature/fix (niente `Edit`/`Write` diretti su file Dart) — delega
+  sempre a un agente dev1 o dev2, interscambiabili, anche per fix piccoli o
+  "ovvi". Il coordinatore assegna task e file in scope, poi lancia `revisore`.
+  *Perché*: l'utente vuole poter sviluppare/testare in parallelo nella stessa
+  sessione senza che il coordinatore intervenga direttamente sul codice.
+- **Revisore dopo ogni dev**: al termine di ogni run di dev1/dev2, il
+  coordinatore lancia sempre `revisore` con lo stesso scope/parametri passati
+  all'agente dev (stessi file, stesso task) — non uno scope diverso senza
+  motivo. È un passo fisso, non opzionale, anche per fix piccoli.
+- **Notifica di lancio, non richiesta di conferma**: quando si lanciano
+  agenti dev1/dev2 (anche in parallelo), il coordinatore comunica cosa sta
+  delegando (agente, scope, file) nel momento in cui parte, ma non aspetta un
+  ok esplicito prima di procedere.
+- **File in uso dall'utente**: se l'utente lavora manualmente su file del
+  progetto in parallelo agli agenti dev, è lui a segnalare quali file sta
+  usando — il coordinatore evita di assegnarli in scrittura a un agente dev
+  finché l'utente non segnala che sono di nuovo liberi.
+- **Istanze dell'utente intoccabili**: se l'utente ha avviato di persona un
+  simulatore iOS, `flutter run`, hot reload o altro processo, il coordinatore
+  (e gli agenti che lancia) non lo ferma, non lo riavvia, e non ne lancia uno
+  equivalente in parallelo che possa entrare in conflitto. Prima di comandi
+  come `killall` o un nuovo `flutter run`/`build` per verifica, controllare se
+  potrebbe esserci un'istanza attiva dell'utente e, in caso di dubbio,
+  chiedere invece di agire. `flutter analyze`/`flutter test` restano liberi,
+  non sono processi persistenti.
+- **Test visivi solo dell'utente**: il coordinatore esegue solo verifiche
+  statiche (`flutter analyze`, `flutter test`, `build_runner`, skill
+  `flutter-check`) — non avvia mai l'app in un simulatore/device per
+  osservare la UI, non fa screenshot, non esprime giudizi sull'aspetto
+  visivo. Quando un task tocca UI/widget, si ferma alla verifica di
+  compilazione/test e segnala che la modifica è pronta per il test visivo
+  dell'utente — non dichiara mai "verificato visivamente" senza che sia stato
+  l'utente a controllarlo.
+- **Autonomia Git limitata**: comandi git di sola lettura (`status`, `diff`,
+  `log`, `show`, `branch --list`) sono liberi. Qualunque comando che modifica
+  lo stato del repo (`commit`, creazione branch/checkout, `push`, `merge`,
+  `reset`, `rebase`...) parte **solo** su istruzione esplicita dell'utente in
+  quel momento — mai di iniziativa, anche se sembra il passo logico dopo un
+  task completato. *Nota*: `.claude/settings.local.json` pre-autorizza
+  l'harness a eseguire senza prompt di conferma `git push/checkout/pull/
+  merge/remote/add/commit` — questo è un permesso tecnico dell'harness, non
+  un via libera a usarli di iniziativa: questa regola resta comunque il
+  criterio su *quando* il coordinatore decide di lanciarli.

@@ -33,6 +33,7 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
   static const _ferieColor = AppColors.systemBlue;
   static const _rolColor = AppColors.systemPurple;
   static const _permessiColor = AppColors.systemOrange;
+  static const _exFestivitaColor = AppColors.systemGreen;
   static const _straordinarioColor = AppColors.systemOrange;
 
   @override
@@ -101,6 +102,8 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
                 _LegendEntry(label: 'Ferie residue', color: _ferieColor),
                 _LegendEntry(label: 'ROL residui', color: _rolColor),
                 _LegendEntry(label: 'Permessi goduti', color: _permessiColor),
+                _LegendEntry(
+                    label: 'Ex festività residue', color: _exFestivitaColor),
               ],
               chart: _FerieRolPermessiChart(buste: filtrati),
               stats: _ferieRolPermessiStats(filtrati),
@@ -420,8 +423,10 @@ _StatsTableData? _ferieRolPermessiStats(List<BustaPaga> buste) {
   final maxFerie = _bustaConMassimo(buste, (b) => b.ferieResidue);
   final minRol = _bustaConMinimo(buste, (b) => b.rolResidui);
   final maxRol = _bustaConMassimo(buste, (b) => b.rolResidui);
+  final minExFestivita = _bustaConMinimo(buste, (b) => b.exFestivitaResidue);
+  final maxExFestivita = _bustaConMassimo(buste, (b) => b.exFestivitaResidue);
   return (
-    colonne: const ['Ferie', 'ROL', 'Permessi'],
+    colonne: const ['Ferie', 'ROL', 'Permessi', 'Ex festività'],
     righe: [
       (
         'Media',
@@ -429,6 +434,7 @@ _StatsTableData? _ferieRolPermessiStats(List<BustaPaga> buste) {
           _formatStatNumber(_media(buste, (b) => b.ferieResidue)),
           _formatStatNumber(_media(buste, (b) => b.rolResidui)),
           _formatStatNumber(_media(buste, (b) => b.permessiGoduti)),
+          _formatStatNumber(_media(buste, (b) => b.exFestivitaResidue)),
         ],
       ),
       (
@@ -437,6 +443,7 @@ _StatsTableData? _ferieRolPermessiStats(List<BustaPaga> buste) {
           '${_formatStatNumber(minFerie.ferieResidue)} (${periodoAxisLabel(minFerie.periodo)})',
           '${_formatStatNumber(minRol.rolResidui)} (${periodoAxisLabel(minRol.periodo)})',
           '—',
+          '${_formatStatNumber(minExFestivita.exFestivitaResidue)} (${periodoAxisLabel(minExFestivita.periodo)})',
         ],
       ),
       (
@@ -445,11 +452,17 @@ _StatsTableData? _ferieRolPermessiStats(List<BustaPaga> buste) {
           '${_formatStatNumber(maxFerie.ferieResidue)} (${periodoAxisLabel(maxFerie.periodo)})',
           '${_formatStatNumber(maxRol.rolResidui)} (${periodoAxisLabel(maxRol.periodo)})',
           '—',
+          '${_formatStatNumber(maxExFestivita.exFestivitaResidue)} (${periodoAxisLabel(maxExFestivita.periodo)})',
         ],
       ),
       (
         'Totale',
-        ['—', '—', _formatStatNumber(_totale(buste, (b) => b.permessiGoduti))],
+        [
+          '—',
+          '—',
+          _formatStatNumber(_totale(buste, (b) => b.permessiGoduti)),
+          '—',
+        ],
       ),
     ],
   );
@@ -758,7 +771,7 @@ class _NettoLordoChart extends StatelessWidget {
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               leftTitles: _valueLeftAxisTitles(
                 labelColor: labelColor,
-                formatValue: (v) => '€${formatNumber(v)}',
+                formatValue: (v) => '€${formatEuro(v)}',
               ),
               bottomTitles: _periodoBottomAxisTitles(
                 periodi: buste.map((b) => b.periodo).toList(),
@@ -801,8 +814,8 @@ class _NettoLordoChart extends StatelessWidget {
     final busta = buste[spot.x.toInt()];
     final label = spot.barIndex == 0 ? 'Netto' : 'Lordo';
     final text = showPeriodo
-        ? '${periodoAxisLabel(busta.periodo)}\n$label: €${formatNumber(spot.y)}'
-        : '$label: €${formatNumber(spot.y)}';
+        ? '${periodoAxisLabel(busta.periodo)}\n$label: €${formatEuro(spot.y)}'
+        : '$label: €${formatEuro(spot.y)}';
     return LineTooltipItem(
       text,
       AppTextStyles.cardLabel.copyWith(
@@ -849,6 +862,8 @@ class _FerieRolPermessiChart extends StatelessWidget {
         BustePagaStatisticheScreen._rolColor, context);
     final permessiColor = CupertinoDynamicColor.resolve(
         BustePagaStatisticheScreen._permessiColor, context);
+    final exFestivitaColor = CupertinoDynamicColor.resolve(
+        BustePagaStatisticheScreen._exFestivitaColor, context);
     final gridColor =
         CupertinoDynamicColor.resolve(AppColors.separator, context);
     final labelColor =
@@ -861,6 +876,7 @@ class _FerieRolPermessiChart extends StatelessWidget {
       ...buste.map((b) => b.ferieResidue),
       ...buste.map((b) => b.rolResidui),
       ...buste.map((b) => b.permessiGoduti),
+      ...buste.map((b) => b.exFestivitaResidue),
     ].reduce((a, b) => a > b ? a : b);
     final bounds = _niceAxisBounds(0, valoriMax, step: 20);
 
@@ -911,6 +927,8 @@ class _FerieRolPermessiChart extends StatelessWidget {
               _line(buste.map((b) => b.rolResidui).toList(), rolColor),
               _line(
                   buste.map((b) => b.permessiGoduti).toList(), permessiColor),
+              _line(buste.map((b) => b.exFestivitaResidue).toList(),
+                  exFestivitaColor),
             ],
           ),
         );
@@ -927,7 +945,8 @@ class _FerieRolPermessiChart extends StatelessWidget {
     final label = switch (spot.barIndex) {
       0 => 'Ferie residue',
       1 => 'ROL residui',
-      _ => 'Permessi goduti',
+      2 => 'Permessi goduti',
+      _ => 'Ex festività residue',
     };
     final text = showPeriodo
         ? '${periodoAxisLabel(busta.periodo)}\n$label: ${formatNumber(spot.y)}'

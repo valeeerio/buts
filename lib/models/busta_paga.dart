@@ -48,6 +48,13 @@ double computeStraordinari(List<VoceCompetenza> competenze) => competenze
     .where((voce) => voceEStraordinaria(voce.descrizione))
     .fold(0.0, (somma, voce) => somma + voce.quantita);
 
+/// Il "netto" derivato: [lordo] meno la somma di tutte le [trattenute],
+/// stessa logica di [computeLordo]/[computeStraordinari] — nessun clamp,
+/// può risultare negativo se le trattenute superano il lordo (dato di
+/// input incoerente da segnalare altrove, non da mascherare qui).
+double computeNetto(double lordo, Map<String, double> trattenute) =>
+    lordo - trattenute.values.fold(0.0, (somma, v) => somma + v);
+
 /// Dati ricavabili da una busta paga. Nomi campo allineati 1:1 a
 /// piano_progetto_finanze_personali.md §5 per rendere meccanica la futura
 /// mappatura a tabella Drift (skill drift-migration / agent
@@ -89,9 +96,11 @@ class BustaPaga {
   /// Voci di competenza individuali (es. Retribuzione ordinaria, Edr
   /// contrattuale, Straordinario per fascia). Vuota di default per
   /// retrocompatibilità con le buste paga salvate prima dell'introduzione di
-  /// questo campo. [lordo]/[straordinari] restano colonne memorizzate,
-  /// ricalcolate da questa lista al momento del salvataggio (vedi
-  /// `computeLordo`/`computeStraordinari`), non getter derivati al volo.
+  /// questo campo. [lordo]/[straordinari]/[netto] restano colonne
+  /// memorizzate, ricalcolate rispettivamente da questa lista e da
+  /// [trattenute] al momento del salvataggio (vedi
+  /// `computeLordo`/`computeStraordinari`/`computeNetto`), non getter
+  /// derivati al volo.
   final List<VoceCompetenza> competenze;
 
   final StatoVerificaBustaPaga statoVerifica;

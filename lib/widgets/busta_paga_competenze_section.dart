@@ -128,7 +128,7 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Text(
-              voce.importo == 0 ? '—' : '€ ${formatNumber(voce.importo)}',
+              voce.importo == 0 ? '—' : '€ ${formatEuro(voce.importo)}',
               style: valueStyle,
               textAlign: TextAlign.center,
             ),

@@ -17,24 +17,24 @@ const _tipoLabels = {
 };
 
 /// Hero card in cima al dettaglio/form busta paga: mese, badge di stato e
-/// netto in massima evidenza. In modalità modifica il netto diventa un
-/// campo di testo e il mese/tipo sono tap-to-edit (aprono i picker del
-/// chiamante); il badge di stato resta sempre di sola lettura, non è
-/// modificabile direttamente.
+/// netto in massima evidenza. In modalità modifica il mese/tipo sono
+/// tap-to-edit (aprono i picker del chiamante); il badge di stato resta
+/// sempre di sola lettura, non è modificabile direttamente. Il netto è
+/// sempre un valore di sola lettura (derivato da lordo meno trattenute, mai
+/// un campo editabile diretto).
 ///
 /// Layout: la prima riga affianca periodo e tipo inline (es. "Luglio 2026 ·
 /// Mensile") con il badge di stato a destra; sotto, una riga a due colonne
 /// mostra il Lordo (sinistra, sempre di sola lettura — è un valore derivato
 /// da `competenze`, mai un campo editabile diretto, vedi CLAUDE.md) e il
-/// Netto (destra, il valore "hero" vero e proprio, l'unico editabile in
-/// modalità modifica).
+/// Netto (destra, il valore "hero" vero e proprio, anch'esso sempre
+/// derivato/di sola lettura).
 ///
 /// Non richiede un `BustaPaga` intero: solo `isConfermato` per il badge
 /// (il form di import, che non ha ancora una busta paga salvata, può così
 /// passare `isConfermato: false` senza fabbricare un modello fittizio),
 /// `lordoDisplay` e `nettoDisplay` (già formattati, senza simbolo "€") per
-/// i valori di sola lettura — quest'ultimo mostrato solo quando
-/// `nettoController` è `null`.
+/// i due valori.
 class BustaPagaHeroCard extends StatelessWidget {
   final bool isConfermato;
   final String periodoLabel;
@@ -42,7 +42,6 @@ class BustaPagaHeroCard extends StatelessWidget {
   final bool isEditing;
   final String lordoDisplay;
   final String nettoDisplay;
-  final TextEditingController? nettoController;
   final VoidCallback? onTapPeriodo;
   final VoidCallback? onTapTipo;
 
@@ -54,7 +53,6 @@ class BustaPagaHeroCard extends StatelessWidget {
     required this.isEditing,
     required this.lordoDisplay,
     required this.nettoDisplay,
-    this.nettoController,
     this.onTapPeriodo,
     this.onTapTipo,
   });
@@ -184,30 +182,11 @@ class BustaPagaHeroCard extends StatelessWidget {
               ),
               Expanded(
                 flex: 2,
-                child: nettoController == null
-                    ? Text(
-                        '€ $nettoDisplay',
-                        textAlign: TextAlign.right,
-                        style: heroAmountStyle,
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text('€ ', style: heroAmountStyle),
-                          Expanded(
-                            child: CupertinoTextField(
-                              controller: nettoController,
-                              placeholder: '0',
-                              textAlign: TextAlign.right,
-                              keyboardType: const TextInputType.numberWithOptions(
-                                  decimal: true, signed: false),
-                              decoration: const BoxDecoration(),
-                              padding: EdgeInsets.zero,
-                              style: heroAmountStyle,
-                            ),
-                          ),
-                        ],
-                      ),
+                child: Text(
+                  '€ $nettoDisplay',
+                  textAlign: TextAlign.right,
+                  style: heroAmountStyle,
+                ),
               ),
             ],
           ),
