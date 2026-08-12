@@ -273,9 +273,14 @@ scroll naturale sotto, con lo stesso pattern di `Padding` esterno che riduce il
 viewport (`_actionBarReservedHeight`) per il margine verso la barra flottante,
 e un `ShaderMask` con `fadeHeight` piccolo (poche decine di pixel, non l'intero
 margine) solo per ammorbidire lo stacco finale, non per "nascondere" più righe
-di contenuto come nell'Archivio. Se si ritocca uno dei due effetti, non
-assumere che debbano avere lo stesso valore assoluto di `fadeHeight`: il
-viewport sottostante è diverso in altezza tra le due schermate.
+di contenuto come nell'Archivio. Lo stesso `ShaderMask` sfuma anche l'inizio
+della lista (gradiente `transparent→white→white→transparent` dall'alto verso
+il basso, stesso `fadeHeight` di partenza per entrambi gli estremi), così il
+primo item (chip documento) scompare in dissolvenza sotto la hero card fissa
+invece che con un taglio netto quando si scrolla verso l'alto. Se si ritocca
+uno dei due effetti, non assumere che debbano avere lo stesso valore assoluto
+di `fadeHeight`: il viewport sottostante è diverso in altezza tra le due
+schermate.
 
 ## Cosa manca (prossimi passi, in ordine di priorità suggerito)
 

@@ -122,10 +122,15 @@ class BustaPagaRegexParser {
   // gruppo descrizione (`[^\n]+?`, non-greedy) è generico — cattura
   // qualunque testo fino al tag GIORNI/ORE più vicino sulla stessa riga —
   // e validato sul campione di PDF reali disponibile: potrebbe richiedere
-  // aggiustamenti su layout mai visti finora.
+  // aggiustamenti su layout mai visti finora. Il segno "-" davanti
+  // all'importo è opzionale (a differenza di quantità/tariffa, che non sono
+  // mai negative): un conguaglio/storno a debito nel cedolino può comparire
+  // come voce di competenza con importo negativo, e va propagato in
+  // `VoceCompetenza.importo` così com'è — scartarlo (come accadeva prima)
+  // invertirebbe silenziosamente il suo effetto in `computeLordo`.
   static final _rigaVoceCompetenza = RegExp(
     r'([^\n]+?)\s*(?:GIORNI|ORE)\s*(\d+,\d{3})'
-    r'(?:\s+[\d.]+,\d{2,5}\s+([\d.]+,\d{2}))?',
+    r'(?:\s+[\d.]+,\d{2,5}\s+(-?[\d.]+,\d{2}))?',
   );
 
   // Descrizioni (confronto case-insensitive, su prefisso trimmato) escluse
@@ -201,9 +206,14 @@ class BustaPagaRegexParser {
   // artefatto incostante di `syncfusion_flutter_pdf`, non deterministico
   // (dipende da come il layout PDF posiziona quella cella quel mese),
   // quindi non recuperabile con un regex più specifico. Soglia scelta ben
-  // sopra qualunque valore mensile plausibile (giorni/ore sempre < 50) ma
-  // ben sotto ai numeri concatenati osservati (dell'ordine di 670000+).
-  bool _valoreRateoImplausibile(double v) => v.abs() >= 100;
+  // sopra qualunque residuo realisticamente accumulabile (un dipendente che
+  // non gode ferie/ROL/ex festività per diversi anni consecutivi può
+  // arrivare a qualche centinaio di ore/giorni residui: 100 era troppo
+  // aggressiva e avrebbe scartato dati legittimi in quel caso, es. un
+  // residuo di 150 ore) ma ben sotto ai numeri concatenati osservati
+  // (dell'ordine di 670000+) — 1000 lascia comunque un ampio margine da
+  // entrambi i lati.
+  bool _valoreRateoImplausibile(double v) => v.abs() >= 1000;
 
   // Ore lavorate reali ("ORE LAV.", campo del blocco "Q.T.A." del
   // cedolino, distinto da "SETT. RETR."/"GG. RETR."/"GG. LAV." sulla
@@ -240,6 +250,23 @@ class BustaPagaRegexParser {
     r'(?:^|\s)\d{2,6}\s+(\d+,\d{2})',
   );
 
+  // Terzo numero (formato con eventuale separatore delle migliaia ".")
+  // immediatamente dopo il valore di "ORE LAV." nello stesso blocco Q.T.A.
+  // (stesso segmento scoped e stesso ancoraggio già usato per
+  // `_oreLavorateDirette`, applicato subito dopo la fine di quel match):
+  // sul PDF di riferimento coincide con "IMPON.CONTRIBUTIVO MESE", che a sua
+  // volta coincide col lordo reale del cedolino (1.543,13) — un totale
+  // competenze già stampato dal software payroll, indipendente dalla somma
+  // delle singole voci di competenza lette da `_rigaVoceCompetenza`. Usato
+  // SOLO come controllo incrociato di plausibilità contro
+  // `computeLordo(competenze)` (vedi `parse()`), mai per sovrascrivere il
+  // valore calcolato: se il layout cambia e questo terzo numero non è più
+  // "IMPON.CONTRIBUTIVO MESE", il controllo può produrre falsi positivi
+  // (warning spurio) ma non falsi dati salvati.
+  static final _totaleCompetenzeDopoOreLavorate = RegExp(
+    r'^\s*[\d.]+,\d{2}\s+[\d.]+,\d{2}\s+([\d.]+,\d{2})',
+  );
+
   static final _inps = RegExp(r'INPS([\d.]+,\d{2})\s+(\d,\d{2})(\d+,\d{2})');
 
   // Nome+aliquota+importo attaccati senza spazio, pattern osservato SOLO per
@@ -248,9 +275,13 @@ class BustaPagaRegexParser {
   // regex applicato a tutta la sezione trattenute rischierebbe di leggere
   // importi annui/imponibili come se fossero l'importo mensile trattenuto
   // (es. una riga "Rata Addizionale Regionale" seguita da un imponibile
-  // fiscale annuo, non un importo mensile).
+  // fiscale annuo, non un importo mensile). Il segno "-" davanti
+  // all'importo è opzionale, stessa motivazione di `_rigaVoceCompetenza`: un
+  // conguaglio/storno a credito su questa trattenuta potrebbe comparire come
+  // importo negativo, da propagare così com'è nella mappa `trattenute`
+  // invece di scartarlo silenziosamente.
   static final _rigaTrattenutaVerificata =
-      RegExp(r'([A-Z][A-Z ]{2,}?)(\d,\d{2})\s+(\d+,\d{2})');
+      RegExp(r'([A-Z][A-Z ]{2,}?)(\d,\d{2})\s+(-?\d+,\d{2})');
 
   static final _periodo = RegExp(
     r'(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\s+(\d{4})',
@@ -337,7 +368,9 @@ class BustaPagaRegexParser {
     // --- competenze: voci individuali, escludendo ferie/permessi (già
     // modellati altrove) ---
     final competenze = <VoceCompetenza>[];
+    int? primaCompetenzaMatchStart;
     for (final m in _rigaVoceCompetenza.allMatches(testo)) {
+      primaCompetenzaMatchStart ??= m.start;
       final descrizione = m.group(1)!.trim();
       final descrizioneLower = descrizione.toLowerCase();
       final esclusa = _descrizioniEscluseDaCompetenze
@@ -357,7 +390,14 @@ class BustaPagaRegexParser {
     // fonte di verità, vedi computeLordo/computeStraordinari) ---
     final lordo = computeLordo(competenze);
     final straordinari = computeStraordinari(competenze);
-    if (lordo == 0) warnings.add('lordo non trovato (nessuna riga di competenza riconosciuta)');
+    // Nota: il controllo è su `competenze.isEmpty`, non su `lordo == 0` — con
+    // il segno "-" reso opzionale sugli importi delle competenze, un lordo
+    // pari a 0 è un risultato legittimo quando le voci si compensano (es.
+    // +1000,00 e uno storno -1000,00), non un sintomo di "nessuna riga
+    // riconosciuta".
+    if (competenze.isEmpty) {
+      warnings.add('lordo non trovato (nessuna riga di competenza riconosciuta)');
+    }
 
     // --- permessi riduz. orario goduti nel mese: somma tutte le righe
     // trovate ---
@@ -416,9 +456,53 @@ class BustaPagaRegexParser {
       }
     }
 
+    // --- controllo incrociato: il "totale competenze" stampato dal software
+    // payroll subito dopo "ORE LAV." nel blocco Q.T.A. (vedi
+    // _totaleCompetenzeDopoOreLavorate) contro il lordo calcolato dalla
+    // somma delle voci di competenza. Solo quando "ore lavorate" è stato
+    // letto direttamente da un match non ambiguo (stesso ancoraggio, stessa
+    // garanzia di scoping): con un match ambiguo o assente non c'è una
+    // posizione affidabile da cui cercare il terzo numero. Non altera mai
+    // `lordo`, solo segnala una divergenza. ---
+    if (oreLavorateMatches.length == 1) {
+      final dopoOreLavorate =
+          segmentoQta.substring(oreLavorateMatches.first.end);
+      final totaleMatch =
+          _totaleCompetenzeDopoOreLavorate.firstMatch(dopoOreLavorate);
+      if (totaleMatch != null) {
+        final totaleStampato = _toDouble(totaleMatch.group(1)!);
+        if ((totaleStampato - lordo).abs() > 0.05) {
+          warnings.add(
+            'lordo calcolato (€${lordo.toStringAsFixed(2)}) diverge dal '
+            'totale competenze stampato sul PDF (€${totaleStampato.toStringAsFixed(2)}): '
+            'verifica manualmente',
+          );
+        }
+      }
+    }
+
+    // --- ferie / ROL / ex festività: cercati SOLO nel testo che precede la
+    // prima riga di competenza riconosciuta (vedi _rigaVoceCompetenza) —
+    // difesa aggiunta per le mensilità supplementari (13esima/14esima),
+    // dove il blocco ratei è tipicamente assente: senza questo scoping, un
+    // tag letterale "(GIORNI)"/"(ORE)" comparso per puro caso in una
+    // sezione successiva del documento (es. una nota fuori tabella)
+    // potrebbe essere scambiato per il blocco ratei reale, agganciandosi a
+    // numeri che non c'entrano nulla con Ferie/ROL/Ex festività. Su tutti i
+    // PDF/fixture reali disponibili (mensili) il blocco ratei precede
+    // sempre la prima riga di competenza, quindi questo scoping non cambia
+    // il comportamento osservato finora. NOTA: difesa basata su
+    // un'ipotesi ragionevole sulla struttura di una 13esima/14esima, non
+    // validata su un vero PDF di quel tipo (non disponibile in questa
+    // sessione, vedi commento in cima al file) — da rivalidare quando ne
+    // sarà disponibile uno reale.
+    final zonaRatei = primaCompetenzaMatchStart != null
+        ? testo.substring(0, primaCompetenzaMatchStart)
+        : testo;
+
     // --- ferie / ROL (maturati, goduti, residui) ---
     double ferieMaturate = 0, ferieGodute = 0, ferieResidue = 0;
-    final ferieMatch = _ratesFerie.firstMatch(testo);
+    final ferieMatch = _ratesFerie.firstMatch(zonaRatei);
     if (ferieMatch != null) {
       final maturate = _toDouble(ferieMatch.group(1)!);
       final godute = _toDouble(ferieMatch.group(2)!);
@@ -441,7 +525,7 @@ class BustaPagaRegexParser {
     }
 
     double rolMaturati = 0, rolGoduti = 0, rolResidui = 0;
-    final rolMatch = _ratesRol.firstMatch(testo);
+    final rolMatch = _ratesRol.firstMatch(zonaRatei);
     if (rolMatch != null) {
       final maturati = _toDouble(rolMatch.group(1)!);
       final goduti = _toDouble(rolMatch.group(2)!);
@@ -464,10 +548,11 @@ class BustaPagaRegexParser {
     }
 
     // --- ex festività (maturate, godute, residue): cercate solo nel testo
-    // subito dopo la fine del match ROL, vedi _ratesExFestivita ---
+    // subito dopo la fine del match ROL (all'interno della stessa zonaRatei
+    // scoped sopra), vedi _ratesExFestivita ---
     double exFestivitaMaturate = 0, exFestivitaGodute = 0, exFestivitaResidue = 0;
     if (rolMatch != null) {
-      final dopoRol = testo.substring(rolMatch.end);
+      final dopoRol = zonaRatei.substring(rolMatch.end);
       final exFestivitaMatch = _ratesExFestivita.firstMatch(dopoRol);
       if (exFestivitaMatch != null) {
         double maturate, godute, residue;
@@ -622,7 +707,7 @@ class BustaPagaRegexParser {
 
     return BustaPagaEstratti(
       periodo: periodo,
-      lordo: lordo > 0 ? lordo : null,
+      lordo: competenze.isNotEmpty ? lordo : null,
       netto: nettoDerivato,
       trattenute: trattenute,
       straordinari: straordinari,

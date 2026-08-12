@@ -638,17 +638,21 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                       blendMode: BlendMode.dstIn,
                       shaderCallback: (rect) {
                         const fadeHeight = 32.0;
-                        final stop =
+                        var topStop =
+                            (fadeHeight / rect.height).clamp(0.0, 1.0);
+                        final bottomStop =
                             1 - (fadeHeight / rect.height).clamp(0.0, 1.0);
+                        topStop = topStop.clamp(0.0, bottomStop);
                         return LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: const [
+                            CupertinoColors.transparent,
                             CupertinoColors.white,
                             CupertinoColors.white,
                             CupertinoColors.transparent,
                           ],
-                          stops: [0.0, stop, 1.0],
+                          stops: [0.0, topStop, bottomStop, 1.0],
                         ).createShader(rect);
                       },
                       child: ListView(

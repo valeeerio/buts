@@ -130,22 +130,33 @@ final ultimaBustaPagaProvider = Provider<BustaPaga?>((ref) {
 /// Predicato condiviso "questa busta paga entra nelle Statistiche": solo
 /// buste confermate (un dato non ancora verificato non deve influenzare
 /// medie/trend) e di tipo mensile (13esima/14esima sono importi anomali
-/// rispetto al trend mensile, li distorcerebbero). Usato sia da
-/// [periodoRangeDisponibileProvider] sia dalla schermata Statistiche
-/// (`buste_paga_statistiche_screen.dart`), così lo slider di periodo copre
-/// esattamente lo stesso sottoinsieme di dati che poi i grafici mostrano.
+/// rispetto al trend mensile, li distorcerebbero). Usato dalla schermata
+/// Statistiche (`buste_paga_statistiche_screen.dart`) per filtrare i dati
+/// effettivamente graficati/mediati — NON dallo slider di periodo, che usa
+/// invece il predicato più permissivo [_bustaInclusaInRangePeriodo] così da
+/// poter coprire anche buste "Da confermare" più recenti.
 bool bustaInclusaInStatistiche(BustaPaga b) =>
     b.statoVerifica == StatoVerificaBustaPaga.confermato &&
     b.tipo == TipoBustaPaga.mensile;
 
-/// Intervallo di periodi coperto dalle buste paga incluse nelle Statistiche
-/// (vedi [bustaInclusaInStatistiche]), usato come estremi min/max del
+/// Predicato più permissivo di [bustaInclusaInStatistiche], usato solo per
+/// calcolare gli estremi dello slider di periodo: stesso criterio "tipo
+/// mensile" ma senza escludere le buste "Da confermare", così una busta
+/// paga più recente ma non ancora confermata estende comunque l'estremo
+/// massimo dello slider, anche se poi non entra nei grafici/medie di
+/// Statistiche (quelli continuano a filtrare con [bustaInclusaInStatistiche]).
+bool _bustaInclusaInRangePeriodo(BustaPaga b) =>
+    b.tipo == TipoBustaPaga.mensile;
+
+/// Intervallo di periodi coperto dalle buste paga mensili (confermate o
+/// meno, vedi [_bustaInclusaInRangePeriodo]), usato come estremi min/max del
 /// selettore di periodo in Statistiche (`CupertinoRangeSlider`). `null` se
 /// nessuna busta paga soddisfa il predicato.
 final periodoRangeDisponibileProvider =
     Provider<({DateTime start, DateTime end})?>((ref) {
-  final buste =
-      ref.watch(busteRepositoryProvider).where(bustaInclusaInStatistiche);
+  final buste = ref
+      .watch(busteRepositoryProvider)
+      .where(_bustaInclusaInRangePeriodo);
   if (buste.isEmpty) return null;
   final periodi = buste.map((b) => b.periodo).toList()..sort();
   return (start: periodi.first, end: periodi.last);

@@ -11,7 +11,7 @@ import '../../utils/busta_paga_formatting.dart';
 import '../../widgets/liquid_glass_surface.dart';
 
 /// Contenuto della tab "Statistiche" della sezione Buste Paga: andamento
-/// netto/lordo, ferie/ROL/permessi residui e ore di straordinario nel tempo.
+/// netto/lordo, ferie/permessi residui e ore di straordinario nel tempo.
 ///
 /// Palette scelta per coerenza cross-chart: ogni serie usa un colore
 /// semantico di sistema fisso (non legato alle 4 aree Budget, dato che
@@ -97,11 +97,12 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
           ),
           sliver: SliverToBoxAdapter(
             child: _ChartCard(
-              title: 'Ferie, ROL e permessi',
+              title: 'Ferie e permessi',
               legend: const [
                 _LegendEntry(label: 'Ferie residue', color: _ferieColor),
-                _LegendEntry(label: 'ROL residui', color: _rolColor),
-                _LegendEntry(label: 'Permessi goduti', color: _permessiColor),
+                _LegendEntry(label: 'Permessi residui', color: _rolColor),
+                _LegendEntry(
+                    label: 'Permessi orario goduti', color: _permessiColor),
                 _LegendEntry(
                     label: 'Ex festività residue', color: _exFestivitaColor),
               ],
@@ -284,7 +285,7 @@ class _StatsTable extends StatelessWidget {
 
     // Un divisore verticale sottile tra ogni colonna (oltre a quelli
     // orizzontali tra le righe), per separare a colpo d'occhio le serie
-    // quando sono 2-3 affiancate (Netto/Lordo, Ferie/ROL/Permessi).
+    // quando sono 2-3 affiancate (Netto/Lordo, Ferie/Permessi).
     List<Widget> withColumnDividers(List<Widget> celle) {
       return [
         for (var i = 0; i < celle.length; i++) ...[
@@ -411,12 +412,12 @@ _StatsTableData? _nettoLordoStats(List<BustaPaga> buste) {
   );
 }
 
-/// Tabella del riepilogo sotto il grafico Ferie/ROL/Permessi. Ferie residue
-/// e ROL residui sono saldi puntuali mese per mese (non quantità da
-/// sommare), quindi la riga "Totale" li mostra come `'—'` — solo i permessi
-/// goduti sono una quantità che ha senso cumulare nel periodo. Stessa
-/// convenzione già usata da `_MaturazioniSection` nel dettaglio busta paga
-/// per le celle non applicabili.
+/// Tabella del riepilogo sotto il grafico Ferie/Permessi. Ferie residue
+/// e permessi residui (dato `rolResidui`) sono saldi puntuali mese per mese
+/// (non quantità da sommare), quindi la riga "Totale" li mostra come `'—'`
+/// — solo i permessi orario goduti sono una quantità che ha senso cumulare
+/// nel periodo. Stessa convenzione già usata da `_MaturazioniSection` nel
+/// dettaglio busta paga per le celle non applicabili.
 _StatsTableData? _ferieRolPermessiStats(List<BustaPaga> buste) {
   if (buste.isEmpty) return null;
   final minFerie = _bustaConMinimo(buste, (b) => b.ferieResidue);
@@ -426,7 +427,7 @@ _StatsTableData? _ferieRolPermessiStats(List<BustaPaga> buste) {
   final minExFestivita = _bustaConMinimo(buste, (b) => b.exFestivitaResidue);
   final maxExFestivita = _bustaConMassimo(buste, (b) => b.exFestivitaResidue);
   return (
-    colonne: const ['Ferie', 'ROL', 'Permessi', 'Ex festività'],
+    colonne: const ['Ferie', 'Permessi', 'Permessi orario', 'Ex festività'],
     righe: [
       (
         'Media',
@@ -944,8 +945,8 @@ class _FerieRolPermessiChart extends StatelessWidget {
     final busta = buste[spot.x.toInt()];
     final label = switch (spot.barIndex) {
       0 => 'Ferie residue',
-      1 => 'ROL residui',
-      2 => 'Permessi goduti',
+      1 => 'Permessi residui',
+      2 => 'Permessi orario goduti',
       _ => 'Ex festività residue',
     };
     final text = showPeriodo

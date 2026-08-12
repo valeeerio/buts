@@ -237,6 +237,39 @@ Firma per quietanza
 1.540,15 114,09 907,81 610,72 1.518,53 1.543,13 131,84 0,26 0,03-1.411,00
 ''';
 
+/// Fixture SINTETICA (nessun PDF reale di 13esima/14esima disponibile in
+/// questa sessione, vedi commento in cima a `busta_paga_regex_parser.dart`
+/// e nel gruppo di test dedicato più sotto) che riproduce l'ipotesi più
+/// plausibile per una mensilità supplementare sul layout "JOB": il blocco
+/// ratei Ferie/ROL/Ex festività è assente (nessuna maturazione su una
+/// tredicesima/quattordicesima), ma il documento contiene ALTROVE (dopo le
+/// righe di competenza) una riga con la stessa forma sintattica esatta dei
+/// tag ratei — "5,00 6,00 7,00 (GIORNI)8,00 9,00 3,00 12,00 (ORE)" — per
+/// verificare che il parser non se ne agganci per errore scambiandola per
+/// il blocco ratei reale (vedi gruppo di test dedicato).
+const _testoTredicesimaSintetica = '''
+JOB - Copyright Sistemi S.p.A. - Autorizzazione INAIL   N°  792   del  03/01/20185DICEMBRE 2026
+Mens.supplementare 12/2026 tredicesima
+MINIMOEPA -CCNL 06/12/241.000,0000010,00000
+Retribuzione ordinaria
+GIORNI
+20,000 50,00000 1.000,00
+*
+*
+*
+*
+Straordinario diurno (30%)
+ORE
+3,000 10,00000 30,00
+*
+*
+*
+Turni recuperabili non goduti 5,00 6,00 7,00 (GIORNI)8,00 9,00 3,00 12,00 (ORE)
+INPS1.050,00 5,84061,32 CONTRIBUTO EBILOG0,50 3,50
+Firma per quietanza
+1.050,00 61,32-988,68
+''';
+
 void main() {
   group('BustaPagaRegexParser', () {
     const parser = BustaPagaRegexParser();
@@ -417,6 +450,23 @@ void main() {
       );
     });
 
+    test('NON scarta un residuo ROL alto ma legittimo (es. 150 ore accumulate '
+        'in più anni senza godimento) — soglia di implausibilità alzata a '
+        '1000 per non confondere questo caso con un artefatto di '
+        'estrazione', () {
+      final testo = _testoSintetico.replaceFirst(
+        '7,00 8,00 3,00 12,00 (ORE)',
+        '7,00 8,00 3,00 150,00 (ORE)',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.rolResidui, closeTo(150.00, 0.001));
+      expect(
+        risultato.warnings.any((w) => w.contains('dati ROL scartati')),
+        isFalse,
+      );
+    });
+
     test('scarta i dati ex festività se il valore "maturate" è implausibile',
         () {
       final testo = _testoSintetico.replaceFirst(
@@ -554,6 +604,38 @@ void main() {
       );
     });
 
+    test(
+        'lordo 0 legittimo (competenze che si compensano) non produce il '
+        'warning "lordo non trovato" e non viene scartato a null', () {
+      // Le tre voci del testo sintetico sommano 1.000,00 + 20,00 + 30,00 =
+      // 1.050,00: aggiungendo uno storno di pari importo la somma
+      // (computeLordo) risulta esattamente 0, ma `competenze` non è vuota —
+      // è un lordo 0 legittimo, non "nessuna riga di competenza
+      // riconosciuta" (vedi fix del 2026-08-12).
+      final testo = _testoSintetico.replaceFirst(
+        '3,000 10,00000 30,00\n',
+        '3,000 10,00000 30,00\n'
+        '*\n'
+        '*\n'
+        '*\n'
+        'Storno retribuzione\n'
+        'GIORNI\n'
+        '1,000 1050,00000 -1050,00\n',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.competenze, isNotEmpty);
+      expect(risultato.lordo, 0.0);
+      expect(
+        risultato.warnings,
+        isNot(
+          contains(
+            'lordo non trovato (nessuna riga di competenza riconosciuta)',
+          ),
+        ),
+      );
+    });
+
     test('warning "trattenuta INPS non trovata" quando la riga INPS manca',
         () {
       final testo = _testoSintetico.replaceFirst(
@@ -624,6 +706,43 @@ void main() {
       expect(
         risultato.trattenute['Altre trattenute (IRPEF + varie)'],
         closeTo(35.18, 0.001),
+      );
+    });
+
+    test('propaga il segno "-" su una voce di competenza negativa (storno/'
+        'conguaglio a debito) invece di scartarlo, riflettendosi in '
+        'computeLordo', () {
+      final testo = _testoSintetico.replaceFirst(
+        '3,000 10,00000 30,00\n',
+        '3,000 10,00000 30,00\n'
+        '*\n'
+        '*\n'
+        '*\n'
+        'Storno retribuzione\n'
+        'GIORNI\n'
+        '1,000 50,00000 -50,00\n',
+      );
+      final risultato = parser.parse(testo);
+
+      final storno = risultato.competenze
+          .firstWhere((v) => v.descrizione == 'Storno retribuzione');
+      expect(storno.importo, closeTo(-50.00, 0.001));
+      // 1000.00 (Retribuzione) + 20.00 (Edr) + 30.00 (Straordinario) - 50.00
+      // (Storno) = 1000.00
+      expect(risultato.lordo, closeTo(1000.00, 0.001));
+    });
+
+    test('propaga il segno "-" su una trattenuta negativa (conguaglio a '
+        'credito) nel formato verificato, senza scartarlo', () {
+      final testo = _testoSintetico.replaceFirst(
+        'CONTRIBUTO EBILOG0,50 3,50',
+        'CONTRIBUTO EBILOG0,50 -3,50',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(
+        risultato.trattenute['CONTRIBUTO EBILOG'],
+        closeTo(-3.50, 0.001),
       );
     });
 
@@ -907,6 +1026,44 @@ void main() {
   });
 
   group(
+      'BustaPagaRegexParser - controllo incrociato lordo calcolato vs '
+      '"totale competenze" stampato sul PDF (Fix 4)', () {
+    const parser = BustaPagaRegexParser();
+
+    test('nessun warning quando il lordo calcolato coincide (entro '
+        'tolleranza) col totale competenze stampato sul PDF reale', () {
+      final risultato = parser.parse(_testoRealeLuglio2026);
+
+      expect(
+        risultato.warnings
+            .any((w) => w.contains('diverge dal totale competenze')),
+        isFalse,
+      );
+    });
+
+    test('segnala un warning esplicito (senza alterare il lordo calcolato) '
+        'quando una voce di competenza mancata/alterata fa divergere '
+        'computeLordo dal totale competenze stampato sul PDF', () {
+      // Altera l'importo di una voce di competenza reale (7,67 -> 5,00):
+      // il "totale competenze" stampato sul PDF (1.543,13, invariato)
+      // diverge ora dal lordo ricalcolato (1.543,13 - 7,67 + 5,00 =
+      // 1.540,46).
+      final testo = _testoRealeLuglio2026.replaceFirst(
+        '22,000 0,34864 7,67',
+        '22,000 0,34864 5,00',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.lordo, closeTo(1540.46, 0.001));
+      expect(
+        risultato.warnings
+            .any((w) => w.contains('diverge dal totale competenze')),
+        isTrue,
+      );
+    });
+  });
+
+  group(
       'BustaPagaRegexParser - ground-truth su PDF reale (Luglio 2026): test '
       'di non-regressione principale per la fedeltà del parser ai PDF '
       'reali — dati anagrafici fittizi, struttura e valori numerici reali, '
@@ -950,6 +1107,10 @@ void main() {
       expect(risultato.rolMaturati, closeTo(23.33, 0.001));
       expect(risultato.rolGoduti, closeTo(11.50, 0.001));
       expect(risultato.rolResidui, closeTo(26.70, 0.001));
+      // In questo layout "Permessi (R.O.L.)" coincide coi ROL goduti (vedi
+      // commento in parse()) — mai verificato finora contro il testo reale,
+      // solo indirettamente uguale a rolGoduti.
+      expect(risultato.permessiGoduti, closeTo(11.50, 0.001));
 
       expect(risultato.exFestivitaMaturate, closeTo(18.67, 0.001));
       expect(risultato.exFestivitaGodute, 0);
@@ -967,6 +1128,22 @@ void main() {
       expect(
         risultato.trattenute['CONTRIBUTO EBILOG'],
         closeTo(3.50, 0.001),
+      );
+      // Valore esatto del residuo aggregato (mai verificato finora, solo
+      // indirettamente tramite il netto finale): lordo (1.543,13) - netto
+      // grezzo letto dal PDF (1.411,00) - INPS (90,11) - CONTRIBUTO EBILOG
+      // (3,50) = 38,52.
+      expect(
+        risultato.trattenute['Altre trattenute (IRPEF + varie)'],
+        closeTo(38.52, 0.001),
+      );
+
+      // Controllo incrociato (Fix 4): il "totale competenze" stampato dal
+      // PDF (1.543,13, subito dopo "ORE LAV." nel blocco Q.T.A.) coincide
+      // col lordo calcolato — nessun warning di divergenza.
+      expect(
+        risultato.warnings.any((w) => w.contains('diverge dal totale competenze')),
+        isFalse,
       );
 
       // Netto derivato (lordo - trattenute, incluso il residuo "Altre
@@ -986,4 +1163,77 @@ void main() {
       );
     });
   });
+
+  group(
+    'robustezza su 13esima/14esima (fixture ipotetica, nessun PDF reale disponibile)',
+    () {
+      const parser = BustaPagaRegexParser();
+
+      test(
+        'una riga "trappola" dopo le competenze non viene scambiata per il '
+        'blocco ratei Ferie/ROL',
+        () {
+          final risultato = parser.parse(_testoTredicesimaSintetica);
+
+          // La riga "Turni recuperabili non goduti 5,00 6,00 7,00
+          // (GIORNI)8,00 9,00 3,00 12,00 (ORE)" ha la stessa identica forma
+          // sintattica del blocco ratei reale (3 numeri + "(GIORNI)", poi 4
+          // numeri + "(ORE)") e SE cercata su tutto il documento
+          // (`_ratesFerie`/`_ratesRol` con `firstMatch` non scoped)
+          // matcherebbe erroneamente, popolando ferie/ROL con
+          // maturato=5,00/goduto=6,00/residuo=7,00 e ROL con
+          // maturato=9,00/goduto=3,00/residuo=12,00 — dati inventati che non
+          // esistono in questa mensilità supplementare (nessun blocco ratei
+          // reale nel testo).
+          //
+          // Il parser è già sicuro contro questo scenario, per due motivi
+          // indipendenti verificati qui:
+          // 1) `zonaRatei` (vedi `parse()`, commento "difesa aggiunta per le
+          //    mensilità supplementari") restringe la ricerca di
+          //    `_ratesFerie`/`_ratesRol` al testo PRIMA della prima riga di
+          //    competenza riconosciuta (`_rigaVoceCompetenza.firstMatch`) —
+          //    la riga trappola, che si trova DOPO le competenze in questa
+          //    fixture, non rientra mai in quello scope;
+          // 2) anche senza scoping, la riga trappola non avrebbe comunque
+          //    fatto match come voce di competenza valida ("8,00"/"9,00" ecc.
+          //    hanno 2 decimali, mentre `_rigaVoceCompetenza` richiede una
+          //    quantità a 3 decimali dopo il tag GIORNI/ORE) — ma è (1),
+          //    verificato sotto tramite i warning attesi, a garantire che
+          //    `_ratesFerie`/`_ratesRol` non la raggiungano affatto.
+          //
+          // Nessuna modifica allo scoping è stata necessaria: era già
+          // presente e sufficiente. Questo test la blinda da regressioni
+          // future.
+          expect(risultato.ferieMaturate, 0);
+          expect(risultato.ferieGodute, 0);
+          expect(risultato.ferieResidue, 0);
+          expect(risultato.rolMaturati, 0);
+          expect(risultato.rolGoduti, 0);
+          expect(risultato.rolResidui, 0);
+          expect(
+            risultato.warnings,
+            containsAll(['dati ferie non trovati', 'dati ROL non trovati']),
+          );
+
+          // Tipo dedotto da "Mens.supplementare 12/2026 tredicesima": la
+          // parola "tredicesima" è presente esplicitamente nel testo, quindi
+          // letta direttamente (non dedotta dal mese, niente warning di
+          // deduzione).
+          expect(risultato.tipo, TipoBustaPaga.tredicesima);
+          expect(
+            risultato.warnings
+                .any((w) => w.contains('tipo mensilità dedotto')),
+            isFalse,
+          );
+
+          // Lordo/straordinari derivati dalle competenze, non toccati da
+          // questo fix: Retribuzione ordinaria 1.000,00 + Straordinario
+          // diurno (30%) 30,00 = 1.030,00; straordinari = 3,00 ore (quantità
+          // dell'unica voce "Straordinario...").
+          expect(risultato.lordo, closeTo(1030.00, 0.001));
+          expect(risultato.straordinari, closeTo(3.00, 0.001));
+        },
+      );
+    },
+  );
 }
