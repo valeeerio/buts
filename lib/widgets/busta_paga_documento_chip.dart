@@ -69,28 +69,32 @@ class BustaPagaDocumentoChip extends StatelessWidget {
     final labelPrimary =
         CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
 
-    return SpringButton(
-      onPressed: () => _apri(context),
-      child: LiquidGlassSurface(
-        radius: AppRadius.glassSmall,
-        blurSigma: 22,
-        elevation: 4,
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm + 4,
-        ),
-        child: Row(
-          children: [
-            Icon(CupertinoIcons.doc_text, size: 20, color: accent),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: Text(
-                p.basename(filePath),
-                overflow: TextOverflow.ellipsis,
-                style: AppTextStyles.subtitle.copyWith(color: labelPrimary),
+    return Semantics(
+      label: 'Apri documento PDF',
+      button: true,
+      child: SpringButton(
+        onPressed: () => _apri(context),
+        child: LiquidGlassSurface(
+          radius: AppRadius.glassSmall,
+          blurSigma: 22,
+          elevation: 4,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm + 4,
+          ),
+          child: Row(
+            children: [
+              Icon(CupertinoIcons.doc_text, size: 20, color: accent),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  p.basename(filePath),
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.subtitle.copyWith(color: labelPrimary),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
+import '../utils/busta_paga_formatting.dart';
 import 'swipe_delete_background.dart';
 
 /// Campo di testo numerico compatto, senza bordo/riempimento proprio (si
@@ -10,7 +11,7 @@ import 'swipe_delete_background.dart';
 /// che sostituisce. Riusato da `BustaPagaStatRow`, `BustaPagaMaturazioniSection`
 /// e da `TrattenutaEditRow` in dettaglio/form busta paga.
 ///
-/// Con `prefix` (es. "€ " nella statistica Lordo, "− € " nelle trattenute) o
+/// Con `prefix` (es. "€ " nella statistica Lordo e nelle trattenute) o
 /// `suffix` (es. " h" nella statistica Straordinari, in ore e non in euro),
 /// il blocco "prefisso/suffisso + campo" si dimensiona sul proprio contenuto
 /// (`IntrinsicWidth`, non una larghezza fissa arbitraria): entrare in
@@ -30,6 +31,7 @@ Widget inlineNumberField(
   String? prefix,
   String? suffix,
   MainAxisAlignment rowAlignment = MainAxisAlignment.center,
+  bool allowNegative = false,
 }) {
   return Builder(
     builder: (context) {
@@ -43,8 +45,8 @@ Widget inlineNumberField(
         controller: controller,
         placeholder: '0',
         textAlign: TextAlign.center,
-        keyboardType:
-            const TextInputType.numberWithOptions(decimal: true, signed: false),
+        keyboardType: TextInputType.numberWithOptions(
+            decimal: true, signed: allowNegative),
         decoration: const BoxDecoration(),
         padding: EdgeInsets.zero,
         style: resolvedStyle,
@@ -125,16 +127,35 @@ Widget trattenutaEditRow(TrattenutaEditRow row, {required VoidCallback onDismiss
               ),
               Expanded(
                 flex: 2,
-                // Stesso prefisso "− € " e centratura della corrispondente
-                // riga di sola lettura: l'importo digitato resta sempre
-                // positivo, il segno e il simbolo sono un prefisso fisso,
-                // non editabile.
+                // A differenza delle altre statistiche, l'importo di una
+                // trattenuta NON è sempre positivo: il parser regex può
+                // riconoscere un valore negativo (conguaglio/storno a
+                // credito del dipendente, vedi commento su
+                // `_rigaTrattenutaVerificata` in
+                // `busta_paga_regex_parser.dart`). Il prefisso qui non è
+                // fisso ma calcolato dal valore CORRENTE del controller
+                // (`ValueListenableBuilder`, ricalcolato ad ogni keystroke),
+                // con la stessa regola di segno di `formatTrattenuta`
+                // ([trattenutaPrefix]) usata dalla vista di sola lettura —
+                // così le due viste restano identiche per lo stesso valore
+                // (requisito "modifica inline" non negoziabile, vedi
+                // `CLAUDE.md`). Testo vuoto/non ancora un numero valido (es.
+                // subito dopo aver digitato solo "-") viene trattato come
+                // "positivo" di default (prefisso "− €"), per non far
+                // sfarfallare il prefisso mentre l'utente sta ancora
+                // scrivendo le cifre.
                 child: Center(
-                  child: inlineNumberField(
-                    row.importo,
-                    prefix: '− € ',
-                    style: AppTextStyles.cardAmount
-                        .copyWith(fontWeight: FontWeight.w400),
+                  child: ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: row.importo,
+                    builder: (context, value, _) {
+                      return inlineNumberField(
+                        row.importo,
+                        prefix: trattenutaPrefix(parseItalianNumber(value.text)),
+                        allowNegative: true,
+                        style: AppTextStyles.cardAmount
+                            .copyWith(fontWeight: FontWeight.w400),
+                      );
+                    },
                   ),
                 ),
               ),

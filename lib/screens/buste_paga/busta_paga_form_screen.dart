@@ -518,6 +518,10 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                     AppSpacing.sm,
                   ),
                   children: [
+                    if (_valoriDaConferma) ...[
+                      const _EstrazioneAutomaticaBanner(),
+                      const SizedBox(height: AppSpacing.lg),
+                    ],
                     BustaPagaHeroCard(
                       isConfermato: false,
                       periodoLabel: _periodoLabel,
@@ -741,6 +745,45 @@ class _StationaryPushBar extends StatelessWidget {
         );
       },
       child: child,
+    );
+  }
+}
+
+/// Banner informativo fisso, sempre visibile mentre `_valoriDaConferma ==
+/// true` (indipendentemente dalla presenza di warning specifici del parser
+/// in `_WarningsSection` sotto): ricorda che i campi del form sono stati
+/// precompilati automaticamente dal parser regex e vanno verificati prima
+/// del salvataggio. Tono volutamente neutro/informativo (icona
+/// `info_circle`, colore secondario) per non essere confuso con gli warning
+/// puntuali (`systemOrange`) che restano più sotto.
+class _EstrazioneAutomaticaBanner extends StatelessWidget {
+  const _EstrazioneAutomaticaBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final secondaryAccent =
+        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+    final labelPrimary =
+        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
+    return LiquidGlassSurface(
+      radius: AppRadius.glassSmall,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(CupertinoIcons.info_circle, color: secondaryAccent, size: 18),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              'Dati estratti automaticamente, verifica prima di salvare.',
+              style: AppTextStyles.subtitle.copyWith(color: labelPrimary),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

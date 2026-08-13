@@ -96,37 +96,45 @@ class BustaPagaHeroCard extends StatelessWidget {
                                 color: labelPrimary,
                               ),
                             )
-                          : GestureDetector(
-                              onTap: onTapPeriodo,
-                              behavior: HitTestBehavior.opaque,
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      periodoLabel,
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 1,
-                                      style: AppTextStyles.sectionTitle
-                                          .copyWith(color: labelPrimary),
+                          : Semantics(
+                              label: 'Cambia periodo',
+                              button: true,
+                              child: GestureDetector(
+                                onTap: onTapPeriodo,
+                                behavior: HitTestBehavior.opaque,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        periodoLabel,
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
+                                        style: AppTextStyles.sectionTitle
+                                            .copyWith(color: labelPrimary),
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(width: AppSpacing.xs),
-                                  Icon(CupertinoIcons.chevron_down,
-                                      size: 16, color: labelSecondary),
-                                ],
+                                    const SizedBox(width: AppSpacing.xs),
+                                    Icon(CupertinoIcons.chevron_down,
+                                        size: 16, color: labelSecondary),
+                                  ],
+                                ),
                               ),
                             ),
                     ),
                     if (onTapTipo != null)
-                      GestureDetector(
-                        onTap: onTapTipo,
-                        behavior: HitTestBehavior.opaque,
-                        child: Padding(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 4),
-                          child: Icon(CupertinoIcons.chevron_down,
-                              size: 12, color: labelSecondary),
+                      Semantics(
+                        label: 'Cambia tipo busta paga',
+                        button: true,
+                        child: GestureDetector(
+                          onTap: onTapTipo,
+                          behavior: HitTestBehavior.opaque,
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 4),
+                            child: Icon(CupertinoIcons.chevron_down,
+                                size: 12, color: labelSecondary),
+                          ),
                         ),
                       ),
                   ],

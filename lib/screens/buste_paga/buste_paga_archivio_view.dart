@@ -501,6 +501,16 @@ class _EmptyState extends StatelessWidget {
                     AppColors.labelSecondary, context),
               ),
             ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Importa il PDF della tua busta paga per iniziare — servono '
+              'PDF con testo selezionabile, non foto o scansioni.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.cardLabel.copyWith(
+                color: CupertinoDynamicColor.resolve(
+                    AppColors.labelSecondary, context),
+              ),
+            ),
             const SizedBox(height: AppSpacing.md),
             LiquidGlassButton(
               onPressed: onAdd,

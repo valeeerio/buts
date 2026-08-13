@@ -747,8 +747,8 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                                             'Nessuna trattenuta', '—')
                                       ]
                                     : corrente.trattenute.entries
-                                        .map((e) => _trattenutaRow(e.key,
-                                            '− € ${formatEuro(e.value)}'))
+                                        .map((e) => _trattenutaRow(
+                                            e.key, formatTrattenuta(e.value)))
                                         .toList(),
                           ),
                         ],

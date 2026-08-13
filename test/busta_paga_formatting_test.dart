@@ -125,4 +125,71 @@ void main() {
       },
     );
   });
+
+  group('formatTrattenuta', () {
+    // Regressione: il parser regex accetta un segno "-" opzionale davanti
+    // all'importo di una trattenuta (vedi `_rigaTrattenutaVerificata` in
+    // `busta_paga_regex_parser.dart`, un conguaglio/storno a CREDITO del
+    // dipendente). `formatEuro` di per sé aggiunge già un "-" per i valori
+    // negativi: un prefisso "− €" fisso davanti a quel segno produceva un
+    // doppio segno fuorviante ("− € -3,50").
+    test('importo positivo (caso comune): prefisso "− €", nessun segno extra',
+        () {
+      expect(formatTrattenuta(90.11), '− € 90,11');
+    });
+
+    test('importo negativo (accredito/conguaglio): prefisso "+ €", valore '
+        'assoluto, mai un doppio segno', () {
+      expect(formatTrattenuta(-3.50), '+ € 3,50');
+      expect(formatTrattenuta(-3.50).contains('-'), isFalse);
+      expect(formatTrattenuta(-3.50).contains('+'), isTrue);
+    });
+
+    test('importo zero: prefisso "− €" (ramo del caso comune)', () {
+      expect(formatTrattenuta(0), '− € 0,00');
+    });
+  });
+
+  group('trattenutaPrefix (parità lettura/modifica)', () {
+    // Regressione: `TrattenutaEditRow` in editing usava un prefisso "€ "
+    // fisso invece di quello dinamico "− €"/"+ €" mostrato in sola lettura
+    // da `formatTrattenuta` — violava il requisito "modifica inline" di
+    // CLAUDE.md ("entrare in modifica non deve cambiare NULLA visivamente").
+    // Il fix riusa [trattenutaPrefix] sia da `formatTrattenuta` sia dal
+    // widget di editing (calcolato in tempo reale sul testo del
+    // controller via `parseItalianNumber`): questi test verificano che il
+    // prefisso calcolato durante la digitazione sia sempre identico a
+    // quello mostrato in sola lettura per lo stesso valore.
+    test('digitando un valore positivo il prefisso è "− €", come in lettura',
+        () {
+      const testoDigitato = '90,11';
+      final valore = parseItalianNumber(testoDigitato);
+      final prefissoInEditing = trattenutaPrefix(valore);
+      final prefissoInLettura =
+          formatTrattenuta(valore).substring(0, prefissoInEditing.length);
+      expect(prefissoInEditing, '− € ');
+      expect(prefissoInEditing, prefissoInLettura);
+    });
+
+    test(
+        'digitando un valore che inizia con "-" il prefisso diventa "+ €", '
+        'come in lettura', () {
+      const testoDigitato = '-3,50';
+      final valore = parseItalianNumber(testoDigitato);
+      final prefissoInEditing = trattenutaPrefix(valore);
+      final prefissoInLettura =
+          formatTrattenuta(valore).substring(0, prefissoInEditing.length);
+      expect(prefissoInEditing, '+ € ');
+      expect(prefissoInEditing, prefissoInLettura);
+    });
+
+    test(
+        'testo vuoto/parziale (es. solo "-" appena digitato) non fa '
+        'sfarfallare il prefisso: resta "− €" finché non è un numero '
+        'negativo valido', () {
+      expect(trattenutaPrefix(parseItalianNumber('')), '− € ');
+      expect(trattenutaPrefix(parseItalianNumber('-')), '− € ');
+      expect(trattenutaPrefix(parseItalianNumber('-3')), '+ € ');
+    });
+  });
 }

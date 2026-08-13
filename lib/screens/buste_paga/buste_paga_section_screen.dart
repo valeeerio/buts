@@ -206,16 +206,20 @@ class _BustePagaSectionScreenState
     final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
     return Row(
       children: [
-        SpringButton(
-          onPressed: () => setState(_closeSearch),
-          child: Container(
-            width: 44,
-            height: 44,
-            alignment: Alignment.center,
-            child: Icon(
-              CupertinoIcons.search,
-              size: 20,
-              color: accent,
+        Semantics(
+          label: 'Chiudi ricerca',
+          button: true,
+          child: SpringButton(
+            onPressed: () => setState(_closeSearch),
+            child: Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              child: Icon(
+                CupertinoIcons.search,
+                size: 20,
+                color: accent,
+              ),
             ),
           ),
         ),
@@ -420,18 +424,22 @@ class _BustePagaSectionScreenState
                                       ),
                                     ),
                                   ),
-                                  SpringButton(
-                                    onPressed: () =>
-                                        setState(() => _searchActive = true),
-                                    child: Container(
-                                      width: 44,
-                                      height: 44,
-                                      alignment: Alignment.center,
-                                      child: Icon(
-                                        CupertinoIcons.search,
-                                        size: 22,
-                                        color: CupertinoDynamicColor.resolve(
-                                            AppColors.systemBlue, context),
+                                  Semantics(
+                                    label: 'Cerca',
+                                    button: true,
+                                    child: SpringButton(
+                                      onPressed: () => setState(
+                                          () => _searchActive = true),
+                                      child: Container(
+                                        width: 44,
+                                        height: 44,
+                                        alignment: Alignment.center,
+                                        child: Icon(
+                                          CupertinoIcons.search,
+                                          size: 22,
+                                          color: CupertinoDynamicColor.resolve(
+                                              AppColors.systemBlue, context),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -544,22 +552,27 @@ class _BustePagaSidecar extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
-            SpringButton(
-              onPressed: onAdd ?? () {},
-              child: ClipPath(
-                clipper: const SquircleClipper(radius: AppRadius.glassSmall),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  color: plusAccent.withValues(alpha: 0.16),
-                  alignment: Alignment.center,
-                  child: importing
-                      ? CupertinoActivityIndicator(color: plusAccent)
-                      : Icon(
-                          CupertinoIcons.add,
-                          size: 24,
-                          color: plusAccent,
-                        ),
+            Semantics(
+              label: 'Aggiungi busta paga',
+              button: true,
+              child: SpringButton(
+                onPressed: onAdd ?? () {},
+                child: ClipPath(
+                  clipper:
+                      const SquircleClipper(radius: AppRadius.glassSmall),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    color: plusAccent.withValues(alpha: 0.16),
+                    alignment: Alignment.center,
+                    child: importing
+                        ? CupertinoActivityIndicator(color: plusAccent)
+                        : Icon(
+                            CupertinoIcons.add,
+                            size: 24,
+                            color: plusAccent,
+                          ),
+                  ),
                 ),
               ),
             ),

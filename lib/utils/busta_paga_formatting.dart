@@ -125,6 +125,27 @@ String formatEuro(double value) {
   return _euroFormat.format(value);
 }
 
+/// Decide il prefisso con segno da mostrare per un importo di trattenuta, a
+/// partire dal solo valore numerico: "− € " per il caso comune (importo ≥ 0,
+/// sottratto dal lordo), "+ € " per un valore negativo — che nel parser
+/// regex (vedi `_rigaTrattenutaVerificata` in `busta_paga_regex_parser.dart`)
+/// rappresenta un conguaglio/storno A CREDITO del dipendente, non "una
+/// trattenuta negativa". Condivisa fra [formatTrattenuta] (vista di sola
+/// lettura) e `trattenutaEditRow` (vista di modifica, calcolato in tempo
+/// reale sul testo digitato) così le due viste restano garantite identiche
+/// per lo stesso valore — vedi requisito "modifica inline" in `CLAUDE.md`.
+String trattenutaPrefix(double value) => value < 0 ? '+ € ' : '− € ';
+
+/// Formatta l'importo di una trattenuta con segno esplicito: "− € 90,11"
+/// per il caso comune (importo positivo, sottratto dal lordo), "+ € 3,50"
+/// per un valore negativo. Usa sempre il valore ASSOLUTO dentro [formatEuro]
+/// (che da solo aggiunge già un "-" per i negativi): un prefisso "− €" fisso
+/// davanti al segno di `formatEuro` produrrebbe un doppio segno fuorviante
+/// ("− € -3,50") — bug reale corretto qui, non un'ipotesi.
+String formatTrattenuta(double value) {
+  return '${trattenutaPrefix(value)}${formatEuro(value.abs())}';
+}
+
 /// Converte un numero in formato italiano digitato dall'utente (punto come
 /// separatore delle migliaia, virgola come separatore decimale — es.
 /// "1.234,56" o "1234,56") in un `double`, tornando `0` se il testo è vuoto o
