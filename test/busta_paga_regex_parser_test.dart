@@ -237,16 +237,22 @@ Firma per quietanza
 1.540,15 114,09 907,81 610,72 1.518,53 1.543,13 131,84 0,26 0,03-1.411,00
 ''';
 
-/// Fixture SINTETICA (nessun PDF reale di 13esima/14esima disponibile in
-/// questa sessione, vedi commento in cima a `busta_paga_regex_parser.dart`
-/// e nel gruppo di test dedicato più sotto) che riproduce l'ipotesi più
-/// plausibile per una mensilità supplementare sul layout "JOB": il blocco
-/// ratei Ferie/ROL/Ex festività è assente (nessuna maturazione su una
-/// tredicesima/quattordicesima), ma il documento contiene ALTROVE (dopo le
-/// righe di competenza) una riga con la stessa forma sintattica esatta dei
-/// tag ratei — "5,00 6,00 7,00 (GIORNI)8,00 9,00 3,00 12,00 (ORE)" — per
-/// verificare che il parser non se ne agganci per errore scambiandola per
-/// il blocco ratei reale (vedi gruppo di test dedicato).
+/// Fixture SINTETICA, costruita a mano prima che un vero PDF di mensilità
+/// supplementare fosse disponibile. L'ipotesi di partenza (blocco ratei
+/// Ferie/ROL/Ex festività assente su 13esima/14esima) è stata SMENTITA da un
+/// PDF reale ("Mens.supplementare 6/2026", vedi test ground-truth dedicato
+/// più sotto e `_rigaVoceCompetenzaSupplementare` in
+/// `busta_paga_regex_parser.dart`): il blocco ratei è invece presente, con
+/// la stessa forma "(GIORNI)"/"(ORE)" del layout mensile. Anche il blocco
+/// competenze del PDF reale usa un tag diverso da quello ipotizzato qui
+/// (letterale "RATEI", non "GIORNI"/"ORE" come in questa fixture). Questa
+/// fixture resta comunque utile come test di robustezza a sé stante — non
+/// rappresenta più la struttura reale di una mensilità supplementare, ma
+/// verifica che una riga con la stessa forma sintattica dei tag ratei
+/// comparsa ALTROVE nel documento (dopo le righe di competenza) — "5,00
+/// 6,00 7,00 (GIORNI)8,00 9,00 3,00 12,00 (ORE)" — non venga scambiata per
+/// il blocco ratei reale grazie allo scoping su `zonaRatei` (vedi gruppo di
+/// test dedicato).
 const _testoTredicesimaSintetica = '''
 JOB - Copyright Sistemi S.p.A. - Autorizzazione INAIL   N°  792   del  03/01/20185DICEMBRE 2026
 Mens.supplementare 12/2026 tredicesima
@@ -268,6 +274,151 @@ Turni recuperabili non goduti 5,00 6,00 7,00 (GIORNI)8,00 9,00 3,00 12,00 (ORE)
 INPS1.050,00 5,84061,32 CONTRIBUTO EBILOG0,50 3,50
 Firma per quietanza
 1.050,00 61,32-988,68
+''';
+
+/// Testo REALE (non sintetico) estratto via `syncfusion_flutter_pdf`
+/// (`PdfTextExtractor`) da un cedolino "Mens.supplementare 6/2026"
+/// (quattordicesima), layout "JOB" — ground-truth per il supporto al
+/// blocco competenze con tag letterale "RATEI" (vedi
+/// `_rigaVoceCompetenzaSupplementare` in `busta_paga_regex_parser.dart`).
+/// Dati anagrafici (nome, CF, indirizzo, IBAN, matricola, posizione
+/// INPS/INAIL, ragione sociale e sede del datore di lavoro) sostituiti con
+/// placeholder fittizi; struttura del documento e TUTTI i valori numerici
+/// (competenze, ratei, trattenute, netto) sono quelli reali del cedolino.
+/// A differenza di [_testoTredicesimaSintetica] (fixture ipotetica scritta
+/// PRIMA che questo PDF reale fosse disponibile), qui il blocco ratei
+/// Ferie/ROL/Ex festività NON è assente: è presente con la stessa forma
+/// "(GIORNI)"/"(ORE)" del layout mensile, e il blocco competenze usa il tag
+/// "RATEI" (non "GIORNI"/"ORE") seguito direttamente da quantità e importo,
+/// senza il campo tariffa intermedio del formato mensile.
+const _testoRealeQuattordicesimaGiugno2026 = '''
+POS. INPSMESE DI RETRIBUZIONE
+POS. INAILVoci di tariffa
+COD.DIP.
+COGNOME E NOMECODICE FISCALENATO A
+IL
+DESCRIZIONE QUALIFICA
+CONTRATTO DI LAVORO - CNEL
+INDIRIZZO
+ANZ. SERVIZIO
+ASSUNZIONEANZ. CONV.
+SCADENZA CONTR.
+FINE RAPPORTOCENTRO DI COSTOSEDE DI LAVORO
+ANNI
+MESI
+MODALITA' DI PAGAMENTORIFERIMENTI BANCARISCATTI ANZIANITA'
+LIVELLO
+% PART TIME
+DATAPROSSIMO
+N.
+RATEI
+MATURATI
+GODUTI
+RESIDUI A.P.ELEMENTI RETRIBUTIVIRESIDUI TOTALI
+A.P.A.C.
+FERIE
+PERMESSI (R.O.L.)
+EX FESTIVITA'
+RETRIBUZIONE ORARIA
+RETRIBUZIONE GIORNALIERA
+RETRIBUZIONE MENSILE
+Unita' di
+C*
+I*
+T*
+N*VOCEDESCRIZIONEQuantita'BaseTRATTENUTECOMPETENZE* = C - Imponibile contributivo ; I - Imponibile Irpef ; T - Imponibile TFR ; N - Considerato nel netto in bustamisura
+DESCRIZIONE CONTRIBUTOIMPONIBILE% C/DIPC/DIPENDENTEC/DITTA: ASS.SAN-PREV.COMPL.DESCRIZIONE CONTRIBUTOIMPONIBILE% C/DIPC/DIPENDENTEC/DITTA: ASS.SAN-PREV.COMPL.
+QTASETT. RETR.GG. RETR.
+GG. LAV.
+ORE LAV.
+CTRIMPON.CONTRIBUTIVO ANNOCONTRIBUTI ANNOIMPON.CONTRIBUTIVO MESEIMPON.CONTRIB. ARROT. MESETOTALE CONTRIBUTI
+IMPONIBILE FISCALE
+IRPEF LORDA
+DETR. LAV.DIPENDENTEGGDETR. CONIUGEDETR. FIGLIDETR. ALTRI FAMILIARIDETR. ONERIMESE
+IMPOSTA SOSTITUTIVA
+IRPEF NETTAIRPEF + IMP. SOST.
+IMPONIBILE
+IMPOSTA
+IMPONIBILE FISCALE
+IRPEF LORDA
+DETR.LAV.DIPENDENTEGGDETR. CONIUGEDETR. FIGLIDETR. ALTRI FAMILIARIDETR.ONERI/CANONIANNO
+IMPOSTA SOSTITUTIVAIRPEF NETTA
+IRPEF TRATTENUTA
+IRPEF CONGUAGLIO
+CONG.IRPEF+IMP.SOST.
+IMPONIBILE
+IMPOSTA
+IMPOSTA TRATTENUTA
+IMPOSTA CONGUAGLIO
+RETRIBUZIONE UTILE TFR
+CONTR. AGG. TFRTFR MESE
+TFR ANNUO PROGR.
+F.DO TFR 31/12 APANTICIPAZIONI ANNOTFR SPETTANTE AZIENDATFR A F.DO PENSIONETFR
+IMPONIBILE LORDO
+RIDUZIONE
+IMPONIBILE NETTO
+%
+IRPEF
+IRPEF ANT. / ACC.
+TOTALE DETRAZIONIAAP
+IMPONIBILE ARRETRATI AP
+%
+IRPEF TFR / ARR. A.P.
+TABELLAN.COMPON.
+FIGLI MIN.
+LIV.REDDITO
+GIORNI
+IMPORTO ASSEGNO
+TOTALE COMPETENZETOTALE TRATTENUTE
+ARR. PRECED.
+ARR. ATTUALE
+NETTO IN BUSTAANFTOT
+JOB - Copyright Sistemi S.p.A. - Autorizzazione INAIL   N°  792   del  03/01/20185Mens.supplementare 6/2026
+0000000000
+BETA SERVIZI S.R.L.
+VIA DEI PLATANI 15
+Autorizzazione unica:
+00100  ROMA  (RM)
+00000000/00
+0000
+N°000000
+00000000000
+C.F.: 1/01/2020Del
+00000000000
+P.IVA:01/06/202600:00Stampato ilOra000
+VERDI ANNA
+VRDNNA80A41H501U
+MILANO  (MI)
+01/01/1980
+VIA GARIBALDI 3
+I000
+N°
+APPR.PROFES.IMPIEG. 10%
+Trasporto e spedizioni merci
+00100  ROMA  (RM)
+00000
+sede di Roma
+ 1/08/2020 1/08/2020
+Amministrazione
+1
+BONIFICO BANCARIO
+IT00 X000 0000 000X X000 0000 000
+ 1/09/2027
+4J
+MINIMOEPA -CCNL 06/12/241.509,8100022,670007,17 9,17 4,00 12,33 (GIORNI)14,87 16,67 7,47 24,06 (ORE)13,33 13,33 26,67 (ORE)9,1219069,658181.532,48251
+14.ma mensilita'
+RATEI
+11,000 1.404,77
+*
+*
+*
+*
+INPS1.405,00 5,84082,05
+FONDO INTEGR. SALARIALE - FIS
+1.405,00 0,2673,75
+9.278,00 566,61 1.404,77 1.405,00 85,80 1.318,97 303,36 303,36 303,36 8.729,70 413,69 1087,66 151U.D.
+Firma per quietanza
+1.404,77 104,06 679,64 610,72 1.290,36 1.404,77 389,16 0,28-0,11 1.016,00
 ''';
 
 void main() {
@@ -1165,7 +1316,7 @@ void main() {
   });
 
   group(
-    'robustezza su 13esima/14esima (fixture ipotetica, nessun PDF reale disponibile)',
+    'robustezza su 13esima/14esima (fixture sintetica, riga trappola fuori scope)',
     () {
       const parser = BustaPagaRegexParser();
 
@@ -1236,4 +1387,84 @@ void main() {
       );
     },
   );
+
+  group(
+      'BustaPagaRegexParser - ground-truth su PDF reale di mensilità '
+      'supplementare (Giugno 2026, quattordicesima): test di '
+      'non-regressione per il layout con tag "RATEI" — dati anagrafici '
+      'fittizi, struttura e valori numerici reali, vedi doc su '
+      '_testoRealeQuattordicesimaGiugno2026', () {
+    const parser = BustaPagaRegexParser();
+
+    test('estrae correttamente OGNI campo di BustaPagaEstratti dal testo '
+        'reale', () {
+      final risultato = parser.parse(_testoRealeQuattordicesimaGiugno2026);
+
+      // Periodo letto da "Mens.supplementare 6/2026".
+      expect(risultato.periodo, '2026-06');
+      // Nessuna delle due parole "tredicesima"/"quattordicesima" compare
+      // nel testo reale: il tipo è dedotto dal mese (giugno -> 14esima),
+      // con warning esplicito di deduzione.
+      expect(risultato.tipo, TipoBustaPaga.quattordicesima);
+      expect(
+        risultato.warnings.any((w) => w.contains('tipo mensilità dedotto')),
+        isTrue,
+      );
+
+      // Competenze: una sola voce "14.ma mensilita'" (tag "RATEI", non
+      // "GIORNI"/"ORE"), 11 mesi maturati, importo 1.404,77 — nessuna
+      // tariffa intermedia da scartare in questo formato.
+      expect(risultato.competenze, hasLength(1));
+      final voce = risultato.competenze.single;
+      expect(voce.descrizione, "14.ma mensilita'");
+      expect(voce.quantita, closeTo(11.0, 0.001));
+      expect(voce.importo, closeTo(1404.77, 0.001));
+
+      expect(risultato.lordo, closeTo(1404.77, 0.001));
+      // Nessuna voce di competenza descritta come "straordinario...".
+      expect(risultato.straordinari, closeTo(0.0, 0.001));
+
+      // Ferie/ROL/Ex festività: il blocco ratei È presente su questo PDF
+      // reale (a differenza dell'ipotesi in _testoTredicesimaSintetica),
+      // stessa forma "(GIORNI)"/"(ORE)" del layout mensile, letto dalla riga
+      // dati che precede "14.ma mensilita'" nel testo linearizzato.
+      expect(risultato.ferieMaturate, closeTo(9.17, 0.001));
+      expect(risultato.ferieGodute, closeTo(4.00, 0.001));
+      expect(risultato.ferieResidue, closeTo(12.33, 0.001));
+      expect(risultato.rolMaturati, closeTo(16.67, 0.001));
+      expect(risultato.rolGoduti, closeTo(7.47, 0.001));
+      expect(risultato.rolResidui, closeTo(24.06, 0.001));
+      expect(risultato.exFestivitaMaturate, closeTo(13.33, 0.001));
+      expect(risultato.exFestivitaGodute, closeTo(0.0, 0.001));
+      expect(risultato.exFestivitaResidue, closeTo(26.67, 0.001));
+
+      // Trattenute: INPS letta direttamente (82,05); "FONDO INTEGR.
+      // SALARIALE - FIS" non produce una chiave nominata pulita (nome
+      // seguito da un ritorno a capo prima dei numeri, come per "Luglio
+      // 2026"), resta aggregata nel residuo "Altre trattenute".
+      expect(risultato.trattenute['INPS'], closeTo(82.05, 0.001));
+      expect(
+        risultato.trattenute['Altre trattenute (IRPEF + varie)'],
+        closeTo(306.72, 0.001),
+      );
+
+      // Netto derivato (lordo - trattenute) — vedi calcolo nel commento su
+      // "Altre trattenute" sopra: 1.404,77 - 82,05 - 306,72 = 1.016,00,
+      // coincide col netto grezzo letto dal PDF (ultimo numero della riga
+      // dopo "Firma per quietanza").
+      expect(risultato.netto, closeTo(1016.00, 0.01));
+
+      // Ore lavorate: non determinabili su questo layout — il blocco
+      // Q.T.A. tra INPS e "Firma per quietanza" non contiene un valore "ORE
+      // LAV." riconoscibile (genuinamente assente/non applicabile: una
+      // mensilità supplementare non retribuisce ore lavorate nel mese) e
+      // nessuna voce "Retribuzione ordinaria" da cui stimarlo con
+      // giorni×8 — warning esplicito, nessun dato inventato.
+      expect(risultato.oreLavorate, isNull);
+      expect(
+        risultato.warnings,
+        contains('ore lavorate non determinabili'),
+      );
+    });
+  });
 }

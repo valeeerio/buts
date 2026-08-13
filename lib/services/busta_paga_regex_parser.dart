@@ -133,6 +133,24 @@ class BustaPagaRegexParser {
     r'(?:\s+[\d.]+,\d{2,5}\s+(-?[\d.]+,\d{2}))?',
   );
 
+  // Variante del pattern sopra per le mensilità supplementari (13esima/
+  // 14esima): verificato su un PDF reale ("Mens.supplementare 6/2026") che il
+  // blocco competenze di questo layout non usa il tag "GIORNI"/"ORE" ma il
+  // tag letterale "RATEI", seguito direttamente da quantità (3 decimali) e
+  // importo (2 decimali) SENZA il campo tariffa intermedio presente nel
+  // formato mensile (nessun terzo numero da scartare tra i due). Osservato un
+  // solo rateo per documento finora ("14.ma mensilita'", 11,000 mesi
+  // maturati, 1.404,77 di importo) ma il pattern è generico/ripetibile come
+  // `_rigaVoceCompetenza` nel caso un domani un cedolino ne stampi più di
+  // uno. Il tag "RATEI" compare anche da solo nell'intestazione della
+  // tabella ratei più in alto nel documento (colonna "RATEI" della tabella
+  // Ferie/ROL/Ex festività): non produce un match spurio perché lì non è
+  // seguito da una quantità a 3 decimali, condizione richiesta da questa
+  // regex.
+  static final _rigaVoceCompetenzaSupplementare = RegExp(
+    r'([^\n]+?)\s*RATEI\s*(\d+,\d{3})\s+(-?[\d.]+,\d{2})',
+  );
+
   // Descrizioni (confronto case-insensitive, su prefisso trimmato) escluse
   // da `competenze`: le righe Ferie/Permessi sono già modellate altrove
   // (tabella Maturazioni, `permessiGodutiMese`) e non vanno duplicate qui,
@@ -366,11 +384,20 @@ class BustaPagaRegexParser {
     }
 
     // --- competenze: voci individuali, escludendo ferie/permessi (già
-    // modellati altrove) ---
+    // modellati altrove). Combina il pattern mensile (tag "GIORNI"/"ORE") e
+    // quello delle mensilità supplementari (tag "RATEI", vedi
+    // `_rigaVoceCompetenzaSupplementare`) — non si sovrappongono mai sullo
+    // stesso testo perché i tag sono letteralmente diversi. ---
     final competenze = <VoceCompetenza>[];
     int? primaCompetenzaMatchStart;
-    for (final m in _rigaVoceCompetenza.allMatches(testo)) {
-      primaCompetenzaMatchStart ??= m.start;
+    final matchCompetenze = [
+      ..._rigaVoceCompetenza.allMatches(testo),
+      ..._rigaVoceCompetenzaSupplementare.allMatches(testo),
+    ]..sort((a, b) => a.start.compareTo(b.start));
+    for (final m in matchCompetenze) {
+      if (primaCompetenzaMatchStart == null || m.start < primaCompetenzaMatchStart) {
+        primaCompetenzaMatchStart = m.start;
+      }
       final descrizione = m.group(1)!.trim();
       final descrizioneLower = descrizione.toLowerCase();
       final esclusa = _descrizioniEscluseDaCompetenze
@@ -482,20 +509,20 @@ class BustaPagaRegexParser {
     }
 
     // --- ferie / ROL / ex festività: cercati SOLO nel testo che precede la
-    // prima riga di competenza riconosciuta (vedi _rigaVoceCompetenza) —
-    // difesa aggiunta per le mensilità supplementari (13esima/14esima),
-    // dove il blocco ratei è tipicamente assente: senza questo scoping, un
-    // tag letterale "(GIORNI)"/"(ORE)" comparso per puro caso in una
-    // sezione successiva del documento (es. una nota fuori tabella)
-    // potrebbe essere scambiato per il blocco ratei reale, agganciandosi a
-    // numeri che non c'entrano nulla con Ferie/ROL/Ex festività. Su tutti i
-    // PDF/fixture reali disponibili (mensili) il blocco ratei precede
-    // sempre la prima riga di competenza, quindi questo scoping non cambia
-    // il comportamento osservato finora. NOTA: difesa basata su
-    // un'ipotesi ragionevole sulla struttura di una 13esima/14esima, non
-    // validata su un vero PDF di quel tipo (non disponibile in questa
-    // sessione, vedi commento in cima al file) — da rivalidare quando ne
-    // sarà disponibile uno reale.
+    // prima riga di competenza riconosciuta (vedi _rigaVoceCompetenza /
+    // _rigaVoceCompetenzaSupplementare) — senza questo scoping, un tag
+    // letterale "(GIORNI)"/"(ORE)" comparso per puro caso in una sezione
+    // successiva del documento (es. una nota fuori tabella) potrebbe essere
+    // scambiato per il blocco ratei reale, agganciandosi a numeri che non
+    // c'entrano nulla con Ferie/ROL/Ex festività. Su tutti i PDF/fixture
+    // reali disponibili (mensili E mensilità supplementari) il blocco ratei
+    // precede sempre la prima riga di competenza, quindi questo scoping non
+    // cambia il comportamento osservato. NOTA aggiornata dopo verifica su un
+    // PDF reale di una 14esima ("Mens.supplementare 6/2026"): a differenza
+    // dell'ipotesi precedente (non validata), il blocco ratei Ferie/ROL/Ex
+    // festività NON è assente sulle mensilità supplementari — è presente con
+    // la stessa struttura "(GIORNI)"/"(ORE)" del layout mensile, con i dati
+    // residui aggiornati al mese di erogazione.
     final zonaRatei = primaCompetenzaMatchStart != null
         ? testo.substring(0, primaCompetenzaMatchStart)
         : testo;

@@ -93,11 +93,23 @@ String periodoDisplayFor({required DateTime periodo, required TipoBustaPaga tipo
 ///
 /// Usata per quantità NON monetarie (ferie, ROL, permessi, ore lavorate,
 /// straordinari, quantità delle voci di competenza) — per importi in euro
-/// usare invece [formatEuro].
+/// usare invece [formatEuro]. Separatore decimale sempre la VIRGOLA
+/// (convenzione italiana, coerente con [formatEuro]/[parseItalianNumber]):
+/// `toStringAsFixed` di per sé è locale-INDIPENDENTE e userebbe sempre il
+/// punto — questo valore viene riusato per precompilare i
+/// `TextEditingController` di Ferie/ROL/Ex festività/Ore lavorate/quantità
+/// competenze in form e dettaglio (editing inline), che al salvataggio
+/// vengono riletti con [parseItalianNumber] (punto = separatore delle
+/// migliaia, virgola = decimale): un valore come "12.83" prodotto con la
+/// vecchia implementazione veniva quindi riletto come "1283" (il punto
+/// interpretato come separatore delle migliaia e rimosso) — bug reale
+/// riprodotto e corretto qui, non un'ipotesi (vedi
+/// `test/busta_paga_formatting_test.dart`).
 String formatNumber(double value) {
-  return value == value.roundToDouble()
+  final fixed = value == value.roundToDouble()
       ? value.toStringAsFixed(0)
       : value.toStringAsFixed(2);
+  return fixed.replaceAll('.', ',');
 }
 
 final NumberFormat _euroFormat = NumberFormat('#,##0.00', 'it_IT');

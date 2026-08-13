@@ -150,7 +150,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
         ? [TrattenutaEditRow()]
         : trattenuteIniziali.entries
             .map((e) => TrattenutaEditRow(
-                chiave: e.key, importo: e.value.toStringAsFixed(2)))
+                chiave: e.key, importo: formatEuro(e.value)))
             .toList();
     for (final row in _trattenute) {
       _attachTrattenutaListeners(row);
