@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
+import '../utils/busta_paga_formatting.dart';
 import 'swipe_delete_background.dart';
 
 /// Campo di testo numerico compatto, senza bordo/riempimento proprio (si
@@ -10,7 +11,7 @@ import 'swipe_delete_background.dart';
 /// che sostituisce. Riusato da `BustaPagaStatRow`, `BustaPagaMaturazioniSection`
 /// e da `TrattenutaEditRow` in dettaglio/form busta paga.
 ///
-/// Con `prefix` (es. "€ " nella statistica Lordo, "− € " nelle trattenute) o
+/// Con `prefix` (es. "€ " nella statistica Lordo e nelle trattenute) o
 /// `suffix` (es. " h" nella statistica Straordinari, in ore e non in euro),
 /// il blocco "prefisso/suffisso + campo" si dimensiona sul proprio contenuto
 /// (`IntrinsicWidth`, non una larghezza fissa arbitraria): entrare in
@@ -43,8 +44,7 @@ Widget inlineNumberField(
         controller: controller,
         placeholder: '0',
         textAlign: TextAlign.center,
-        keyboardType:
-            const TextInputType.numberWithOptions(decimal: true, signed: false),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
         decoration: const BoxDecoration(),
         padding: EdgeInsets.zero,
         style: resolvedStyle,
@@ -79,10 +79,49 @@ class TrattenutaEditRow {
   final TextEditingController chiave;
   final TextEditingController importo;
 
-  TrattenutaEditRow({String chiave = '', String importo = ''})
+  /// `true` se il valore ORIGINALE di questa trattenuta (al momento della
+  /// costruzione della riga) era negativo — un conguaglio/storno A CREDITO
+  /// del dipendente, vedi `trattenutaPrefix`. Caso raro e MAI digitato
+  /// direttamente dall'utente: nasce dalla riga ARR. PRECED./ARR. ATTUALE
+  /// del cedolino, calcolata dal parser (vedi `_trattenuteDaCoordinate`/
+  /// `_chiaveArrotondamento` in `busta_paga_regex_parser.dart`).
+  ///
+  /// Il controller [importo] mostra e fa digitare SEMPRE e SOLO il valore
+  /// ASSOLUTO — esattamente come la vista di sola lettura (`formatTrattenuta`,
+  /// che applica `value.abs()` dentro `formatEuro`) — mentre il segno resta
+  /// tracciato QUI, separato dal testo, e va riapplicato leggendo
+  /// [valoreConSegno]: prima di questo fix il controller veniva precompilato
+  /// col valore CON segno (es. "-0,14") e il widget anteponeva comunque un
+  /// prefisso "+"/"−" calcolato dallo stesso segno, producendo un doppio
+  /// segno in editing ("+ € -0,14") che la sola lettura non mostra mai — bug
+  /// reale corretto qui, non un'ipotesi. Catturato una sola volta alla
+  /// costruzione della riga, mai ricalcolato dal testo digitato in [importo].
+  bool negativo;
+
+  /// [importo] è il valore CON SEGNO originale (es. -0.14 per un conguaglio a
+  /// credito), `null` per una riga nuova/vuota (bottone "+ Aggiungi voce") —
+  /// vedi la doc su [negativo] per come viene scomposto in segno/valore
+  /// assoluto.
+  TrattenutaEditRow({String chiave = '', double? importo})
       : id = _nextId++,
         chiave = TextEditingController(text: chiave),
-        importo = TextEditingController(text: importo);
+        negativo = importo != null && importo < 0,
+        importo = TextEditingController(
+          text: importo == null ? '' : formatEuro(importo.abs()),
+        );
+
+  /// Valore "vero" della trattenuta, col segno di [negativo] riapplicato al
+  /// valore assoluto attualmente digitato in [importo] — unico punto da cui
+  /// leggere il valore per salvataggio/calcoli live (mai
+  /// `parseItalianNumber(importo.text)` da solo, che perderebbe il segno).
+  /// `.abs()` sul testo digitato è una rete di sicurezza: il campo non
+  /// impedisce comunque di incollare/digitare un "-" (nessun
+  /// `inputFormatters` dedicato), un eventuale segno digitato per errore non
+  /// deve poter invertire due volte il segno finale.
+  double get valoreConSegno {
+    final assoluto = parseItalianNumber(importo.text).abs();
+    return negativo ? -assoluto : assoluto;
+  }
 
   void dispose() {
     chiave.dispose();
@@ -96,7 +135,8 @@ class TrattenutaEditRow {
 /// eliminare una busta paga in `BusteePagaArchivioView`), senza alert di
 /// conferma: qui si rimuove solo una riga dallo stato locale di
 /// modifica/import, ancora reversibile con "Annulla".
-Widget trattenutaEditRow(TrattenutaEditRow row, {required VoidCallback onDismissed}) {
+Widget trattenutaEditRow(TrattenutaEditRow row,
+    {required VoidCallback onDismissed}) {
   return Dismissible(
     key: ValueKey(row.id),
     direction: DismissDirection.endToStart,
@@ -112,9 +152,22 @@ Widget trattenutaEditRow(TrattenutaEditRow row, {required VoidCallback onDismiss
             children: [
               Expanded(
                 flex: 3,
+                // `maxLines: null` (nessun limite, cresce verticalmente) invece
+                // del default di `CupertinoTextField` (1 riga, che TRONCA
+                // orizzontalmente il testo che eccede la larghezza) — la vista
+                // di sola lettura (`Text` senza `maxLines`, in
+                // `busta_paga_detail_screen.dart`) va invece a capo su più
+                // righe per le chiavi lunghe (es. "FONDO INTEGR. SALARIALE -
+                // FIS", "Differenza di arrotondamento (mese
+                // precedente/attuale)"): senza questo, entrare in modifica
+                // tagliava silenziosamente il testo visibile e cambiava
+                // l'altezza della riga — violava il requisito "modifica
+                // inline" non negoziabile (vedi CLAUDE.md), bug reale corretto
+                // qui, non un'ipotesi.
                 child: CupertinoTextField(
                   controller: row.chiave,
                   placeholder: 'Voce',
+                  maxLines: null,
                   decoration: const BoxDecoration(),
                   padding: EdgeInsets.zero,
                   style: AppTextStyles.subtitle.copyWith(
@@ -125,14 +178,27 @@ Widget trattenutaEditRow(TrattenutaEditRow row, {required VoidCallback onDismiss
               ),
               Expanded(
                 flex: 2,
-                // Stesso prefisso "− € " e centratura della corrispondente
-                // riga di sola lettura: l'importo digitato resta sempre
-                // positivo, il segno e il simbolo sono un prefisso fisso,
-                // non editabile.
+                // A differenza delle altre statistiche, l'importo di una
+                // trattenuta NON è sempre positivo: il parser regex può
+                // riconoscere un valore negativo (conguaglio/storno a
+                // credito del dipendente, vedi commento su
+                // `_rigaTrattenutaVerificata`/`_trattenuteDaCoordinate` in
+                // `busta_paga_regex_parser.dart`). Il segno non è mai
+                // digitato dall'utente: è catturato una sola volta in
+                // `row.negativo` alla costruzione della riga (vedi la sua
+                // doc), non ricalcolato ad ogni keystroke sul testo digitato
+                // in `row.importo` — che mostra sempre e solo il valore
+                // ASSOLUTO, esattamente come la vista di sola lettura
+                // (`formatTrattenuta`). Il prefisso "− €"/"+ €" riflette
+                // quindi sempre lo stesso segno mostrato in lettura, per
+                // costruzione (requisito "modifica inline" non negoziabile,
+                // vedi CLAUDE.md) — non più un doppio segno "+ € -0,14"
+                // quando il valore digitato coincide col testo con segno del
+                // controller (bug reale corretto qui, non un'ipotesi).
                 child: Center(
                   child: inlineNumberField(
                     row.importo,
-                    prefix: '− € ',
+                    prefix: trattenutaPrefix(row.valoreConSegno),
                     style: AppTextStyles.cardAmount
                         .copyWith(fontWeight: FontWeight.w400),
                   ),

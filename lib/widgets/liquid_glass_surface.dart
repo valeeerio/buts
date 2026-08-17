@@ -65,8 +65,7 @@ class LiquidGlassSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark =
-        MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+    final isDark = MediaQuery.platformBrightnessOf(context) == Brightness.dark;
     final fill = CupertinoDynamicColor.resolve(AppColors.glassFill, context);
     final highlight =
         CupertinoDynamicColor.resolve(AppColors.glassHighlight, context);

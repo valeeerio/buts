@@ -44,15 +44,15 @@ String annoAxisLabel(DateTime periodo) {
   return "'${DateFormat('yy', 'it_IT').format(periodo)}";
 }
 
-/// Etichetta "13esima mensilità"/"14esima mensilità" per i tipi non
-/// mensili, `null` per `TipoBustaPaga.mensile` (nessuna label da mostrare al
-/// posto del mese in quel caso).
+/// Etichetta "13esima"/"14esima" per i tipi non mensili, `null` per
+/// `TipoBustaPaga.mensile` (nessuna label da mostrare al posto del mese in
+/// quel caso).
 String? tipoMensilitaLabel(TipoBustaPaga tipo) {
   switch (tipo) {
     case TipoBustaPaga.tredicesima:
-      return '13esima mensilità';
+      return '13esima';
     case TipoBustaPaga.quattordicesima:
-      return '14esima mensilità';
+      return '14esima';
     case TipoBustaPaga.mensile:
       return null;
   }
@@ -67,7 +67,7 @@ String bustaPagaMeseDisplay(BustaPaga bustaPaga) {
 }
 
 /// Label da mostrare al posto di mese+anno (es. "Agosto 2026") quando la
-/// busta paga è una 13esima/14esima (es. "14esima mensilità 2026"). Ricade
+/// busta paga è una 13esima/14esima (es. "14esima 2026"). Ricade
 /// su [periodoLabel] per le buste mensili normali.
 String bustaPagaPeriodoDisplay(BustaPaga bustaPaga) =>
     periodoDisplayFor(periodo: bustaPaga.periodo, tipo: bustaPaga.tipo);
@@ -77,7 +77,8 @@ String bustaPagaPeriodoDisplay(BustaPaga bustaPaga) =>
 /// modalità modifica, dove periodo e tipo "in corso di modifica" vivono in
 /// controller/stato locali separati, non ancora ricomposti in un oggetto
 /// `BustaPaga`.
-String periodoDisplayFor({required DateTime periodo, required TipoBustaPaga tipo}) {
+String periodoDisplayFor(
+    {required DateTime periodo, required TipoBustaPaga tipo}) {
   final tipoLabel = tipoMensilitaLabel(tipo);
   if (tipoLabel == null) {
     final formatted = DateFormat('MMMM yyyy', 'it_IT').format(periodo);
@@ -90,10 +91,92 @@ String periodoDisplayFor({required DateTime periodo, required TipoBustaPaga tipo
 /// Formatta un numero troncando a intero se il valore è intero, altrimenti
 /// mostra due cifre decimali — estratta da `_formatNumber` in
 /// `BustaPagaDetailScreen`, riusata anche da `BustaPagaSummaryHero`.
+///
+/// Usata per quantità NON monetarie (ferie, ROL, permessi, ore lavorate,
+/// straordinari, quantità delle voci di competenza) — per importi in euro
+/// usare invece [formatEuro]. Separatore decimale sempre la VIRGOLA
+/// (convenzione italiana, coerente con [formatEuro]/[parseItalianNumber]):
+/// `toStringAsFixed` di per sé è locale-INDIPENDENTE e userebbe sempre il
+/// punto — questo valore viene riusato per precompilare i
+/// `TextEditingController` di Ferie/ROL/Ex festività/Ore lavorate/quantità
+/// competenze in form e dettaglio (editing inline), che al salvataggio
+/// vengono riletti con [parseItalianNumber] (punto = separatore delle
+/// migliaia, virgola = decimale): un valore come "12.83" prodotto con la
+/// vecchia implementazione veniva quindi riletto come "1283" (il punto
+/// interpretato come separatore delle migliaia e rimosso) — bug reale
+/// riprodotto e corretto qui, non un'ipotesi (vedi
+/// `test/busta_paga_formatting_test.dart`).
 String formatNumber(double value) {
-  return value == value.roundToDouble()
+  final fixed = value == value.roundToDouble()
       ? value.toStringAsFixed(0)
       : value.toStringAsFixed(2);
+  return fixed.replaceAll('.', ',');
+}
+
+final NumberFormat _fixedDecimalFormat = NumberFormat('#,##0.00', 'it_IT');
+
+/// Formatta un numero nel formato italiano con separatore delle migliaia
+/// (punto) e sempre esattamente due cifre decimali fisse (virgola) — a
+/// differenza di [formatNumber], che omette i decimali per i valori interi
+/// e non raggruppa le migliaia. Utile dove più valori formattati convivono
+/// nella stessa colonna/tabella e un numero di decimali incoerente (es.
+/// "9,13" sopra "16") renderebbe più difficile scansionarla a colpo
+/// d'occhio — usata dalle tabelle di riepilogo sotto i grafici in
+/// `buste_paga_statistiche_screen.dart` (ferie/permessi/straordinari, non
+/// importi in euro). Per importi in EURO usare [formatEuro] — stessa
+/// formattazione numerica, tenuta come funzione separata per chiarezza
+/// semantica nei punti di chiamata (valuta vs quantità generica).
+String formatNumberFixed(double value) {
+  return _fixedDecimalFormat.format(value);
+}
+
+/// Formatta un importo in EURO nel formato italiano: punto come separatore
+/// delle migliaia, virgola come separatore decimale, sempre esattamente due
+/// cifre decimali (es. "1.483,54", "1.411,00") — a differenza di
+/// [formatNumber], che omette i decimali per i valori interi e non
+/// raggruppa le migliaia, e va usata solo per quantità non monetarie.
+/// Riservata a netto, lordo, importi di competenze/trattenute e ogni altro
+/// valore espresso in euro.
+String formatEuro(double value) {
+  return _fixedDecimalFormat.format(value);
+}
+
+/// Decide il prefisso con segno da mostrare per un importo di trattenuta, a
+/// partire dal solo valore numerico: "− € " per il caso comune (importo ≥ 0,
+/// sottratto dal lordo), "+ € " per un valore negativo — che nel parser
+/// regex (vedi `_rigaTrattenutaVerificata` in `busta_paga_regex_parser.dart`)
+/// rappresenta un conguaglio/storno A CREDITO del dipendente, non "una
+/// trattenuta negativa". Condivisa fra [formatTrattenuta] (vista di sola
+/// lettura) e `trattenutaEditRow` (vista di modifica, calcolato in tempo
+/// reale sul testo digitato) così le due viste restano garantite identiche
+/// per lo stesso valore — vedi requisito "modifica inline" in `CLAUDE.md`.
+String trattenutaPrefix(double value) => value < 0 ? '+ € ' : '− € ';
+
+/// Formatta l'importo di una trattenuta con segno esplicito: "− € 90,11"
+/// per il caso comune (importo positivo, sottratto dal lordo), "+ € 3,50"
+/// per un valore negativo. Usa sempre il valore ASSOLUTO dentro [formatEuro]
+/// (che da solo aggiunge già un "-" per i negativi): un prefisso "− €" fisso
+/// davanti al segno di `formatEuro` produrrebbe un doppio segno fuorviante
+/// ("− € -3,50") — bug reale corretto qui, non un'ipotesi.
+String formatTrattenuta(double value) {
+  return '${trattenutaPrefix(value)}${formatEuro(value.abs())}';
+}
+
+/// Formatta un importo in euro con prefisso "€ " anteponendo il segno "−"
+/// PRIMA del simbolo valuta per i valori negativi, invece di concatenare
+/// ingenuamente "€ " al risultato di [formatEuro] (che per un negativo
+/// produce già un "-" tutto suo, es. "€ -1.411,00" — un segno fuorviante,
+/// dopo il simbolo valuta invece che prima). Stessa coerenza già applicata a
+/// [formatTrattenuta]/[trattenutaPrefix], ma SENZA la loro inversione di
+/// segno (lì un valore positivo è "una trattenuta", quindi mostrato con "−";
+/// qui il segno mostrato corrisponde 1:1 al segno del valore, non è una
+/// trattenuta con convenzione invertita). Riservata a importi normalmente
+/// non negativi ma che possono eccezionalmente esserlo (es. il netto, se le
+/// trattenute superano il lordo) — bug reale corretto qui, non un'ipotesi.
+String formatEuroConSegno(double value) {
+  return value < 0
+      ? '− € ${formatEuro(value.abs())}'
+      : '€ ${formatEuro(value)}';
 }
 
 /// Converte un numero in formato italiano digitato dall'utente (punto come

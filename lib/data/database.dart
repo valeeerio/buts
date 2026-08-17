@@ -33,7 +33,8 @@ class TrattenuteConverter extends TypeConverter<Map<String, double>, String> {
   Map<String, double> fromSql(String fromDb) {
     if (fromDb.isEmpty) return const {};
     final decoded = jsonDecode(fromDb) as Map<String, dynamic>;
-    return decoded.map((key, value) => MapEntry(key, (value as num).toDouble()));
+    return decoded
+        .map((key, value) => MapEntry(key, (value as num).toDouble()));
   }
 
   @override
@@ -57,7 +58,15 @@ class VoceCompetenzaListConverter
         .map((e) => e as Map<String, dynamic>)
         .map((e) => VoceCompetenza(
               descrizione: e['descrizione'] as String,
-              quantita: (e['quantita'] as num).toDouble(),
+              // `num?` (non `num`): righe scritte da questo fix in avanti
+              // possono avere `quantita: null` nel JSON (vedi
+              // `VoceCompetenza.quantita`, ora nullable) — le righe scritte
+              // PRIMA di questo fix hanno sempre un numero reale (mai
+              // `null`, il vecchio bug scriveva 0 anche per una quantità
+              // assente), quindi restano compatibili e continuano a
+              // leggersi identiche a prima (nessun dato esistente perso o
+              // alterato).
+              quantita: (e['quantita'] as num?)?.toDouble(),
               importo: (e['importo'] as num).toDouble(),
             ))
         .toList();
@@ -88,8 +97,9 @@ class BustePagaTable extends Table {
 
   /// Mappa nome trattenuta -> importo, serializzata come JSON. Vedi
   /// [TrattenuteConverter] per la motivazione della scelta.
-  TextColumn get trattenute =>
-      text().map(const TrattenuteConverter()).withDefault(const Constant('{}'))();
+  TextColumn get trattenute => text()
+      .map(const TrattenuteConverter())
+      .withDefault(const Constant('{}'))();
 
   RealColumn get straordinari => real()();
   RealColumn get ferieMaturate => real()();
@@ -109,11 +119,9 @@ class BustePagaTable extends Table {
   /// Ex festività maturate/godute/residue — vedi `BustaPaga.exFestivitaMaturate`
   /// e affini. Default 0 per compatibilità con le righe esistenti create
   /// prima dell'introduzione di questi campi (v5 -> v6).
-  RealColumn get exFestivitaMaturate =>
-      real().withDefault(const Constant(0))();
+  RealColumn get exFestivitaMaturate => real().withDefault(const Constant(0))();
   RealColumn get exFestivitaGodute => real().withDefault(const Constant(0))();
-  RealColumn get exFestivitaResidue =>
-      real().withDefault(const Constant(0))();
+  RealColumn get exFestivitaResidue => real().withDefault(const Constant(0))();
 
   RealColumn get oreLavorate => real()();
 
@@ -128,8 +136,7 @@ class BustePagaTable extends Table {
   /// Stato di verifica (v1: sempre `confermato`, inserimento manuale; il
   /// valore `daConfermare` è predisposto per la Fase 3 AI on-device — vedi
   /// StatoVerificaBustaPaga).
-  IntColumn get statoVerifica =>
-      intEnum<StatoVerificaBustaPaga>().withDefault(
+  IntColumn get statoVerifica => intEnum<StatoVerificaBustaPaga>().withDefault(
         Constant(StatoVerificaBustaPaga.confermato.index),
       )();
 
@@ -189,8 +196,8 @@ class AppDatabase extends _$AppDatabase {
           if (from < 3) {
             await m.database
                 .customStatement('DROP TABLE IF EXISTS movimento_area_table');
-            await m.database.customStatement(
-                'DROP TABLE IF EXISTS voce_ricorrente_table');
+            await m.database
+                .customStatement('DROP TABLE IF EXISTS voce_ricorrente_table');
             await m.database
                 .customStatement('DROP TABLE IF EXISTS mese_budget_table');
             await m.database.customStatement('DROP TABLE IF EXISTS area_table');
@@ -223,8 +230,7 @@ class AppDatabase extends _$AppDatabase {
           if (from < 6) {
             await m.addColumn(
                 bustePagaTable, bustePagaTable.exFestivitaMaturate);
-            await m.addColumn(
-                bustePagaTable, bustePagaTable.exFestivitaGodute);
+            await m.addColumn(bustePagaTable, bustePagaTable.exFestivitaGodute);
             await m.addColumn(
                 bustePagaTable, bustePagaTable.exFestivitaResidue);
           }

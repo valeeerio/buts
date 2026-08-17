@@ -17,9 +17,18 @@ enum TipoBustaPaga { mensile, tredicesima, quattordicesima }
 /// contrattuale", "Straordinario diurno (30%)") estratta dal PDF o inserita
 /// manualmente nel form/dettaglio. `importo` è 0 quando la riga del PDF non
 /// riporta un importo monetario associato (es. righe di sola quantità).
+///
+/// `quantita` è invece NULLABLE: `null` quando la riga del PDF non riporta
+/// alcuna quantità (nessun tag GIORNI/ORE/RATEI, colonna quantità vuota —
+/// es. "930 Trattamento integrativo DL 3/2020", "942 Somma integrativa"),
+/// distinto da 0 stampato esplicitamente. Un "0" mostrato in UI per una riga
+/// che in realtà non ha alcuna quantità (giorni/ore) è fuorviante ("zero
+/// giorni/ore" invece di "nessuna quantità associata a questa voce") — va
+/// mostrato come assente (un trattino), sia in sola lettura sia in editing,
+/// vedi `BustaPagaCompetenzeSection`/`VoceCompetenzaEditRow`.
 class VoceCompetenza {
   final String descrizione;
-  final double quantita;
+  final double? quantita;
   final double importo;
 
   const VoceCompetenza({
@@ -33,6 +42,12 @@ class VoceCompetenza {
 /// descrizione inizia (case-insensitive) con "straordinario" — usato sia dal
 /// parser sia dalle schermate di editing per calcolare `straordinari` in ore
 /// a partire dalla lista `competenze`, unica fonte di verità.
+/// Sentinella privata usata da [BustaPaga.copyWith] per distinguere "il
+/// chiamante non ha passato [BustaPaga.copyWith.fileOrigine]" da "il
+/// chiamante vuole azzerarlo esplicitamente a `null`" — il pattern
+/// `fileOrigine ?? this.fileOrigine` non permette quest'ultimo caso.
+const _unset = Object();
+
 bool voceEStraordinaria(String descrizione) =>
     descrizione.trim().toLowerCase().startsWith('straordinario');
 
@@ -43,10 +58,20 @@ double computeLordo(List<VoceCompetenza> competenze) =>
     competenze.fold(0.0, (somma, voce) => somma + voce.importo);
 
 /// Somma delle quantità (ore) delle voci di competenza "straordinario": lo
-/// "straordinari" derivato, stessa logica di [computeLordo].
+/// "straordinari" derivato, stessa logica di [computeLordo]. Una quantità
+/// ASSENTE (vedi [VoceCompetenza.quantita]) conta come 0 nella somma — un
+/// caso mai osservato per una voce di straordinario reale (sempre tag "ORE"
+/// sul PDF), ma il tipo nullable del campo richiede comunque di gestirlo.
 double computeStraordinari(List<VoceCompetenza> competenze) => competenze
     .where((voce) => voceEStraordinaria(voce.descrizione))
-    .fold(0.0, (somma, voce) => somma + voce.quantita);
+    .fold(0.0, (somma, voce) => somma + (voce.quantita ?? 0));
+
+/// Il "netto" derivato: [lordo] meno la somma di tutte le [trattenute],
+/// stessa logica di [computeLordo]/[computeStraordinari] — nessun clamp,
+/// può risultare negativo se le trattenute superano il lordo (dato di
+/// input incoerente da segnalare altrove, non da mascherare qui).
+double computeNetto(double lordo, Map<String, double> trattenute) =>
+    lordo - trattenute.values.fold(0.0, (somma, v) => somma + v);
 
 /// Dati ricavabili da una busta paga. Nomi campo allineati 1:1 a
 /// piano_progetto_finanze_personali.md §5 per rendere meccanica la futura
@@ -89,9 +114,11 @@ class BustaPaga {
   /// Voci di competenza individuali (es. Retribuzione ordinaria, Edr
   /// contrattuale, Straordinario per fascia). Vuota di default per
   /// retrocompatibilità con le buste paga salvate prima dell'introduzione di
-  /// questo campo. [lordo]/[straordinari] restano colonne memorizzate,
-  /// ricalcolate da questa lista al momento del salvataggio (vedi
-  /// `computeLordo`/`computeStraordinari`), non getter derivati al volo.
+  /// questo campo. [lordo]/[straordinari]/[netto] restano colonne
+  /// memorizzate, ricalcolate rispettivamente da questa lista e da
+  /// [trattenute] al momento del salvataggio (vedi
+  /// `computeLordo`/`computeStraordinari`/`computeNetto`), non getter
+  /// derivati al volo.
   final List<VoceCompetenza> competenze;
 
   final StatoVerificaBustaPaga statoVerifica;
@@ -125,7 +152,7 @@ class BustaPaga {
   BustaPaga copyWith({
     String? id,
     DateTime? periodo,
-    String? fileOrigine,
+    Object? fileOrigine = _unset,
     double? lordo,
     double? netto,
     Map<String, double>? trattenute,
@@ -149,7 +176,9 @@ class BustaPaga {
     return BustaPaga(
       id: id ?? this.id,
       periodo: periodo ?? this.periodo,
-      fileOrigine: fileOrigine ?? this.fileOrigine,
+      fileOrigine: identical(fileOrigine, _unset)
+          ? this.fileOrigine
+          : fileOrigine as String?,
       lordo: lordo ?? this.lordo,
       netto: netto ?? this.netto,
       trattenute: trattenute ?? this.trattenute,

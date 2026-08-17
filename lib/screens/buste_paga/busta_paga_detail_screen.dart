@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -15,6 +17,8 @@ import '../../widgets/busta_paga_maturazioni_section.dart';
 import '../../widgets/busta_paga_stat_row.dart';
 import '../../widgets/flat_chip_button.dart';
 import '../../widgets/glass_form_section.dart';
+import '../../widgets/liquid_glass_surface.dart';
+import '../../widgets/spring_button.dart';
 import '../../widgets/trattenuta_edit_row.dart';
 import '../../widgets/voce_competenza_edit_row.dart';
 
@@ -42,6 +46,155 @@ const _tipoLabels = {
   TipoBustaPaga.quattordicesima: '14esima',
 };
 
+/// Label "Marzo 2026" per una data di periodo, usata solo dal diff (vedi
+/// [buildBustaPagaEditDiff]) — estratta da `_BustaPagaDetailScreenState` come
+/// funzione di livello file (non usa alcuno stato dell'istanza) insieme al
+/// diff stesso, per la stessa ragione di testabilità.
+String _periodoLabelForDate(DateTime data) {
+  final formatted = DateFormat('MMMM yyyy', 'it_IT').format(data);
+  return formatted[0].toUpperCase() + formatted.substring(1);
+}
+
+/// Costruisce l'elenco leggibile delle differenze fra due versioni della
+/// stessa busta paga, mostrato nel popup "Hai modificato i seguenti dati,
+/// confermi?" prima di salvare una modifica inline (vedi
+/// `_BustaPagaDetailScreenState._save`/`_buildDiff`, l'unico punto di
+/// chiamata reale nell'app).
+///
+/// Funzione pura di [vecchia]/[nuova] (nessuna dipendenza da stato del
+/// widget): estratta a livello di file — invece di restare un metodo privato
+/// della `State` — solo per poter essere testata direttamente, senza dover
+/// pilotare l'intera schermata attraverso Riverpod/Drift.
+/// `@visibleForTesting`: non è pensata per essere chiamata da altrove
+/// nell'app.
+///
+/// Ogni importo (Netto/Lordo, trattenute, importi di competenza) passa
+/// sempre da un helper di formattazione con segno di
+/// `lib/utils/busta_paga_formatting.dart` (`formatEuroConSegno` per
+/// Netto/Lordo/competenze, `formatTrattenuta` per le trattenute — quella
+/// convenzione INVERTE il segno mostrato, propria delle sole trattenute), mai
+/// da "€ " concatenato a mano davanti a `formatEuro`: sia le trattenute
+/// (conguaglio/storno a credito, es. "Differenza di arrotondamento") sia le
+/// voci di competenza (storno a debito, vedi `_rigaVoceCompetenza` in
+/// `busta_paga_regex_parser.dart`) possono avere un valore negativo, e
+/// `formatEuro` da solo antepone già un "-" al numero — una concatenazione
+/// manuale produrrebbe un doppio segno fuorviante ("€ -0,14") — bug reale
+/// corretto qui, non un'ipotesi.
+@visibleForTesting
+List<String> buildBustaPagaEditDiff(BustaPaga vecchia, BustaPaga nuova) {
+  final diff = <String>[];
+
+  void addIfChanged(String label, double oldValue, double newValue,
+      {String Function(double) format = formatNumber}) {
+    if (format(oldValue) != format(newValue)) {
+      diff.add('$label: ${format(oldValue)} → ${format(newValue)}');
+    }
+  }
+
+  if (_periodoLabelForDate(vecchia.periodo) !=
+      _periodoLabelForDate(nuova.periodo)) {
+    diff.add(
+      'Periodo: ${_periodoLabelForDate(vecchia.periodo)} → '
+      '${_periodoLabelForDate(nuova.periodo)}',
+    );
+  }
+  if (vecchia.tipo != nuova.tipo) {
+    diff.add(
+      'Tipo: ${_tipoLabels[vecchia.tipo]} → ${_tipoLabels[nuova.tipo]}',
+    );
+  }
+  // `formatEuroConSegno`, non `formatEuro` nudo: Netto/Lordo sono
+  // normalmente non negativi ma possono eccezionalmente esserlo (netto se
+  // le trattenute superano il lordo, vedi doc di `formatEuroConSegno`) —
+  // stesso helper già usato per questi due campi nella hero card
+  // (`lordoDisplay`/`nettoDisplay`), per coerenza di stile col resto di
+  // questo popup (che mostra sempre "€ " per ogni altro importo) e senza
+  // rischio di doppio segno.
+  addIfChanged('Netto', vecchia.netto, nuova.netto, format: formatEuroConSegno);
+  addIfChanged('Lordo', vecchia.lordo, nuova.lordo, format: formatEuroConSegno);
+  addIfChanged('Straordinari', vecchia.straordinari, nuova.straordinari);
+  addIfChanged('Ferie maturate', vecchia.ferieMaturate, nuova.ferieMaturate);
+  addIfChanged('Ferie godute', vecchia.ferieGodute, nuova.ferieGodute);
+  addIfChanged('Ferie residue', vecchia.ferieResidue, nuova.ferieResidue);
+  addIfChanged('ROL maturati', vecchia.rolMaturati, nuova.rolMaturati);
+  addIfChanged('ROL goduti', vecchia.rolGoduti, nuova.rolGoduti);
+  addIfChanged('ROL residui', vecchia.rolResidui, nuova.rolResidui);
+  addIfChanged('Permessi goduti', vecchia.permessiGoduti, nuova.permessiGoduti);
+  addIfChanged(
+      'Permessi (mese)', vecchia.permessiGodutiMese, nuova.permessiGodutiMese);
+  addIfChanged('Ex festività maturate', vecchia.exFestivitaMaturate,
+      nuova.exFestivitaMaturate);
+  addIfChanged('Ex festività godute', vecchia.exFestivitaGodute,
+      nuova.exFestivitaGodute);
+  addIfChanged('Ex festività residue', vecchia.exFestivitaResidue,
+      nuova.exFestivitaResidue);
+  addIfChanged('Ore lavorate', vecchia.oreLavorate, nuova.oreLavorate);
+
+  final chiavi = {...vecchia.trattenute.keys, ...nuova.trattenute.keys};
+  for (final chiave in chiavi) {
+    final prima = vecchia.trattenute[chiave];
+    final dopo = nuova.trattenute[chiave];
+    // `formatTrattenuta`: stesso helper già usato dalla riga di sola
+    // lettura (`_trattenutaRow`) e dal prefisso di `trattenutaEditRow`, così
+    // questo popup resta coerente con come lo stesso valore è mostrato
+    // ovunque altrove in questa schermata — vedi doc del bug sopra.
+    if (prima == null && dopo != null) {
+      diff.add('Trattenuta $chiave: aggiunta (${formatTrattenuta(dopo)})');
+    } else if (prima != null && dopo == null) {
+      diff.add('Trattenuta $chiave: rimossa (era ${formatTrattenuta(prima)})');
+    } else if (prima != null &&
+        dopo != null &&
+        formatEuro(prima) != formatEuro(dopo)) {
+      diff.add(
+        'Trattenuta $chiave: ${formatTrattenuta(prima)} → '
+        '${formatTrattenuta(dopo)}',
+      );
+    }
+  }
+
+  // Stesso pattern del diff trattenute, chiave sulla descrizione (unica per
+  // voce nell'uso reale di questo layout busta paga).
+  final vecchieCompetenze = {
+    for (final v in vecchia.competenze) v.descrizione: v
+  };
+  final nuoveCompetenze = {for (final v in nuova.competenze) v.descrizione: v};
+  final descrizioniCompetenze = {
+    ...vecchieCompetenze.keys,
+    ...nuoveCompetenze.keys
+  };
+  // Quantità ASSENTE (vedi `VoceCompetenza.quantita`) mostrata come "—" nel
+  // diff, stessa convenzione di sola lettura/editing — mai "0", fuorviante.
+  String formatQuantita(double? v) => v == null ? '—' : formatNumber(v);
+  for (final descrizione in descrizioniCompetenze) {
+    final prima = vecchieCompetenze[descrizione];
+    final dopo = nuoveCompetenze[descrizione];
+    // `formatEuroConSegno`, non `formatTrattenuta`: a differenza delle
+    // trattenute, qui il segno mostrato deve coincidere con quello del
+    // valore (vedi doc del bug sopra), come per Netto/Lordo.
+    if (prima == null && dopo != null) {
+      diff.add('Competenza $descrizione: aggiunta '
+          '(${formatQuantita(dopo.quantita)}, '
+          '${formatEuroConSegno(dopo.importo)})');
+    } else if (prima != null && dopo == null) {
+      diff.add('Competenza $descrizione: rimossa '
+          '(era ${formatQuantita(prima.quantita)}, '
+          '${formatEuroConSegno(prima.importo)})');
+    } else if (prima != null &&
+        dopo != null &&
+        (formatQuantita(prima.quantita) != formatQuantita(dopo.quantita) ||
+            formatEuro(prima.importo) != formatEuro(dopo.importo))) {
+      diff.add(
+        'Competenza $descrizione: ${formatQuantita(prima.quantita)}, '
+        '${formatEuroConSegno(prima.importo)} → '
+        '${formatQuantita(dopo.quantita)}, '
+        '${formatEuroConSegno(dopo.importo)}',
+      );
+    }
+  }
+
+  return diff;
+}
+
 /// Vista di dettaglio di una busta paga: hero con i dati principali, tabella
 /// riepilogativa di Ferie/ROL/Permessi e sezioni di dettaglio per documento,
 /// importi e trattenute. La barra flottante in basso permette di confermare
@@ -68,7 +221,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   late DateTime _periodoEdit;
   late TipoBustaPaga _tipoEdit;
 
-  late TextEditingController _nettoCtrl;
   late TextEditingController _oreLavorateCtrl;
 
   late TextEditingController _ferieMaturateCtrl;
@@ -79,8 +231,11 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   late TextEditingController _rolGodutiCtrl;
   late TextEditingController _rolResiduiCtrl;
 
-  late TextEditingController _permessiGodutiCtrl;
-  late TextEditingController _permessiGodutiMeseCtrl;
+  // Nessun campo di editing collegato (sezioni UI rimosse perché ridondanti/
+  // mai popolate, vedi CLAUDE.md): valori portati staticamente dal modello
+  // fino al salvataggio, senza `TextEditingController` fantasma.
+  late double _permessiGoduti;
+  late double _permessiGodutiMese;
 
   late TextEditingController _exFestivitaMaturateCtrl;
   late TextEditingController _exFestivitaGoduteCtrl;
@@ -89,22 +244,12 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   late List<TrattenutaEditRow> _trattenuteEdit;
   late List<VoceCompetenzaEditRow> _competenzeEdit;
 
-  String _periodoLabelForDate(DateTime data) {
-    final formatted = DateFormat('MMMM yyyy', 'it_IT').format(data);
-    return formatted[0].toUpperCase() + formatted.substring(1);
-  }
-
   /// Popola tutti i controller di editing dai valori correnti (letti dal
-  /// provider) e attiva la modalità modifica. I controller di
-  /// `ferieResidue`/`rolResidui` hanno anche un listener che forza un
-  /// rebuild, così `_StatRow` (che li mostra in sola lettura, riflettendo lo
-  /// stesso dato della tabella Maturato/Goduto/Residuo) resta sincronizzato
-  /// live mentre l'utente digita nella tabella.
+  /// provider) e attiva la modalità modifica.
   void _enterEditing(BustaPaga corrente) {
     _periodoEdit = corrente.periodo;
     _tipoEdit = corrente.tipo;
 
-    _nettoCtrl = TextEditingController(text: formatNumber(corrente.netto));
     _oreLavorateCtrl =
         TextEditingController(text: formatNumber(corrente.oreLavorate));
 
@@ -122,43 +267,41 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     _rolResiduiCtrl =
         TextEditingController(text: formatNumber(corrente.rolResidui));
 
-    _permessiGodutiCtrl =
-        TextEditingController(text: formatNumber(corrente.permessiGoduti));
-    _permessiGodutiMeseCtrl =
-        TextEditingController(text: formatNumber(corrente.permessiGodutiMese));
+    _permessiGoduti = corrente.permessiGoduti;
+    _permessiGodutiMese = corrente.permessiGodutiMese;
 
-    _exFestivitaMaturateCtrl = TextEditingController(
-        text: formatNumber(corrente.exFestivitaMaturate));
-    _exFestivitaGoduteCtrl = TextEditingController(
-        text: formatNumber(corrente.exFestivitaGodute));
-    _exFestivitaResidueCtrl = TextEditingController(
-        text: formatNumber(corrente.exFestivitaResidue));
+    _exFestivitaMaturateCtrl =
+        TextEditingController(text: formatNumber(corrente.exFestivitaMaturate));
+    _exFestivitaGoduteCtrl =
+        TextEditingController(text: formatNumber(corrente.exFestivitaGodute));
+    _exFestivitaResidueCtrl =
+        TextEditingController(text: formatNumber(corrente.exFestivitaResidue));
 
     _trattenuteEdit = corrente.trattenute.isEmpty
         ? [TrattenutaEditRow()]
         : corrente.trattenute.entries
-            .map((e) => TrattenutaEditRow(
-                chiave: e.key, importo: formatNumber(e.value)))
+            .map((e) => TrattenutaEditRow(chiave: e.key, importo: e.value))
             .toList();
+    for (final row in _trattenuteEdit) {
+      _attachTrattenutaListeners(row);
+    }
 
     _competenzeEdit = corrente.competenze.isEmpty
         ? [VoceCompetenzaEditRow()]
         : corrente.competenze
             .map((v) => VoceCompetenzaEditRow(
                   descrizione: v.descrizione,
-                  quantita: formatNumber(v.quantita),
-                  importo: v.importo == 0 ? '' : formatNumber(v.importo),
+                  // Vuoto (non "0") quando la quantità è ASSENTE, stessa
+                  // convenzione già in uso per `importo == 0` subito sotto —
+                  // preserva l'assenza al salvataggio senza modifiche, vedi
+                  // `VoceCompetenzaEditRow.quantitaValue`.
+                  quantita: v.quantita == null ? '' : formatNumber(v.quantita!),
+                  importo: v.importo == 0 ? '' : formatEuro(v.importo),
                 ))
             .toList();
     for (final row in _competenzeEdit) {
       _attachCompetenzaListeners(row);
     }
-
-    // Forza il rebuild dello `_StatRow` (Ferie/ROL residui) ogni volta che
-    // cambia il campo "Residuo" corrispondente nella tabella sottostante.
-    _ferieResidueCtrl.addListener(_onResiduiChanged);
-    _rolResiduiCtrl.addListener(_onResiduiChanged);
-    _exFestivitaResidueCtrl.addListener(_onResiduiChanged);
 
     setState(() => _isEditing = true);
   }
@@ -173,6 +316,13 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     row.importo.addListener(_onResiduiChanged);
   }
 
+  /// Rebuild forzato ogni volta che l'importo di una trattenuta cambia, così
+  /// il Netto mostrato in hero (derivato da Lordo - trattenute) resta
+  /// sincronizzato live — stesso meccanismo di `_attachCompetenzaListeners`.
+  void _attachTrattenutaListeners(TrattenutaEditRow row) {
+    row.importo.addListener(_onResiduiChanged);
+  }
+
   List<VoceCompetenza> get _competenzeCorrenti => _competenzeEdit
       .where((row) => row.descrizione.text.trim().isNotEmpty)
       .map((row) => VoceCompetenza(
@@ -182,10 +332,22 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
           ))
       .toList();
 
+  /// Mappa trattenute correnti da `_trattenuteEdit`, filtrando le righe con
+  /// chiave vuota — stesso filtro già usato al salvataggio (`_save`), estratto
+  /// qui perché riusato anche per il Netto mostrato live in `build`.
+  Map<String, double> get _trattenuteCorrenti {
+    final trattenute = <String, double>{};
+    for (final row in _trattenuteEdit) {
+      final chiave = row.chiave.text.trim();
+      if (chiave.isEmpty) continue;
+      trattenute[chiave] = row.valoreConSegno;
+    }
+    return trattenute;
+  }
+
   void _onResiduiChanged() => setState(() {});
 
   void _disposeEditingControllers() {
-    _nettoCtrl.dispose();
     _oreLavorateCtrl.dispose();
     _ferieMaturateCtrl.dispose();
     _ferieGoduteCtrl.dispose();
@@ -193,8 +355,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     _rolMaturatiCtrl.dispose();
     _rolGodutiCtrl.dispose();
     _rolResiduiCtrl.dispose();
-    _permessiGodutiCtrl.dispose();
-    _permessiGodutiMeseCtrl.dispose();
     _exFestivitaMaturateCtrl.dispose();
     _exFestivitaGoduteCtrl.dispose();
     _exFestivitaResidueCtrl.dispose();
@@ -215,7 +375,11 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       parseItalianNumber(controller.text);
 
   void _addTrattenuta() {
-    setState(() => _trattenuteEdit.add(TrattenutaEditRow()));
+    setState(() {
+      final row = TrattenutaEditRow();
+      _attachTrattenutaListeners(row);
+      _trattenuteEdit.add(row);
+    });
   }
 
   void _removeTrattenuta(int index) {
@@ -245,33 +409,54 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     await showCupertinoModalPopup<void>(
       context: context,
       builder: (context) {
-        return Container(
-          height: 280,
-          color: CupertinoDynamicColor.resolve(AppColors.surface, context),
+        final accent =
+            CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.screenHorizontal,
+            0,
+            AppSpacing.screenHorizontal,
+            AppSpacing.sm,
+          ),
           child: SafeArea(
             top: false,
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+            child: SizedBox(
+              height: 280,
+              child: LiquidGlassSurface(
+                radius: AppRadius.glass,
+                child: Column(
                   children: [
-                    CupertinoButton(
-                      child: const Text('Fatto'),
-                      onPressed: () {
-                        setState(() => _periodoEdit = tempSelection);
-                        Navigator.of(context).pop();
-                      },
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        SpringButton(
+                          onPressed: () {
+                            setState(() => _periodoEdit = tempSelection);
+                            Navigator.of(context).pop();
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.sm),
+                            child: Text(
+                              'Fatto',
+                              style: AppTextStyles.subtitle.copyWith(
+                                color: accent,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Expanded(
+                      child: CupertinoDatePicker(
+                        mode: CupertinoDatePickerMode.monthYear,
+                        initialDateTime: _periodoEdit,
+                        onDateTimeChanged: (value) => tempSelection = value,
+                      ),
                     ),
                   ],
                 ),
-                Expanded(
-                  child: CupertinoDatePicker(
-                    mode: CupertinoDatePickerMode.monthYear,
-                    initialDateTime: _periodoEdit,
-                    onDateTimeChanged: (value) => tempSelection = value,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         );
@@ -321,43 +506,41 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   /// rispetto a [corrente] e, se non vuoto, chiede conferma esplicita
   /// prima di salvare — vedi CLAUDE.md/istruzioni task per il comportamento
   /// dettagliato dei 3 esiti (invariato / conferma / annulla).
-  void _save(BustaPaga corrente) {
-    final nettoText = _nettoCtrl.text.trim();
-    if (nettoText.isEmpty ||
-        double.tryParse(nettoText.replaceAll('.', '').replaceAll(',', '.')) ==
-            null) {
-      _showAlert(
-        'Netto non valido',
-        'Inserisci un valore numerico per il netto prima di salvare.',
-      );
-      return;
-    }
-
-    final trattenute = <String, double>{};
-    for (final row in _trattenuteEdit) {
-      final chiave = row.chiave.text.trim();
-      if (chiave.isEmpty) continue;
-      trattenute[chiave] = _parse(row.importo);
-    }
-
-    // Lordo/straordinari sono derivati dalla lista competenze correntemente
-    // in editing (vedi computeLordo/computeStraordinari). Se la lista è
-    // vuota (busta paga pre-migrazione mai riaperta in modifica, o utente
-    // che rimuove tutte le righe) si mantiene il valore precedente invece
-    // di azzerarlo — vedi CLAUDE.md/istruzioni task.
+  /// Lordo/straordinari/netto derivati dalle competenze/trattenute
+  /// correntemente in editing, con lo stesso fallback usato sia dal valore
+  /// mostrato live nell'hero (`build()`) sia dal salvataggio (`_save`): se le
+  /// competenze sono vuote (busta paga pre-migrazione mai riaperta in
+  /// modifica, o utente che rimuove tutte le righe) si mantiene il lordo/
+  /// straordinari precedente invece di azzerarlo; se sia competenze sia
+  /// trattenute sono vuote si mantiene anche il netto precedente. Unica
+  /// fonte di verità: evita che il valore mostrato live diverga da quello
+  /// effettivamente salvabile (vedi istruzioni task).
+  ({double lordo, double straordinari, double netto}) _valoriDerivatiEditing(
+      BustaPaga corrente) {
     final competenze = _competenzeCorrenti;
+    final trattenute = _trattenuteCorrenti;
     final lordo =
         competenze.isEmpty ? corrente.lordo : computeLordo(competenze);
     final straordinari = competenze.isEmpty
         ? corrente.straordinari
         : computeStraordinari(competenze);
+    final netto = (competenze.isEmpty && trattenute.isEmpty)
+        ? corrente.netto
+        : computeNetto(lordo, trattenute);
+    return (lordo: lordo, straordinari: straordinari, netto: netto);
+  }
+
+  void _save(BustaPaga corrente) {
+    final trattenute = _trattenuteCorrenti;
+    final competenze = _competenzeCorrenti;
+    final valori = _valoriDerivatiEditing(corrente);
 
     final candidato = corrente.copyWith(
       periodo: _periodoEdit,
       tipo: _tipoEdit,
-      netto: _parse(_nettoCtrl),
-      lordo: lordo,
-      straordinari: straordinari,
+      netto: valori.netto,
+      lordo: valori.lordo,
+      straordinari: valori.straordinari,
       oreLavorate: _parse(_oreLavorateCtrl),
       ferieMaturate: _parse(_ferieMaturateCtrl),
       ferieGodute: _parse(_ferieGoduteCtrl),
@@ -365,8 +548,8 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       rolMaturati: _parse(_rolMaturatiCtrl),
       rolGoduti: _parse(_rolGodutiCtrl),
       rolResidui: _parse(_rolResiduiCtrl),
-      permessiGoduti: _parse(_permessiGodutiCtrl),
-      permessiGodutiMese: _parse(_permessiGodutiMeseCtrl),
+      permessiGoduti: _permessiGoduti,
+      permessiGodutiMese: _permessiGodutiMese,
       exFestivitaMaturate: _parse(_exFestivitaMaturateCtrl),
       exFestivitaGodute: _parse(_exFestivitaGoduteCtrl),
       exFestivitaResidue: _parse(_exFestivitaResidueCtrl),
@@ -450,101 +633,15 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     );
   }
 
-  List<String> _buildDiff(BustaPaga vecchia, BustaPaga nuova) {
-    final diff = <String>[];
-
-    void addIfChanged(String label, double oldValue, double newValue) {
-      if (formatNumber(oldValue) != formatNumber(newValue)) {
-        diff.add(
-            '$label: ${formatNumber(oldValue)} → ${formatNumber(newValue)}');
-      }
-    }
-
-    if (_periodoLabelForDate(vecchia.periodo) !=
-        _periodoLabelForDate(nuova.periodo)) {
-      diff.add(
-        'Periodo: ${_periodoLabelForDate(vecchia.periodo)} → '
-        '${_periodoLabelForDate(nuova.periodo)}',
-      );
-    }
-    if (vecchia.tipo != nuova.tipo) {
-      diff.add(
-        'Tipo: ${_tipoLabels[vecchia.tipo]} → ${_tipoLabels[nuova.tipo]}',
-      );
-    }
-    addIfChanged('Netto', vecchia.netto, nuova.netto);
-    addIfChanged('Lordo', vecchia.lordo, nuova.lordo);
-    addIfChanged('Straordinari', vecchia.straordinari, nuova.straordinari);
-    addIfChanged('Ferie maturate', vecchia.ferieMaturate, nuova.ferieMaturate);
-    addIfChanged('Ferie godute', vecchia.ferieGodute, nuova.ferieGodute);
-    addIfChanged('Ferie residue', vecchia.ferieResidue, nuova.ferieResidue);
-    addIfChanged('ROL maturati', vecchia.rolMaturati, nuova.rolMaturati);
-    addIfChanged('ROL goduti', vecchia.rolGoduti, nuova.rolGoduti);
-    addIfChanged('ROL residui', vecchia.rolResidui, nuova.rolResidui);
-    addIfChanged(
-        'Permessi goduti', vecchia.permessiGoduti, nuova.permessiGoduti);
-    addIfChanged('Permessi (mese)', vecchia.permessiGodutiMese,
-        nuova.permessiGodutiMese);
-    addIfChanged('Ex festività maturate', vecchia.exFestivitaMaturate,
-        nuova.exFestivitaMaturate);
-    addIfChanged('Ex festività godute', vecchia.exFestivitaGodute,
-        nuova.exFestivitaGodute);
-    addIfChanged('Ex festività residue', vecchia.exFestivitaResidue,
-        nuova.exFestivitaResidue);
-    addIfChanged('Ore lavorate', vecchia.oreLavorate, nuova.oreLavorate);
-
-    final chiavi = {...vecchia.trattenute.keys, ...nuova.trattenute.keys};
-    for (final chiave in chiavi) {
-      final prima = vecchia.trattenute[chiave];
-      final dopo = nuova.trattenute[chiave];
-      if (prima == null && dopo != null) {
-        diff.add('Trattenuta $chiave: aggiunta (€ ${formatNumber(dopo)})');
-      } else if (prima != null && dopo == null) {
-        diff.add('Trattenuta $chiave: rimossa (era € ${formatNumber(prima)})');
-      } else if (prima != null &&
-          dopo != null &&
-          formatNumber(prima) != formatNumber(dopo)) {
-        diff.add(
-          'Trattenuta $chiave: € ${formatNumber(prima)} → € ${formatNumber(dopo)}',
-        );
-      }
-    }
-
-    // Stesso pattern del diff trattenute, chiave sulla descrizione (unica per
-    // voce nell'uso reale di questo layout busta paga).
-    final vecchieCompetenze = {
-      for (final v in vecchia.competenze) v.descrizione: v
-    };
-    final nuoveCompetenze = {
-      for (final v in nuova.competenze) v.descrizione: v
-    };
-    final descrizioniCompetenze = {
-      ...vecchieCompetenze.keys,
-      ...nuoveCompetenze.keys
-    };
-    for (final descrizione in descrizioniCompetenze) {
-      final prima = vecchieCompetenze[descrizione];
-      final dopo = nuoveCompetenze[descrizione];
-      if (prima == null && dopo != null) {
-        diff.add('Competenza $descrizione: aggiunta '
-            '(${formatNumber(dopo.quantita)}, € ${formatNumber(dopo.importo)})');
-      } else if (prima != null && dopo == null) {
-        diff.add('Competenza $descrizione: rimossa '
-            '(era ${formatNumber(prima.quantita)}, € ${formatNumber(prima.importo)})');
-      } else if (prima != null &&
-          dopo != null &&
-          (formatNumber(prima.quantita) != formatNumber(dopo.quantita) ||
-              formatNumber(prima.importo) != formatNumber(dopo.importo))) {
-        diff.add(
-          'Competenza $descrizione: ${formatNumber(prima.quantita)}, '
-          '€ ${formatNumber(prima.importo)} → ${formatNumber(dopo.quantita)}, '
-          '€ ${formatNumber(dopo.importo)}',
-        );
-      }
-    }
-
-    return diff;
-  }
+  /// Costruisce l'elenco leggibile delle differenze fra due versioni della
+  /// stessa busta paga per il popup di conferma prima di salvare una
+  /// modifica inline. Logica vera e propria estratta nella funzione di
+  /// livello file [buildBustaPagaEditDiff] (non un metodo di questa `State`)
+  /// per essere testabile senza dover pilotare l'intera schermata attraverso
+  /// Riverpod/Drift — questo resta un sottile delegato, unico punto di
+  /// chiamata reale nell'app.
+  List<String> _buildDiff(BustaPaga vecchia, BustaPaga nuova) =>
+      buildBustaPagaEditDiff(vecchia, nuova);
 
   @override
   void dispose() {
@@ -583,13 +680,12 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                     isConfermato: corrente.statoVerifica ==
                         StatoVerificaBustaPaga.confermato,
                     periodoLabel: periodoLabelVista,
-                    tipo: _isEditing ? _tipoEdit : corrente.tipo,
-                    isEditing: _isEditing,
-                    lordoDisplay: formatNumber(_isEditing
-                        ? computeLordo(_competenzeCorrenti)
+                    lordoDisplay: formatEuroConSegno(_isEditing
+                        ? _valoriDerivatiEditing(corrente).lordo
                         : corrente.lordo),
-                    nettoDisplay: formatNumber(corrente.netto),
-                    nettoController: _isEditing ? _nettoCtrl : null,
+                    nettoDisplay: formatEuroConSegno(_isEditing
+                        ? _valoriDerivatiEditing(corrente).netto
+                        : corrente.netto),
                     onTapPeriodo: _isEditing ? _pickPeriodo : null,
                     onTapTipo: _isEditing ? _pickTipo : null,
                   ),
@@ -602,17 +698,21 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                       blendMode: BlendMode.dstIn,
                       shaderCallback: (rect) {
                         const fadeHeight = 32.0;
-                        final stop =
+                        var topStop =
+                            (fadeHeight / rect.height).clamp(0.0, 1.0);
+                        final bottomStop =
                             1 - (fadeHeight / rect.height).clamp(0.0, 1.0);
+                        topStop = topStop.clamp(0.0, bottomStop);
                         return LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: const [
+                            CupertinoColors.transparent,
                             CupertinoColors.white,
                             CupertinoColors.white,
                             CupertinoColors.transparent,
                           ],
-                          stops: [0.0, stop, 1.0],
+                          stops: [0.0, topStop, bottomStop, 1.0],
                         ).createShader(rect);
                       },
                       child: ListView(
@@ -623,37 +723,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                           AppSpacing.xl,
                         ),
                         children: [
-                          BustaPagaStatRow(items: [
-                            (
-                              'Ferie residue',
-                              Text(
-                                _isEditing
-                                    ? formatNumber(_parse(_ferieResidueCtrl))
-                                    : formatNumber(corrente.ferieResidue),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                            (
-                              'Permessi residui',
-                              Text(
-                                _isEditing
-                                    ? formatNumber(_parse(_rolResiduiCtrl))
-                                    : formatNumber(corrente.rolResidui),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                            (
-                              'Ex festività',
-                              Text(
-                                _isEditing
-                                    ? formatNumber(
-                                        _parse(_exFestivitaResidueCtrl))
-                                    : formatNumber(corrente.exFestivitaResidue),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ]),
-                          const SizedBox(height: AppSpacing.lg),
                           if (corrente.fileOrigine != null) ...[
                             BustaPagaDocumentoChip(
                               filePath: corrente.fileOrigine!,
@@ -668,8 +737,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                             rolMaturati: formatNumber(corrente.rolMaturati),
                             rolGoduti: formatNumber(corrente.rolGoduti),
                             rolResidui: formatNumber(corrente.rolResidui),
-                            permessiGoduti:
-                                formatNumber(corrente.permessiGoduti),
                             exFestivitaMaturate:
                                 formatNumber(corrente.exFestivitaMaturate),
                             exFestivitaGodute:
@@ -686,8 +753,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                                 _isEditing ? _rolMaturatiCtrl : null,
                             rolGodutiCtrl: _isEditing ? _rolGodutiCtrl : null,
                             rolResiduiCtrl: _isEditing ? _rolResiduiCtrl : null,
-                            permessiGodutiCtrl:
-                                _isEditing ? _permessiGodutiCtrl : null,
                             exFestivitaMaturateCtrl:
                                 _isEditing ? _exFestivitaMaturateCtrl : null,
                             exFestivitaGoduteCtrl:
@@ -706,18 +771,9 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                             (
                               'Straordinari',
                               Text(
-                                '${formatNumber(_isEditing ? computeStraordinari(_competenzeCorrenti) : corrente.straordinari)} h',
+                                '${formatNumber(_isEditing ? _valoriDerivatiEditing(corrente).straordinari : corrente.straordinari)} h',
                                 textAlign: TextAlign.center,
                               ),
-                            ),
-                            (
-                              'Permessi (mese)',
-                              _isEditing
-                                  ? inlineNumberField(_permessiGodutiMeseCtrl,
-                                      suffix: ' h')
-                                  : Text(
-                                      '${formatNumber(corrente.permessiGodutiMese)} h',
-                                      textAlign: TextAlign.center),
                             ),
                           ]),
                           const SizedBox(height: AppSpacing.lg),
@@ -740,8 +796,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                                         i++)
                                       trattenutaEditRow(
                                         _trattenuteEdit[i],
-                                        onDismissed: () =>
-                                            _removeTrattenuta(i),
+                                        onDismissed: () => _removeTrattenuta(i),
                                       ),
                                     _aggiungiVoceButton(context),
                                   ]
@@ -751,8 +806,8 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                                             'Nessuna trattenuta', '—')
                                       ]
                                     : corrente.trattenute.entries
-                                        .map((e) => _trattenutaRow(e.key,
-                                            '− € ${formatNumber(e.value)}'))
+                                        .map((e) => _trattenutaRow(
+                                            e.key, formatTrattenuta(e.value)))
                                         .toList(),
                           ),
                         ],
@@ -820,8 +875,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-      child: CupertinoButton(
-        padding: EdgeInsets.zero,
+      child: SpringButton(
         onPressed: _addTrattenuta,
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -872,7 +926,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       },
     );
   }
-
 }
 
 /// Barra flottante in basso: chip piatti senza superficie di vetro attorno
@@ -907,8 +960,9 @@ class _ActionBar extends StatelessWidget {
     final secondaryAccent =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
 
+    final Widget content;
     if (isEditing) {
-      return Row(
+      content = Row(
         children: [
           Expanded(
             child: FlatChipButton(
@@ -929,43 +983,72 @@ class _ActionBar extends StatelessWidget {
           ),
         ],
       );
+    } else {
+      final daConfermare =
+          bustaPaga.statoVerifica == StatoVerificaBustaPaga.daConfermare;
+
+      content = Row(
+        children: [
+          if (daConfermare) ...[
+            Expanded(
+              flex: 7,
+              child: FlatChipButton(
+                icon: CupertinoIcons.checkmark_alt,
+                label: 'Conferma',
+                color: greenAccent,
+                onPressed: onConferma,
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              flex: 3,
+              child: FlatChipButton(
+                icon: CupertinoIcons.pencil,
+                label: 'Modifica',
+                color: accent,
+                onPressed: onModifica,
+              ),
+            ),
+          ] else
+            Expanded(
+              child: FlatChipButton(
+                icon: CupertinoIcons.pencil,
+                label: 'Modifica',
+                color: accent,
+                onPressed: onModifica,
+              ),
+            ),
+        ],
+      );
     }
 
-    final daConfermare =
-        bustaPaga.statoVerifica == StatoVerificaBustaPaga.daConfermare;
-
-    return Row(
+    // Blur di sfondo dietro l'intera fascia della barra (non solo dietro ai
+    // singoli chip), stesso pattern di `_pinnedBackground` nell'Archivio —
+    // vedi `_floatingBarBackground` in `buste_paga_section_screen.dart`.
+    return Stack(
       children: [
-        if (daConfermare) ...[
-          Expanded(
-            flex: 7,
-            child: FlatChipButton(
-              icon: CupertinoIcons.checkmark_alt,
-              label: 'Conferma',
-              color: greenAccent,
-              onPressed: onConferma,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            flex: 3,
-            child: FlatChipButton(
-              icon: CupertinoIcons.pencil,
-              label: 'Modifica',
-              color: accent,
-              onPressed: onModifica,
-            ),
-          ),
-        ] else
-          Expanded(
-            child: FlatChipButton(
-              icon: CupertinoIcons.pencil,
-              label: 'Modifica',
-              color: accent,
-              onPressed: onModifica,
-            ),
-          ),
+        Positioned.fill(child: _floatingBarBackground(context)),
+        content,
       ],
     );
   }
+}
+
+/// Sfondo "chrome" traslucido/sfocato dietro la barra flottante
+/// "Conferma/Modifica"/"Salva/Annulla": stesso `BackdropFilter` di
+/// `_pinnedBackground` in `buste_paga_archivio_view.dart` (stesso raggio di
+/// blur, stesso fill di opacità, stesso `ClipRect` come antenato diretto del
+/// `BackdropFilter` — vincolo critico per Impeller su device reale, vedi
+/// CLAUDE.md), copre l'intera fascia della barra.
+Widget _floatingBarBackground(BuildContext context) {
+  final fill =
+      CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context);
+  return ClipRect(
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+      child: DecoratedBox(
+        decoration: BoxDecoration(color: fill.withValues(alpha: 0.8)),
+      ),
+    ),
+  );
 }

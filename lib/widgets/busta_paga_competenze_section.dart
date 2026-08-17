@@ -6,6 +6,7 @@ import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/busta_paga_formatting.dart';
 import 'glass_form_section.dart';
+import 'spring_button.dart';
 import 'voce_competenza_edit_row.dart';
 
 /// Tabella delle voci di competenza individuali (Retribuzione ordinaria, Edr
@@ -120,7 +121,12 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Text(
-              formatNumber(voce.quantita),
+              // `—`: quantità ASSENTE (nessun tag GIORNI/ORE/RATEI sul PDF
+              // per questa riga, es. "930 Trattamento integrativo"), distinta
+              // da 0 stampato esplicitamente — vedi `VoceCompetenza.quantita`.
+              // Mostrare "0" sarebbe fuorviante ("zero giorni/ore" invece di
+              // "nessuna quantità associata").
+              voce.quantita == null ? '—' : formatNumber(voce.quantita!),
               style: valueStyle,
               textAlign: TextAlign.center,
             ),
@@ -128,7 +134,7 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Text(
-              voce.importo == 0 ? '—' : '€ ${formatNumber(voce.importo)}',
+              voce.importo == 0 ? '—' : formatEuroConSegno(voce.importo),
               style: valueStyle,
               textAlign: TextAlign.center,
             ),
@@ -153,9 +159,8 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
   Widget _aggiungiVoceButton(Color accent) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-      child: CupertinoButton(
-        padding: EdgeInsets.zero,
-        onPressed: onAggiungi,
+      child: SpringButton(
+        onPressed: onAggiungi ?? () {},
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [

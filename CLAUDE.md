@@ -17,11 +17,17 @@ apre direttamente sull'archivio Buste Paga, che è la schermata radice.
 **Sezione Buste Paga**: `buste_paga_section_screen.dart` è il contenitore radice
 dell'app: barra di benvenuto in cima (saluto dinamico in base all'ora del giorno,
 `greetingFor()`, + data corrente) e sotto-navigazione **Archivio**
-(`buste_paga_archivio_view.dart`, hero ultima busta paga + elenco) / **Statistiche**
-(`buste_paga_statistiche_screen.dart`, grafici `fl_chart`: andamento netto/lordo,
-ferie/ROL/permessi residui, straordinario per mese — mostrati sempre, anche con 0
-o 1 busta paga: ogni grafico senza dati sufficienti mostra il messaggio "Non ci
-sono dati" al posto di bloccare l'intera pagina). La sotto-navigazione non è più
+(`buste_paga_archivio_view.dart`, hero ultima busta paga + elenco — la hero è
+`BustaPagaSummaryHero` in `lib/widgets/busta_paga_summary_hero.dart`: mese
+(pallino di stato + label) e netto in evidenza impilati a sinistra, a destra un
+gruppetto compatto `_StatTrio` con Ferie/Permessi/Ex fest. separati da
+divisori verticali sottili, centrato verticalmente rispetto all'altezza
+combinata di mese+netto — tutto dentro un'unica `LiquidGlassSurface`) /
+**Statistiche** (`buste_paga_statistiche_screen.dart`, grafici `fl_chart`:
+andamento netto/lordo, ferie/ROL/permessi residui, straordinario per mese —
+mostrati sempre, anche con 0 o 1 busta paga: ogni grafico senza dati sufficienti
+mostra il messaggio "Non ci sono dati" al posto di bloccare l'intera pagina). La
+sotto-navigazione non è più
 un tab in alto ma una **sidecar flottante ancorata in basso**, widget privato
 `_BustePagaSidecar`: i due segmenti Archivio/Statistiche sono `FlatChipButton`
 (`lib/widgets/flat_chip_button.dart`, vedi sotto) — solo il segmento attivo ha il
@@ -61,15 +67,17 @@ regex.
 **Dettaglio busta paga** (`busta_paga_detail_screen.dart`,
 `ConsumerStatefulWidget` — non più `ConsumerWidget`, serve stato locale per la
 modalità modifica): hero card in cima (mese, badge di stato Confermato/Da
-confermare — verde/rosso, stessa semantica del pallino in Archivio — netto in
-evidenza massima) **fissa fuori dall'area scrollabile**, sotto una riga di
-mini-statistiche Ferie residue/ROL residui/Lordo e più sotto una riga
-Ore lavorate/Straordinari (raggruppate per unità: la prima riga è in
-euro/giorni, la seconda in ore — Straordinari è ore, non euro, coerente col
-grafico "Ore straordinario" di Statistiche), entrambe **un'unica**
-`LiquidGlassSurface` a scomparti
-(mai più superfici di vetro affiancate, vedi nota bug in "Stile visivo"), una
-tabella unica "Ferie, ROL e permessi" (colonne Maturato/Goduto/Residuo) al
+confermare — verde/rosso, stessa semantica del pallino in Archivio — sotto,
+Lordo e Netto affiancati, separati da un divisore verticale, **visivamente
+identici** in font/dimensione/peso/colore e distinti solo dall'etichetta
+sopra ciascun valore, nessuno dei due più "in evidenza" dell'altro) **fissa
+fuori dall'area scrollabile**, sotto una riga di
+mini-statistiche Ore lavorate/Straordinari (**unica** `LiquidGlassSurface` a
+scomparti, mai più superfici di vetro affiancate, vedi nota bug in "Stile
+visivo" — rimossa il 2026-08-11 l'analoga riga Ferie residue/Permessi
+residui/Ex festività, ridondante con la colonna "Residuo" della tabella
+Maturazioni sottostante), una tabella unica "Ferie, ROL e permessi" (colonne
+Maturato/Goduto/Residuo) al
 posto di sezioni separate per categoria, chip documento PDF tappabile e
 sezione Trattenute — nessuna di queste sezioni ha più un titolo sopra la card
 (rimossi per pulizia visiva). In fondo, una barra flottante (`_ActionBar`,
@@ -131,7 +139,7 @@ di questa modifica — nessun dato esistente toccato o perso.
 `busta_paga_form_screen.dart` — attiva `_isEditing = true` sulla stessa
 schermata di dettaglio, e le stesse card diventano editabili sul posto (hero
 Netto e periodo tappabile con lo stesso picker mese/anno del vecchio form,
-`BustaPagaStatRow` Ferie/ROL/Lordo e Ore/Straordinari, tabella Maturazioni, righe
+`BustaPagaStatRow` Ore/Straordinari, tabella Maturazioni, righe
 Trattenute con `Dismissible`+`SwipeDeleteBackground` al posto di un bottone
 "meno" per rimuoverle). **Requisito non negoziabile confermato più volte
 dall'utente**: entrare in modifica non deve cambiare NULLA visivamente
@@ -145,11 +153,11 @@ mostra un popup "Hai modificato i seguenti dati, confermi?" con l'elenco
 vecchio → nuovo prima di applicare (`copyWith` con `statoVerifica` che torna
 automaticamente a `daConfermare` se la busta era "Confermata"); se il diff è
 vuoto esce dalla modifica senza popup. "Annulla" scarta tutti i controller e
-torna alla vista di sola lettura. Ferie residue/ROL residui in `BustaPagaStatRow`
-restano sempre di sola lettura anche in modifica: rispecchiano live (via
-listener sui controller) il campo "Residuo" della tabella Maturazioni, che è
-l'unico editabile per quei dati (evita due campi indipendenti per lo stesso
-valore).
+torna alla vista di sola lettura. Ferie residue/ROL residui/Ex festività
+residue non hanno più una riga di mini-statistiche dedicata (rimossa il
+2026-08-11, ridondante): il campo "Residuo" della tabella Maturazioni resta
+l'unico punto, di sola lettura o editabile, in cui questi dati sono
+mostrati/modificati.
 
 Componenti di stile riutilizzabili dell'app (Liquid Glass, vedi sezione "Stile
 visivo" sotto): `lib/widgets/liquid_glass_surface.dart` (superficie in vetro
@@ -265,9 +273,14 @@ scroll naturale sotto, con lo stesso pattern di `Padding` esterno che riduce il
 viewport (`_actionBarReservedHeight`) per il margine verso la barra flottante,
 e un `ShaderMask` con `fadeHeight` piccolo (poche decine di pixel, non l'intero
 margine) solo per ammorbidire lo stacco finale, non per "nascondere" più righe
-di contenuto come nell'Archivio. Se si ritocca uno dei due effetti, non
-assumere che debbano avere lo stesso valore assoluto di `fadeHeight`: il
-viewport sottostante è diverso in altezza tra le due schermate.
+di contenuto come nell'Archivio. Lo stesso `ShaderMask` sfuma anche l'inizio
+della lista (gradiente `transparent→white→white→transparent` dall'alto verso
+il basso, stesso `fadeHeight` di partenza per entrambi gli estremi), così il
+primo item (chip documento) scompare in dissolvenza sotto la hero card fissa
+invece che con un taglio netto quando si scrolla verso l'alto. Se si ritocca
+uno dei due effetti, non assumere che debbano avere lo stesso valore assoluto
+di `fadeHeight`: il viewport sottostante è diverso in altezza tra le due
+schermate.
 
 ## Cosa manca (prossimi passi, in ordine di priorità suggerito)
 
@@ -289,3 +302,54 @@ precompilazione dati da PDF, nessun piano di sostituirlo.
 - Componenti riutilizzabili in `lib/widgets/`, non dentro le singole schermate.
 - Preferire `CupertinoDynamicColor.resolve(context)` per ogni colore, per garantire
   che light/dark mode funzionino automaticamente.
+
+## Come collaborare su questo progetto (regole del coordinatore)
+
+Queste regole valgono per l'assistente che coordina il lavoro su Buts, non solo
+per uno specifico agente dev — governano come si distribuisce il lavoro tra
+coordinatore, agenti dev1/dev2, agente `revisore` e utente.
+
+- **Sviluppo sempre delegato**: il coordinatore non scrive mai direttamente
+  codice di feature/fix (niente `Edit`/`Write` diretti su file Dart) — delega
+  sempre a un agente dev1 o dev2, interscambiabili, anche per fix piccoli o
+  "ovvi". Il coordinatore assegna task e file in scope, poi lancia `revisore`.
+  *Perché*: l'utente vuole poter sviluppare/testare in parallelo nella stessa
+  sessione senza che il coordinatore intervenga direttamente sul codice.
+- **Revisore dopo ogni dev**: al termine di ogni run di dev1/dev2, il
+  coordinatore lancia sempre `revisore` con lo stesso scope/parametri passati
+  all'agente dev (stessi file, stesso task) — non uno scope diverso senza
+  motivo. È un passo fisso, non opzionale, anche per fix piccoli.
+- **Notifica di lancio, non richiesta di conferma**: quando si lanciano
+  agenti dev1/dev2 (anche in parallelo), il coordinatore comunica cosa sta
+  delegando (agente, scope, file) nel momento in cui parte, ma non aspetta un
+  ok esplicito prima di procedere.
+- **File in uso dall'utente**: se l'utente lavora manualmente su file del
+  progetto in parallelo agli agenti dev, è lui a segnalare quali file sta
+  usando — il coordinatore evita di assegnarli in scrittura a un agente dev
+  finché l'utente non segnala che sono di nuovo liberi.
+- **Istanze dell'utente intoccabili**: se l'utente ha avviato di persona un
+  simulatore iOS, `flutter run`, hot reload o altro processo, il coordinatore
+  (e gli agenti che lancia) non lo ferma, non lo riavvia, e non ne lancia uno
+  equivalente in parallelo che possa entrare in conflitto. Prima di comandi
+  come `killall` o un nuovo `flutter run`/`build` per verifica, controllare se
+  potrebbe esserci un'istanza attiva dell'utente e, in caso di dubbio,
+  chiedere invece di agire. `flutter analyze`/`flutter test` restano liberi,
+  non sono processi persistenti.
+- **Test visivi solo dell'utente**: il coordinatore esegue solo verifiche
+  statiche (`flutter analyze`, `flutter test`, `build_runner`, skill
+  `flutter-check`) — non avvia mai l'app in un simulatore/device per
+  osservare la UI, non fa screenshot, non esprime giudizi sull'aspetto
+  visivo. Quando un task tocca UI/widget, si ferma alla verifica di
+  compilazione/test e segnala che la modifica è pronta per il test visivo
+  dell'utente — non dichiara mai "verificato visivamente" senza che sia stato
+  l'utente a controllarlo.
+- **Autonomia Git limitata**: comandi git di sola lettura (`status`, `diff`,
+  `log`, `show`, `branch --list`) sono liberi. Qualunque comando che modifica
+  lo stato del repo (`commit`, creazione branch/checkout, `push`, `merge`,
+  `reset`, `rebase`...) parte **solo** su istruzione esplicita dell'utente in
+  quel momento — mai di iniziativa, anche se sembra il passo logico dopo un
+  task completato. *Nota*: `.claude/settings.local.json` pre-autorizza
+  l'harness a eseguire senza prompt di conferma `git push/checkout/pull/
+  merge/remote/add/commit` — questo è un permesso tecnico dell'harness, non
+  un via libera a usarli di iniziativa: questa regola resta comunque il
+  criterio su *quando* il coordinatore decide di lanciarli.

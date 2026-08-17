@@ -11,7 +11,7 @@ import '../../utils/busta_paga_formatting.dart';
 import '../../widgets/liquid_glass_surface.dart';
 
 /// Contenuto della tab "Statistiche" della sezione Buste Paga: andamento
-/// netto/lordo, ferie/ROL/permessi residui e ore di straordinario nel tempo.
+/// netto/lordo, ferie/permessi residui e ore di straordinario nel tempo.
 ///
 /// Palette scelta per coerenza cross-chart: ogni serie usa un colore
 /// semantico di sistema fisso (non legato alle 4 aree Budget, dato che
@@ -33,14 +33,13 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
   static const _ferieColor = AppColors.systemBlue;
   static const _rolColor = AppColors.systemPurple;
   static const _permessiColor = AppColors.systemOrange;
+  static const _exFestivitaColor = AppColors.systemGreen;
   static const _straordinarioColor = AppColors.systemOrange;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final buste = ref
-        .watch(busteRepositoryProvider)
-        .where(bustaInclusaInStatistiche)
-        .toList();
+    final tutte = ref.watch(busteRepositoryProvider);
+    final buste = tutte.where(bustaInclusaInStatistiche).toList();
     final sorted = [...buste]..sort((a, b) => a.periodo.compareTo(b.periodo));
     final filtro = periodoFiltro;
     final filtrati = filtro == null
@@ -50,6 +49,24 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
                 !b.periodo.isBefore(filtro.start) &&
                 !b.periodo.isAfter(filtro.end))
             .toList();
+
+    // Buste mensili "Da confermare" nel periodo selezionato (stesso filtro
+    // di `filtrati`, criterio permissivo di [_bustaInclusaInRangePeriodo]
+    // meno restrittivo di [bustaInclusaInStatistiche]): lo slider di periodo
+    // sopra i grafici le include già (estende gli estremi min/max), ma i
+    // grafici no — appena importate più buste paga in un colpo solo e prima
+    // di confermarle, l'utente vedrebbe altrimenti uno slider popolato sopra
+    // a tre card "Non ci sono dati" senza spiegazione, apparentemente un bug
+    // di rendering. Passato a ogni grafico per un messaggio esplicito nello
+    // stato vuoto (vedi [_NoDataMessage]) invece di quello generico.
+    final busteNonConfermate = tutte
+        .where((b) =>
+            b.tipo == TipoBustaPaga.mensile &&
+            b.statoVerifica == StatoVerificaBustaPaga.daConfermare &&
+            (filtro == null ||
+                (!b.periodo.isBefore(filtro.start) &&
+                    !b.periodo.isAfter(filtro.end))))
+        .length;
 
     return ShaderMask(
       blendMode: BlendMode.dstIn,
@@ -67,97 +84,128 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
         ).createShader(rect);
       },
       child: CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.screenHorizontal,
-            AppSpacing.lg,
-            AppSpacing.screenHorizontal,
-            AppSpacing.md,
-          ),
-          sliver: SliverToBoxAdapter(
-            child: _ChartCard(
-              title: 'Netto e lordo nel tempo',
-              legend: const [
-                _LegendEntry(label: 'Netto', color: _nettoColor),
-                _LegendEntry(label: 'Lordo', color: _lordoColor),
-              ],
-              chart: _NettoLordoChart(buste: filtrati),
-              stats: _nettoLordoStats(filtrati),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screenHorizontal,
+              AppSpacing.lg,
+              AppSpacing.screenHorizontal,
+              AppSpacing.md,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: _ChartCard(
+                title: 'Netto e lordo nel tempo',
+                legend: const [
+                  _LegendEntry(label: 'Netto', color: _nettoColor),
+                  _LegendEntry(label: 'Lordo', color: _lordoColor),
+                ],
+                chart: _NettoLordoChart(
+                  buste: filtrati,
+                  busteNonConfermate: busteNonConfermate,
+                ),
+                stats: _nettoLordoStats(filtrati),
+              ),
             ),
           ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.screenHorizontal,
-            0,
-            AppSpacing.screenHorizontal,
-            AppSpacing.md,
-          ),
-          sliver: SliverToBoxAdapter(
-            child: _ChartCard(
-              title: 'Ferie, ROL e permessi',
-              legend: const [
-                _LegendEntry(label: 'Ferie residue', color: _ferieColor),
-                _LegendEntry(label: 'ROL residui', color: _rolColor),
-                _LegendEntry(label: 'Permessi goduti', color: _permessiColor),
-              ],
-              chart: _FerieRolPermessiChart(buste: filtrati),
-              stats: _ferieRolPermessiStats(filtrati),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screenHorizontal,
+              0,
+              AppSpacing.screenHorizontal,
+              AppSpacing.md,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: _ChartCard(
+                title: 'Ferie e permessi',
+                legend: const [
+                  _LegendEntry(label: 'Ferie residue', color: _ferieColor),
+                  _LegendEntry(label: 'Permessi residui', color: _rolColor),
+                  _LegendEntry(
+                      label: 'Permessi orario goduti', color: _permessiColor),
+                  _LegendEntry(
+                      label: 'Ex festività residue', color: _exFestivitaColor),
+                ],
+                chart: _FerieRolPermessiChart(
+                  buste: filtrati,
+                  busteNonConfermate: busteNonConfermate,
+                ),
+                stats: _ferieRolPermessiStats(filtrati),
+              ),
             ),
           ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.screenHorizontal,
-            0,
-            AppSpacing.screenHorizontal,
-            AppSpacing.xl,
-          ),
-          sliver: SliverToBoxAdapter(
-            child: _ChartCard(
-              title: 'Straordinario per mese',
-              legend: const [
-                _LegendEntry(
-                    label: 'Ore straordinario', color: _straordinarioColor),
-              ],
-              chart: _StraordinarioChart(buste: filtrati),
-              stats: _straordinarioStats(filtrati),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screenHorizontal,
+              0,
+              AppSpacing.screenHorizontal,
+              AppSpacing.xl,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: _ChartCard(
+                title: 'Straordinario per mese',
+                legend: const [
+                  _LegendEntry(
+                      label: 'Ore straordinario', color: _straordinarioColor),
+                ],
+                chart: _StraordinarioChart(
+                  buste: filtrati,
+                  busteNonConfermate: busteNonConfermate,
+                ),
+                stats: _straordinarioStats(filtrati),
+              ),
             ),
           ),
-        ),
-      ],
+        ],
       ),
     );
   }
 }
 
-/// Messaggio mostrato al posto del grafico quando non ci sono buste paga
-/// da rappresentare (archivio vuoto).
+/// Messaggio mostrato al posto del grafico quando non ci sono buste paga da
+/// rappresentare — archivio vuoto (nessuna busta paga mensile confermata nel
+/// periodo selezionato), oppure [busteNonConfermate] > 0: in quel caso i
+/// dati esistono e sono già inclusi nello slider di periodo sopra i grafici
+/// (vedi `_bustaInclusaInRangePeriodo`), ma sono esclusi da qui perché non
+/// ancora confermati (`bustaInclusaInStatistiche`) — un messaggio esplicito
+/// al posto del generico "Non ci sono dati" evita che l'utente scambi
+/// questo per un bug di rendering subito dopo un import massivo.
 class _NoDataMessage extends StatelessWidget {
-  const _NoDataMessage();
+  final int busteNonConfermate;
+
+  const _NoDataMessage({this.busteNonConfermate = 0});
 
   @override
   Widget build(BuildContext context) {
+    final secondary =
+        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+    final messaggio = busteNonConfermate <= 0
+        ? 'Non ci sono dati'
+        : busteNonConfermate == 1
+            ? 'Hai 1 busta paga da confermare: confermala per vederla nei '
+                'grafici.'
+            : 'Hai $busteNonConfermate buste paga da confermare: '
+                'confermale per vederle nei grafici.';
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            CupertinoIcons.chart_bar_alt_fill,
-            size: 28,
-            color: CupertinoDynamicColor.resolve(
-                AppColors.labelSecondary, context),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Non ci sono dati',
-            style: AppTextStyles.cardLabel.copyWith(
-              color: CupertinoDynamicColor.resolve(
-                  AppColors.labelSecondary, context),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              busteNonConfermate > 0
+                  ? CupertinoIcons.checkmark_seal
+                  : CupertinoIcons.chart_bar_alt_fill,
+              size: 28,
+              color: secondary,
             ),
-          ),
-        ],
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              messaggio,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.cardLabel.copyWith(color: secondary),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -206,8 +254,7 @@ class _ChartCard extends StatelessWidget {
               spacing: AppSpacing.md,
               runSpacing: AppSpacing.xs,
               children: [
-                for (final entry in legend)
-                  _LegendChip(entry: entry),
+                for (final entry in legend) _LegendChip(entry: entry),
               ],
             ),
             const SizedBox(height: AppSpacing.md),
@@ -251,8 +298,7 @@ class _StatsTable extends StatelessWidget {
         CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
     final dividerColor =
         CupertinoDynamicColor.resolve(AppColors.separator, context);
-    final headerStyle =
-        AppTextStyles.cardLabel.copyWith(color: labelColor);
+    final headerStyle = AppTextStyles.cardLabel.copyWith(color: labelColor);
     final labelStyle = AppTextStyles.cardLabel.copyWith(
       color: valueColor,
       fontWeight: FontWeight.w600,
@@ -270,7 +316,8 @@ class _StatsTable extends StatelessWidget {
     // "€ 1563.99 (mag '26)" in colonne strette): FittedBox lo restringe
     // fino a stare su una riga sola invece di lasciarlo wrappare — garanzia
     // strutturale indipendente dal numero di colonne del grafico.
-    Widget cell(String text, TextStyle style, {TextAlign align = TextAlign.center}) {
+    Widget cell(String text, TextStyle style,
+        {TextAlign align = TextAlign.center}) {
       return FittedBox(
         fit: BoxFit.scaleDown,
         alignment:
@@ -281,7 +328,7 @@ class _StatsTable extends StatelessWidget {
 
     // Un divisore verticale sottile tra ogni colonna (oltre a quelli
     // orizzontali tra le righe), per separare a colpo d'occhio le serie
-    // quando sono 2-3 affiancate (Netto/Lordo, Ferie/ROL/Permessi).
+    // quando sono 2-3 affiancate (Netto/Lordo, Ferie/Permessi).
     List<Widget> withColumnDividers(List<Widget> celle) {
       return [
         for (var i = 0; i < celle.length; i++) ...[
@@ -316,8 +363,8 @@ class _StatsTable extends StatelessWidget {
               children: withColumnDividers([
                 Expanded(
                   flex: 2,
-                  child: cell(data.righe[i].$1, labelStyle,
-                      align: TextAlign.left),
+                  child:
+                      cell(data.righe[i].$1, labelStyle, align: TextAlign.left),
                 ),
                 for (final valore in data.righe[i].$2)
                   Expanded(
@@ -337,16 +384,14 @@ class _StatsTable extends StatelessWidget {
 /// [buste] non vuota.
 BustaPaga _bustaConMinimo(
     List<BustaPaga> buste, double Function(BustaPaga) selettore) {
-  return buste.reduce(
-      (a, b) => selettore(a) <= selettore(b) ? a : b);
+  return buste.reduce((a, b) => selettore(a) <= selettore(b) ? a : b);
 }
 
 /// Trova la busta paga con il valore massimo secondo [selettore]. Richiede
 /// [buste] non vuota.
 BustaPaga _bustaConMassimo(
     List<BustaPaga> buste, double Function(BustaPaga) selettore) {
-  return buste.reduce(
-      (a, b) => selettore(a) >= selettore(b) ? a : b);
+  return buste.reduce((a, b) => selettore(a) >= selettore(b) ? a : b);
 }
 
 double _media(List<BustaPaga> buste, double Function(BustaPaga) selettore) {
@@ -357,12 +402,15 @@ double _totale(List<BustaPaga> buste, double Function(BustaPaga) selettore) {
   return buste.map(selettore).reduce((a, b) => a + b);
 }
 
-/// Formatta sempre con 2 decimali (a differenza di `formatNumber`, che li
-/// omette per i valori esatti) — usato solo nelle tabelle statistiche
-/// sotto i grafici, dove valori nella stessa colonna con un numero di
-/// decimali incoerente (es. "1487" sotto "1449.25") rendono più difficile
-/// scansionare la colonna a colpo d'occhio.
-String _formatStatNumber(double value) => value.toStringAsFixed(2);
+/// Formatta sempre con 2 decimali fissi e formato italiano (punto per le
+/// migliaia, virgola per i decimali — a differenza di `toStringAsFixed`,
+/// locale-indipendente e quindi sempre col punto) — usato solo nelle
+/// tabelle statistiche sotto i grafici, dove valori nella stessa colonna con
+/// un numero di decimali incoerente (es. "1.487,00" sotto "1.449,25")
+/// rendono più difficile scansionare la colonna a colpo d'occhio. Delega a
+/// [formatNumberFixed] in `busta_paga_formatting.dart` invece di duplicare
+/// la logica di formattazione.
+String _formatStatNumber(double value) => formatNumberFixed(value);
 
 /// Tabella del riepilogo sotto il grafico Netto/Lordo. Opera sulle stesse
 /// [buste] già filtrate (confermate, mensili, nel periodo selezionato) che
@@ -379,56 +427,59 @@ _StatsTableData? _nettoLordoStats(List<BustaPaga> buste) {
       (
         'Media',
         [
-          '€ ${_formatStatNumber(_media(buste, (b) => b.netto))}',
-          '€ ${_formatStatNumber(_media(buste, (b) => b.lordo))}',
+          formatEuroConSegno(_media(buste, (b) => b.netto)),
+          formatEuroConSegno(_media(buste, (b) => b.lordo)),
         ],
       ),
       (
         'Minimo',
         [
-          '€ ${_formatStatNumber(minNetto.netto)} (${periodoAxisLabel(minNetto.periodo)})',
-          '€ ${_formatStatNumber(minLordo.lordo)} (${periodoAxisLabel(minLordo.periodo)})',
+          '${formatEuroConSegno(minNetto.netto)} (${periodoAxisLabel(minNetto.periodo)})',
+          '${formatEuroConSegno(minLordo.lordo)} (${periodoAxisLabel(minLordo.periodo)})',
         ],
       ),
       (
         'Massimo',
         [
-          '€ ${_formatStatNumber(maxNetto.netto)} (${periodoAxisLabel(maxNetto.periodo)})',
-          '€ ${_formatStatNumber(maxLordo.lordo)} (${periodoAxisLabel(maxLordo.periodo)})',
+          '${formatEuroConSegno(maxNetto.netto)} (${periodoAxisLabel(maxNetto.periodo)})',
+          '${formatEuroConSegno(maxLordo.lordo)} (${periodoAxisLabel(maxLordo.periodo)})',
         ],
       ),
       (
         'Totale',
         [
-          '€ ${_formatStatNumber(_totale(buste, (b) => b.netto))}',
-          '€ ${_formatStatNumber(_totale(buste, (b) => b.lordo))}',
+          formatEuroConSegno(_totale(buste, (b) => b.netto)),
+          formatEuroConSegno(_totale(buste, (b) => b.lordo)),
         ],
       ),
     ],
   );
 }
 
-/// Tabella del riepilogo sotto il grafico Ferie/ROL/Permessi. Ferie residue
-/// e ROL residui sono saldi puntuali mese per mese (non quantità da
-/// sommare), quindi la riga "Totale" li mostra come `'—'` — solo i permessi
-/// goduti sono una quantità che ha senso cumulare nel periodo. Stessa
-/// convenzione già usata da `_MaturazioniSection` nel dettaglio busta paga
-/// per le celle non applicabili.
+/// Tabella del riepilogo sotto il grafico Ferie/Permessi. Ferie residue
+/// e permessi residui (dato `rolResidui`) sono saldi puntuali mese per mese
+/// (non quantità da sommare), quindi la riga "Totale" li mostra come `'—'`
+/// — solo i permessi orario goduti sono una quantità che ha senso cumulare
+/// nel periodo. Stessa convenzione già usata da `_MaturazioniSection` nel
+/// dettaglio busta paga per le celle non applicabili.
 _StatsTableData? _ferieRolPermessiStats(List<BustaPaga> buste) {
   if (buste.isEmpty) return null;
   final minFerie = _bustaConMinimo(buste, (b) => b.ferieResidue);
   final maxFerie = _bustaConMassimo(buste, (b) => b.ferieResidue);
   final minRol = _bustaConMinimo(buste, (b) => b.rolResidui);
   final maxRol = _bustaConMassimo(buste, (b) => b.rolResidui);
+  final minExFestivita = _bustaConMinimo(buste, (b) => b.exFestivitaResidue);
+  final maxExFestivita = _bustaConMassimo(buste, (b) => b.exFestivitaResidue);
   return (
-    colonne: const ['Ferie', 'ROL', 'Permessi'],
+    colonne: const ['Ferie', 'Permessi', 'Permessi orario', 'Ex festività'],
     righe: [
       (
         'Media',
         [
           _formatStatNumber(_media(buste, (b) => b.ferieResidue)),
           _formatStatNumber(_media(buste, (b) => b.rolResidui)),
-          _formatStatNumber(_media(buste, (b) => b.permessiGoduti)),
+          _formatStatNumber(_media(buste, (b) => b.permessiGodutiMese)),
+          _formatStatNumber(_media(buste, (b) => b.exFestivitaResidue)),
         ],
       ),
       (
@@ -437,6 +488,7 @@ _StatsTableData? _ferieRolPermessiStats(List<BustaPaga> buste) {
           '${_formatStatNumber(minFerie.ferieResidue)} (${periodoAxisLabel(minFerie.periodo)})',
           '${_formatStatNumber(minRol.rolResidui)} (${periodoAxisLabel(minRol.periodo)})',
           '—',
+          '${_formatStatNumber(minExFestivita.exFestivitaResidue)} (${periodoAxisLabel(minExFestivita.periodo)})',
         ],
       ),
       (
@@ -445,11 +497,17 @@ _StatsTableData? _ferieRolPermessiStats(List<BustaPaga> buste) {
           '${_formatStatNumber(maxFerie.ferieResidue)} (${periodoAxisLabel(maxFerie.periodo)})',
           '${_formatStatNumber(maxRol.rolResidui)} (${periodoAxisLabel(maxRol.periodo)})',
           '—',
+          '${_formatStatNumber(maxExFestivita.exFestivitaResidue)} (${periodoAxisLabel(maxExFestivita.periodo)})',
         ],
       ),
       (
         'Totale',
-        ['—', '—', _formatStatNumber(_totale(buste, (b) => b.permessiGoduti))],
+        [
+          '—',
+          '—',
+          _formatStatNumber(_totale(buste, (b) => b.permessiGodutiMese)),
+          '—',
+        ],
       ),
     ],
   );
@@ -467,16 +525,26 @@ _StatsTableData? _straordinarioStats(List<BustaPaga> buste) {
   return (
     colonne: const ['Ore straordinario'],
     righe: [
-      ('Media', ['${_formatStatNumber(_media(buste, (b) => b.straordinari))} h/mese']),
+      (
+        'Media',
+        ['${_formatStatNumber(_media(buste, (b) => b.straordinari))} h/mese']
+      ),
       (
         'Minimo',
-        ['${_formatStatNumber(min.straordinari)} h (${periodoAxisLabel(min.periodo)})'],
+        [
+          '${_formatStatNumber(min.straordinari)} h (${periodoAxisLabel(min.periodo)})'
+        ],
       ),
       (
         'Massimo',
-        ['${_formatStatNumber(max.straordinari)} h (${periodoAxisLabel(max.periodo)})'],
+        [
+          '${_formatStatNumber(max.straordinari)} h (${periodoAxisLabel(max.periodo)})'
+        ],
       ),
-      ('Totale', ['${_formatStatNumber(_totale(buste, (b) => b.straordinari))} h']),
+      (
+        'Totale',
+        ['${_formatStatNumber(_totale(buste, (b) => b.straordinari))} h']
+      ),
     ],
   );
 }
@@ -579,6 +647,81 @@ List<int> _yearBoundaryIndices(List<DateTime> periodi) {
   return indices;
 }
 
+/// Espande [buste] (assunta ordinata per periodo crescente, un solo
+/// elemento per mese solare — garantito da [bustaInclusaInStatistiche], che
+/// filtra solo mensili confermate: l'app impedisce comunque due mensili
+/// nello stesso anno+mese, vedi controllo anti-duplicati in
+/// `buste_paga_section_screen.dart`) in una sequenza continua di TUTTI i
+/// mesi solari fra il primo e l'ultimo periodo presente, un elemento per
+/// mese: quelli senza una busta paga (mese non ancora confermato o non
+/// importato) hanno `busta: null`.
+///
+/// Usata per disegnare le serie dei grafici su un asse X che riflette il
+/// calendario reale invece della sola posizione nell'array: prima di questo
+/// fix `FlSpot(i.toDouble(), ...)` usava l'indice nella lista filtrata come
+/// coordinata X, quindi un mese mancante (frequente in un reimport massivo,
+/// dove le buste si confermano una alla volta) faceva letteralmente sparire
+/// il buco — la riga/barra del mese precedente si univa a quella del mese
+/// successivo come se fossero consecutivi, senza alcun segnale visivo.
+/// Con la griglia, l'indice nell'array coincide sempre con un preciso mese
+/// solare (compresi quelli senza dati): un mese mancante resta uno slot con
+/// `busta: null`, che i chiamanti traducono in un vero e proprio buco visivo
+/// — `FlSpot.nullSpot` per le linee (fl_chart spezza la linea in più
+/// segmenti quando incontra uno "spot nullo", meccanismo nativo, non uno
+/// stratagemma: vedi `LineChartBarData.spots`) e l'assenza di una barra per
+/// `_StraordinarioChart` — invece di un'interpolazione silenziosa.
+List<({DateTime periodo, BustaPaga? busta})> _grigliaMensile(
+  List<BustaPaga> buste,
+) {
+  if (buste.isEmpty) return const [];
+  final risultato = <({DateTime periodo, BustaPaga? busta})>[];
+  var cursore = DateTime(buste.first.periodo.year, buste.first.periodo.month);
+  final fine = DateTime(buste.last.periodo.year, buste.last.periodo.month);
+  var indice = 0;
+  while (!cursore.isAfter(fine)) {
+    final corrisponde = indice < buste.length &&
+        buste[indice].periodo.year == cursore.year &&
+        buste[indice].periodo.month == cursore.month;
+    risultato.add(
+      (periodo: cursore, busta: corrisponde ? buste[indice] : null),
+    );
+    if (corrisponde) indice++;
+    // `DateTime(year, month + 1)` normalizza da solo il riporto a gennaio
+    // dell'anno successivo quando `month` supera 12.
+    cursore = DateTime(cursore.year, cursore.month + 1);
+  }
+  return risultato;
+}
+
+/// Analoga a [_grigliaMensile] ma a livello di trimestre, sui bucket già
+/// prodotti da [_aggregaStraordinariPerTrimestre]: un trimestre interamente
+/// privo di buste paga confermate (3 mesi consecutivi mancanti, possibile
+/// solo quando l'aggregazione trimestrale è attiva, cioè con 2+ anni di
+/// dati) resta comunque un buco visibile invece di sparire. Richiede
+/// [buste] non vuota.
+List<({DateTime periodo, double? totale})> _grigliaTrimestrale(
+  List<BustaPaga> buste,
+) {
+  final aggregati = _aggregaStraordinariPerTrimestre(buste);
+  int chiaveTrimestre(DateTime periodo) =>
+      periodo.year * 4 + (periodo.month - 1) ~/ 3;
+  final mappa = <int, double>{
+    for (final punto in aggregati) chiaveTrimestre(punto.periodo): punto.totale,
+  };
+  final risultato = <({DateTime periodo, double? totale})>[];
+  final chiaveFine = chiaveTrimestre(aggregati.last.periodo);
+  for (var chiave = chiaveTrimestre(aggregati.first.periodo);
+      chiave <= chiaveFine;
+      chiave++) {
+    final anno = chiave ~/ 4;
+    final trimestre = chiave % 4;
+    risultato.add(
+      (periodo: DateTime(anno, trimestre * 3 + 1), totale: mappa[chiave]),
+    );
+  }
+  return risultato;
+}
+
 /// Asse X condiviso dai tre grafici della schermata (etichette periodo
 /// diradate in base allo spazio disponibile) — estratto per evitare che il
 /// fix della sovrapposizione venga applicato a un solo grafico per errore.
@@ -626,21 +769,65 @@ AxisTitles _periodoBottomAxisTitles({
     );
   }
 
+  // Sotto la soglia annuale l'etichetta resta il solo mese ("ago") — con un
+  // periodo che attraversa un solo anno solare non c'è ambiguità. Quando
+  // invece [periodi] attraversa più anni (tipico di un archivio con 12+
+  // mensilità su due anni solari, es. ago '25 → lug '26), lo stesso nome di
+  // mese può comparire due volte identico ("ago ott dic feb apr giu" non
+  // rivela a colpo d'occhio che si passa da un anno all'altro): si forza
+  // sempre visibile il primo tick di ogni anno (`_yearBoundaryIndices`,
+  // stesso helper già usato sopra per la modalità annuale) e SOLO su quei
+  // tick si mostra il periodo completo con l'anno (`periodoAxisLabel`, "ago
+  // '25") invece del solo mese — un'etichetta più lunga isolata nel punto
+  // in cui serve davvero, non su ogni tick (che affollerebbe l'asse senza
+  // aggiungere informazione ai tick "interni" a un anno già stabilito dal
+  // tick precedente).
+  //
+  // Si applica SOLO quando [shortLabelBuilder] è il default (etichetta solo
+  // mese): il caso trimestrale di `_StraordinarioChart` aggregato
+  // (`_trimestreLabel`, "T1 '24") include già sempre l'anno per costruzione,
+  // quindi non necessita di (e andrebbe anzi in conflitto di formato con)
+  // questo trattamento.
+  final usaEtichettaMeseDefault = identical(shortLabelBuilder, meseAxisLabel);
+  final multiAnno = usaEtichettaMeseDefault &&
+      periodi.isNotEmpty &&
+      periodi.first.year != periodi.last.year;
+  final confiniAnno =
+      multiAnno ? _yearBoundaryIndices(periodi).toSet() : const <int>{};
   final interval = _bottomTitleInterval(
       count: periodi.length, availableWidth: availableWidth);
+  final intervalSteps = interval.round();
+  final gridIndices = <int>{
+    for (var i = 0; i < periodi.length; i += intervalSteps) i,
+  };
+  // Unione "grezza" griglia regolare + confini anno: un confine non allineato
+  // alla griglia (es. griglia diradata ogni 2 con confine all'indice 5) cade
+  // a un solo indice di distanza da un tick regolare adiacente (4 o 6) — le
+  // due etichette finirebbero attaccate, e quella di confine è pure più
+  // lunga (mese+anno anziché solo mese). Il confine porta più informazione
+  // e vince sempre: si scartano i tick regolari troppo vicini (a meno di
+  // `intervalSteps`, la stessa distanza minima già usata per evitare
+  // sovrapposizioni fra due tick regolari) a un confine, invece di mostrarli
+  // entrambi adiacenti.
+  final shown = <int>{...gridIndices, ...confiniAnno}..removeWhere((i) =>
+      !confiniAnno.contains(i) &&
+      confiniAnno.any((c) => (i - c).abs() < intervalSteps));
   return AxisTitles(
     sideTitles: SideTitles(
       showTitles: true,
       reservedSize: 22,
-      interval: interval,
+      interval: 1,
       getTitlesWidget: (value, meta) {
         final index = value.round();
-        if (index < 0 || index >= periodi.length) {
+        if (index < 0 || index >= periodi.length || !shown.contains(index)) {
           return const SizedBox.shrink();
         }
+        final label = confiniAnno.contains(index)
+            ? periodoAxisLabel(periodi[index])
+            : shortLabelBuilder(periodi[index]);
         return Padding(
           padding: const EdgeInsets.only(top: 6),
-          child: Text(shortLabelBuilder(periodi[index]), style: textStyle),
+          child: Text(label, style: textStyle),
         );
       },
     ),
@@ -665,8 +852,8 @@ AxisTitles _valueLeftAxisTitles({
           padding: const EdgeInsets.only(right: 6),
           child: Text(
             formatValue(value),
-            style: AppTextStyles.cardLabel.copyWith(
-                color: labelColor, fontSize: 10),
+            style: AppTextStyles.cardLabel
+                .copyWith(color: labelColor, fontSize: 10),
           ),
         );
       },
@@ -702,12 +889,15 @@ AxisTitles _valueLeftAxisTitles({
 
 class _NettoLordoChart extends StatelessWidget {
   final List<BustaPaga> buste;
+  final int busteNonConfermate;
 
-  const _NettoLordoChart({required this.buste});
+  const _NettoLordoChart({required this.buste, this.busteNonConfermate = 0});
 
   @override
   Widget build(BuildContext context) {
-    if (buste.isEmpty) return const _NoDataMessage();
+    if (buste.isEmpty) {
+      return _NoDataMessage(busteNonConfermate: busteNonConfermate);
+    }
 
     final nettoColor = CupertinoDynamicColor.resolve(
         BustePagaStatisticheScreen._nettoColor, context);
@@ -718,6 +908,13 @@ class _NettoLordoChart extends StatelessWidget {
     final labelColor =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
     final tooltip = _tooltipColors(context);
+
+    // Griglia continua mese per mese (vedi doc di libreria su
+    // `_grigliaMensile`): un mese senza busta paga confermata resta un buco
+    // visibile nel grafico (`FlSpot.nullSpot`) invece di sparire
+    // silenziosamente collegando i due mesi adiacenti come se fossero
+    // consecutivi.
+    final griglia = _grigliaMensile(buste);
 
     // Range ristretto ai dati reali (non da 0): Netto e Lordo hanno un
     // divario fisso di alcune centinaia di euro (INPS/IRPEF) che, su un
@@ -758,10 +955,10 @@ class _NettoLordoChart extends StatelessWidget {
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               leftTitles: _valueLeftAxisTitles(
                 labelColor: labelColor,
-                formatValue: (v) => '€${formatNumber(v)}',
+                formatValue: formatEuroConSegno,
               ),
               bottomTitles: _periodoBottomAxisTitles(
-                periodi: buste.map((b) => b.periodo).toList(),
+                periodi: [for (final g in griglia) g.periodo],
                 availableWidth: constraints.maxWidth,
                 labelColor: labelColor,
               ),
@@ -775,6 +972,7 @@ class _NettoLordoChart extends StatelessWidget {
                   return [
                     for (var i = 0; i < touchedSpots.length; i++)
                       _tooltipItem(
+                        griglia,
                         touchedSpots[i],
                         showPeriodo: i == 0,
                         textColor: tooltip.text,
@@ -784,8 +982,8 @@ class _NettoLordoChart extends StatelessWidget {
               ),
             ),
             lineBarsData: [
-              _line(buste.map((b) => b.netto).toList(), nettoColor),
-              _line(buste.map((b) => b.lordo).toList(), lordoColor),
+              _line(griglia, (b) => b.netto, nettoColor),
+              _line(griglia, (b) => b.lordo, lordoColor),
             ],
           ),
         );
@@ -793,16 +991,22 @@ class _NettoLordoChart extends StatelessWidget {
     );
   }
 
-  LineTooltipItem _tooltipItem(
+  LineTooltipItem? _tooltipItem(
+    List<({DateTime periodo, BustaPaga? busta})> griglia,
     LineBarSpot spot, {
     required bool showPeriodo,
     required Color textColor,
   }) {
-    final busta = buste[spot.x.toInt()];
+    final busta = griglia[spot.x.toInt()].busta;
+    // Guardia difensiva: fl_chart esclude gli spot nulli dal touch
+    // detection (`getNearestTouchedSpot`), quindi in pratica `busta` non è
+    // mai `null` qui — ma un tooltip mancante è comunque preferibile a un
+    // crash se questa garanzia dovesse mai cambiare.
+    if (busta == null) return null;
     final label = spot.barIndex == 0 ? 'Netto' : 'Lordo';
     final text = showPeriodo
-        ? '${periodoAxisLabel(busta.periodo)}\n$label: €${formatNumber(spot.y)}'
-        : '$label: €${formatNumber(spot.y)}';
+        ? '${periodoAxisLabel(busta.periodo)}\n$label: ${formatEuroConSegno(spot.y)}'
+        : '$label: ${formatEuroConSegno(spot.y)}';
     return LineTooltipItem(
       text,
       AppTextStyles.cardLabel.copyWith(
@@ -812,10 +1016,17 @@ class _NettoLordoChart extends StatelessWidget {
     );
   }
 
-  LineChartBarData _line(List<double> values, Color color) {
+  LineChartBarData _line(
+    List<({DateTime periodo, BustaPaga? busta})> griglia,
+    double Function(BustaPaga) selettore,
+    Color color,
+  ) {
     return LineChartBarData(
       spots: [
-        for (var i = 0; i < values.length; i++) FlSpot(i.toDouble(), values[i]),
+        for (var i = 0; i < griglia.length; i++)
+          griglia[i].busta == null
+              ? FlSpot.nullSpot
+              : FlSpot(i.toDouble(), selettore(griglia[i].busta!)),
       ],
       isCurved: true,
       curveSmoothness: 0.2,
@@ -836,12 +1047,18 @@ class _NettoLordoChart extends StatelessWidget {
 
 class _FerieRolPermessiChart extends StatelessWidget {
   final List<BustaPaga> buste;
+  final int busteNonConfermate;
 
-  const _FerieRolPermessiChart({required this.buste});
+  const _FerieRolPermessiChart({
+    required this.buste,
+    this.busteNonConfermate = 0,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (buste.isEmpty) return const _NoDataMessage();
+    if (buste.isEmpty) {
+      return _NoDataMessage(busteNonConfermate: busteNonConfermate);
+    }
 
     final ferieColor = CupertinoDynamicColor.resolve(
         BustePagaStatisticheScreen._ferieColor, context);
@@ -849,20 +1066,38 @@ class _FerieRolPermessiChart extends StatelessWidget {
         BustePagaStatisticheScreen._rolColor, context);
     final permessiColor = CupertinoDynamicColor.resolve(
         BustePagaStatisticheScreen._permessiColor, context);
+    final exFestivitaColor = CupertinoDynamicColor.resolve(
+        BustePagaStatisticheScreen._exFestivitaColor, context);
     final gridColor =
         CupertinoDynamicColor.resolve(AppColors.separator, context);
     final labelColor =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
     final tooltip = _tooltipColors(context);
 
+    // Griglia continua mese per mese, stesso meccanismo di
+    // `_NettoLordoChart` (vedi doc di libreria su `_grigliaMensile`).
+    final griglia = _grigliaMensile(buste);
+
     // Solo bound "puliti" (fix sovrapposizione etichette): a differenza di
-    // Netto/Lordo, qui il range resta da 0 — non richiesto restringerlo.
-    final valoriMax = [
+    // Netto/Lordo, qui il range resta da 0 — non richiesto restringerlo,
+    // SALVO che uno di questi residui risulti negativo (es. ferie godute
+    // oltre il maturato): senza estendere `minY` sotto zero in quel caso, il
+    // punto verrebbe disegnato fuori dall'area di plot (fl_chart non clippa
+    // di default, `clipData` è `FlClipData.none()`) — bug reale corretto
+    // qui, non un'ipotesi.
+    final valori = [
       ...buste.map((b) => b.ferieResidue),
       ...buste.map((b) => b.rolResidui),
-      ...buste.map((b) => b.permessiGoduti),
-    ].reduce((a, b) => a > b ? a : b);
-    final bounds = _niceAxisBounds(0, valoriMax, step: 20);
+      ...buste.map((b) => b.permessiGodutiMese),
+      ...buste.map((b) => b.exFestivitaResidue),
+    ];
+    final valoriMax = valori.reduce((a, b) => a > b ? a : b);
+    final valoriMin = valori.reduce((a, b) => a < b ? a : b);
+    final bounds = _niceAxisBounds(
+      valoriMin < 0 ? valoriMin : 0,
+      valoriMax,
+      step: 20,
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -884,7 +1119,7 @@ class _FerieRolPermessiChart extends StatelessWidget {
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               leftTitles: _valueLeftAxisTitles(labelColor: labelColor),
               bottomTitles: _periodoBottomAxisTitles(
-                periodi: buste.map((b) => b.periodo).toList(),
+                periodi: [for (final g in griglia) g.periodo],
                 availableWidth: constraints.maxWidth,
                 labelColor: labelColor,
               ),
@@ -898,6 +1133,7 @@ class _FerieRolPermessiChart extends StatelessWidget {
                   return [
                     for (var i = 0; i < touchedSpots.length; i++)
                       _tooltipItem(
+                        griglia,
                         touchedSpots[i],
                         showPeriodo: i == 0,
                         textColor: tooltip.text,
@@ -907,10 +1143,10 @@ class _FerieRolPermessiChart extends StatelessWidget {
               ),
             ),
             lineBarsData: [
-              _line(buste.map((b) => b.ferieResidue).toList(), ferieColor),
-              _line(buste.map((b) => b.rolResidui).toList(), rolColor),
-              _line(
-                  buste.map((b) => b.permessiGoduti).toList(), permessiColor),
+              _line(griglia, (b) => b.ferieResidue, ferieColor),
+              _line(griglia, (b) => b.rolResidui, rolColor),
+              _line(griglia, (b) => b.permessiGodutiMese, permessiColor),
+              _line(griglia, (b) => b.exFestivitaResidue, exFestivitaColor),
             ],
           ),
         );
@@ -918,16 +1154,19 @@ class _FerieRolPermessiChart extends StatelessWidget {
     );
   }
 
-  LineTooltipItem _tooltipItem(
+  LineTooltipItem? _tooltipItem(
+    List<({DateTime periodo, BustaPaga? busta})> griglia,
     LineBarSpot spot, {
     required bool showPeriodo,
     required Color textColor,
   }) {
-    final busta = buste[spot.x.toInt()];
+    final busta = griglia[spot.x.toInt()].busta;
+    if (busta == null) return null;
     final label = switch (spot.barIndex) {
       0 => 'Ferie residue',
-      1 => 'ROL residui',
-      _ => 'Permessi goduti',
+      1 => 'Permessi residui',
+      2 => 'Permessi orario goduti',
+      _ => 'Ex festività residue',
     };
     final text = showPeriodo
         ? '${periodoAxisLabel(busta.periodo)}\n$label: ${formatNumber(spot.y)}'
@@ -941,10 +1180,17 @@ class _FerieRolPermessiChart extends StatelessWidget {
     );
   }
 
-  LineChartBarData _line(List<double> values, Color color) {
+  LineChartBarData _line(
+    List<({DateTime periodo, BustaPaga? busta})> griglia,
+    double Function(BustaPaga) selettore,
+    Color color,
+  ) {
     return LineChartBarData(
       spots: [
-        for (var i = 0; i < values.length; i++) FlSpot(i.toDouble(), values[i]),
+        for (var i = 0; i < griglia.length; i++)
+          griglia[i].busta == null
+              ? FlSpot.nullSpot
+              : FlSpot(i.toDouble(), selettore(griglia[i].busta!)),
       ],
       isCurved: true,
       curveSmoothness: 0.2,
@@ -973,8 +1219,12 @@ class _FerieRolPermessiChart extends StatelessWidget {
 /// scrollabile in un singolo chart.
 class _StraordinarioChart extends StatefulWidget {
   final List<BustaPaga> buste;
+  final int busteNonConfermate;
 
-  const _StraordinarioChart({required this.buste});
+  const _StraordinarioChart({
+    required this.buste,
+    this.busteNonConfermate = 0,
+  });
 
   @override
   State<_StraordinarioChart> createState() => _StraordinarioChartState();
@@ -1019,7 +1269,9 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
   @override
   Widget build(BuildContext context) {
     final buste = widget.buste;
-    if (buste.isEmpty) return const _NoDataMessage();
+    if (buste.isEmpty) {
+      return _NoDataMessage(busteNonConfermate: widget.busteNonConfermate);
+    }
 
     final barColor = CupertinoDynamicColor.resolve(
         BustePagaStatisticheScreen._straordinarioColor, context);
@@ -1030,18 +1282,27 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
     final tooltip = _tooltipColors(context);
 
     final aggregato = buste.length > _quarterlyAggregationThreshold;
+    // Griglia continua (mensile o trimestrale a seconda dell'aggregazione),
+    // stesso meccanismo di `_NettoLordoChart`/`_FerieRolPermessiChart` (vedi
+    // doc di libreria su `_grigliaMensile`/`_grigliaTrimestrale`): un
+    // mese/trimestre senza dati resta un buco visibile (nessuna barra
+    // disegnata per quello slot) invece di sparire silenziosamente
+    // avvicinando le barre dei mesi/trimestri adiacenti come se fossero
+    // consecutivi.
     final punti = aggregato
-        ? _aggregaStraordinariPerTrimestre(buste)
+        ? _grigliaTrimestrale(buste)
         : [
-            for (final b in buste) (periodo: b.periodo, totale: b.straordinari)
+            for (final g in _grigliaMensile(buste))
+              (periodo: g.periodo, totale: g.busta?.straordinari),
           ];
     final shortLabelBuilder = aggregato ? _trimestreLabel : meseAxisLabel;
 
-    final maxValue =
-        punti.fold<double>(0, (max, p) => p.totale > max ? p.totale : max);
-    final maxIndex = punti.indexWhere((p) => p.totale == maxValue);
-    final bounds = _niceAxisBounds(0, maxValue <= 0 ? 1 : maxValue * 1.2,
-        step: 20);
+    final maxValue = punti.fold<double>(
+        0, (max, p) => (p.totale ?? 0) > max ? p.totale! : max);
+    final maxIndex =
+        punti.indexWhere((p) => p.totale != null && p.totale == maxValue);
+    final bounds =
+        _niceAxisBounds(0, maxValue <= 0 ? 1 : maxValue * 1.2, step: 20);
 
     Widget buildPlot({required double width, required bool showLeftAxis}) {
       return SizedBox(
@@ -1065,8 +1326,7 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               leftTitles: showLeftAxis
                   ? _valueLeftAxisTitles(labelColor: labelColor)
-                  : const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
+                  : const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               bottomTitles: _periodoBottomAxisTitles(
                 periodi: [for (final p in punti) p.periodo],
                 availableWidth: width,
@@ -1095,19 +1355,21 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
             ),
             barGroups: [
               for (var i = 0; i < punti.length; i++)
-                BarChartGroupData(
-                  x: i,
-                  barRods: [
-                    BarChartRodData(
-                      toY: punti[i].totale,
-                      color: i == maxIndex
-                          ? barColor
-                          : barColor.withValues(alpha: 0.55),
-                      width: _barWidth,
-                      borderRadius: BorderRadius.circular(AppRadius.small / 2),
-                    ),
-                  ],
-                ),
+                if (punti[i].totale != null)
+                  BarChartGroupData(
+                    x: i,
+                    barRods: [
+                      BarChartRodData(
+                        toY: punti[i].totale!,
+                        color: i == maxIndex
+                            ? barColor
+                            : barColor.withValues(alpha: 0.55),
+                        width: _barWidth,
+                        borderRadius:
+                            BorderRadius.circular(AppRadius.small / 2),
+                      ),
+                    ],
+                  ),
             ],
           ),
         ),
@@ -1142,8 +1404,7 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
       builder: (context, constraints) {
         final viewportWidth = constraints.maxWidth;
         final contentWidth = punti.length * _minGroupSlotWidth;
-        final needsScroll =
-            contentWidth > viewportWidth - _leftAxisWidth;
+        final needsScroll = contentWidth > viewportWidth - _leftAxisWidth;
 
         if (!needsScroll) {
           return buildPlot(width: viewportWidth, showLeftAxis: true);

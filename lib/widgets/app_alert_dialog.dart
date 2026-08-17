@@ -54,8 +54,7 @@ class AppAlertDialog extends StatelessWidget {
     final labelSecondary =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
     final surface = CupertinoDynamicColor.resolve(AppColors.surface, context);
-    final isDark =
-        MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+    final isDark = MediaQuery.platformBrightnessOf(context) == Brightness.dark;
 
     return Center(
       child: Padding(

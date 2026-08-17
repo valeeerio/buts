@@ -68,7 +68,12 @@ class BustaPagaListItem extends StatelessWidget {
               ),
             ),
             Text(
-              '€ ${formatNumber(bustaPaga.netto)}',
+              // `formatEuroConSegno`, non "€ ${formatEuro(...)}": per un
+              // netto negativo `formatEuro` porta già il proprio "-",
+              // producendo "€ -1.411,00" (segno dopo il simbolo valuta) —
+              // stessa coerenza già applicata alle trattenute, vedi
+              // `busta_paga_formatting.dart`.
+              formatEuroConSegno(bustaPaga.netto),
               style: AppTextStyles.cardAmount.copyWith(
                 color: labelPrimary,
                 fontWeight: FontWeight.w400,

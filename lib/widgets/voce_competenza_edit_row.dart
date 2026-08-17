@@ -29,7 +29,15 @@ class VoceCompetenzaEditRow {
         quantita = TextEditingController(text: quantita),
         importo = TextEditingController(text: importo);
 
-  double get quantitaValue => parseItalianNumber(quantita.text);
+  /// `null` quando il campo è vuoto — stessa convenzione della vista di sola
+  /// lettura: la riga del PDF non riportava alcuna quantità (nessun tag
+  /// GIORNI/ORE/RATEI, es. "930 Trattamento integrativo"), distinta da "0"
+  /// digitato esplicitamente, che resta un valore reale (vedi
+  /// `VoceCompetenza.quantita`). Lasciare il campo vuoto (placeholder "0"
+  /// grigio di `inlineNumberField`, mai testo reale) preserva l'assenza
+  /// anche al salvataggio senza modifiche (round trip).
+  double? get quantitaValue =>
+      quantita.text.trim().isEmpty ? null : parseItalianNumber(quantita.text);
 
   double get importoValue => parseItalianNumber(importo.text);
 
