@@ -35,8 +35,15 @@ import 'liquid_glass_surface.dart';
 /// Non richiede un `BustaPaga` intero: solo `isConfermato` per il badge
 /// (il form di import, che non ha ancora una busta paga salvata, può così
 /// passare `isConfermato: false` senza fabbricare un modello fittizio),
-/// `lordoDisplay` e `nettoDisplay` (già formattati, senza simbolo "€") per
-/// i due valori.
+/// `lordoDisplay` e `nettoDisplay` per i due valori — già formattati
+/// COMPLETI di simbolo "€" e segno (`formatEuroConSegno` lato chiamante,
+/// vedi `lib/utils/busta_paga_formatting.dart`): questo widget si limita a
+/// mostrarli così come arrivano, senza anteporre un proprio "€ " fisso. Un
+/// prefisso "€ " fisso qui produrrebbe un doppio segno per i valori
+/// negativi (es. "€ -1.411,00" invece di "− € 1.411,00") — sia
+/// `computeNetto` che `computeLordo` possono risultare negativi per
+/// costruzione (trattenute superiori al lordo, storni/conguagli), non è
+/// un caso ipotetico — bug reale corretto qui, non un'ipotesi.
 class BustaPagaHeroCard extends StatelessWidget {
   final bool isConfermato;
   final String periodoLabel;
@@ -175,7 +182,7 @@ class BustaPagaHeroCard extends StatelessWidget {
                       FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          '€ $lordoDisplay',
+                          lordoDisplay,
                           textAlign: TextAlign.center,
                           maxLines: 1,
                           style: amountValueStyle,
@@ -204,7 +211,7 @@ class BustaPagaHeroCard extends StatelessWidget {
                       FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          '€ $nettoDisplay',
+                          nettoDisplay,
                           textAlign: TextAlign.center,
                           maxLines: 1,
                           style: amountValueStyle,

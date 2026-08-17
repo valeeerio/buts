@@ -75,7 +75,10 @@ class BustaPagaSummaryHero extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      '€ ${formatEuro(bustaPaga.netto)}',
+                      // `formatEuroConSegno`, non "€ ${formatEuro(...)}":
+                      // stessa coerenza di `BustaPagaListItem`, vedi
+                      // `busta_paga_formatting.dart`.
+                      formatEuroConSegno(bustaPaga.netto),
                       style: AppTextStyles.greeting.copyWith(
                         color: labelPrimary,
                         fontWeight: FontWeight.w400,

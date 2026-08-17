@@ -57,7 +57,15 @@ class VoceCompetenzaListConverter
         .map((e) => e as Map<String, dynamic>)
         .map((e) => VoceCompetenza(
               descrizione: e['descrizione'] as String,
-              quantita: (e['quantita'] as num).toDouble(),
+              // `num?` (non `num`): righe scritte da questo fix in avanti
+              // possono avere `quantita: null` nel JSON (vedi
+              // `VoceCompetenza.quantita`, ora nullable) — le righe scritte
+              // PRIMA di questo fix hanno sempre un numero reale (mai
+              // `null`, il vecchio bug scriveva 0 anche per una quantità
+              // assente), quindi restano compatibili e continuano a
+              // leggersi identiche a prima (nessun dato esistente perso o
+              // alterato).
+              quantita: (e['quantita'] as num?)?.toDouble(),
               importo: (e['importo'] as num).toDouble(),
             ))
         .toList();

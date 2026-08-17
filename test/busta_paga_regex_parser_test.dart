@@ -43,9 +43,21 @@ const _testoCompetenzeReali = 'Retribuzione ordinaria\r\n'
     '20259,39 \r\n'
     '*\r\n';
 
+/// Testo sintetico (dati fittizi) usato dal grosso dei test del percorso
+/// testuale "storico" (senza coordinate) sotto. Il blocco ratei Ferie
+/// ("...05,17 6,00 2,00 9,17 (GIORNI)...") riproduce deliberatamente lo
+/// stesso artefatto di concatenazione visto su PDF reali (l'ultimo valore di
+/// una riga precedente non correlata incollato SENZA spazio al primo valore
+/// Ferie, vedi doc su `_valoriFerieARitroso` in `busta_paga_regex_parser.
+/// dart`): "5,17" non è un valore arbitrario, è scelto apposta perché
+/// soddisfa il bilancio "residuo = residuo A.P. + maturato - goduto" (9,17 =
+/// 5,17 + 6,00 - 2,00), verificato per Ferie anche sul caso a 4 valori — a
+/// differenza di quel "residuo A.P." (mai esposto/asserito da un test,
+/// sempre scartato), la terna maturato/goduto/residuo (6,00/2,00/9,17) È
+/// asserita dai test sotto e deve restare quella.
 const _testoSintetico = '''
 JOB - Copyright Sistemi S.p.A. - Autorizzazione INAIL   N°  792   del  03/01/20185MARZO 2026
-MINIMOEPA -CCNL 06/12/241.000,0000010,000005,84 6,00 2,00 9,17 (GIORNI)7,00 8,00 3,00 12,00 (ORE)8,00 3,00 5,00 (ORE)9,12
+MINIMOEPA -CCNL 06/12/241.000,0000010,000005,17 6,00 2,00 9,17 (GIORNI)7,00 8,00 3,00 12,00 (ORE)8,00 3,00 5,00 (ORE)9,12
 Retribuzione ordinaria
 GIORNI
 20,000 50,00000 1.000,00
@@ -459,7 +471,8 @@ void main() {
       expect(straordinario.importo, closeTo(30.00, 0.001));
     });
 
-    test('esclude "Ferie godute" dalle competenze (già modellata nella '
+    test(
+        'esclude "Ferie godute" dalle competenze (già modellata nella '
         'tabella Maturazioni)', () {
       final risultato = parser.parse(_testoSintetico);
 
@@ -468,8 +481,7 @@ void main() {
       expect(descrizioni.any((d) => d.startsWith('ferie godute')), isFalse);
     });
 
-    test('esclude righe "Permessi riduz. orario goduti" dalle competenze',
-        () {
+    test('esclude righe "Permessi riduz. orario goduti" dalle competenze', () {
       final testo = _testoSintetico.replaceFirst(
         'Ferie godute',
         'Permessi riduz. orario goduti\nORE\n4,030\nFerie godute',
@@ -478,11 +490,11 @@ void main() {
 
       final descrizioni =
           risultato.competenze.map((v) => v.descrizione.toLowerCase());
-      expect(
-          descrizioni.any((d) => d.startsWith('permessi riduz')), isFalse);
+      expect(descrizioni.any((d) => d.startsWith('permessi riduz')), isFalse);
     });
 
-    test('estrae "Permessi riduz. orario goduti" del mese in permessiGodutiMese',
+    test(
+        'estrae "Permessi riduz. orario goduti" del mese in permessiGodutiMese',
         () {
       final testo = _testoSintetico.replaceFirst(
         'Ferie godute',
@@ -493,14 +505,16 @@ void main() {
       expect(risultato.permessiGodutiMese, closeTo(4.030, 0.001));
     });
 
-    test('riconosce una trattenuta nel formato verificato '
+    test(
+        'riconosce una trattenuta nel formato verificato '
         '("CONTRIBUTO EBILOG0,50 3,50") come chiave nominata', () {
       final risultato = parser.parse(_testoSintetico);
 
       expect(risultato.trattenute['CONTRIBUTO EBILOG'], closeTo(3.50, 0.001));
     });
 
-    test('non riconosce una trattenuta nel formato verificato se è fuori dal '
+    test(
+        'non riconosce una trattenuta nel formato verificato se è fuori dal '
         'segmento INPS→Firma per quietanza', () {
       // Sposta il testo "CONTRIBUTO EBILOG0,50 3,50" fuori dal segmento
       // INPS->Firma (prima di INPS): non deve produrre una chiave nominata.
@@ -515,7 +529,8 @@ void main() {
       expect(risultato.trattenute.containsKey('CONTRIBUTO EBILOG'), isFalse);
     });
 
-    test('non riconosce una riga di trattenuta non nel formato verificato '
+    test(
+        'non riconosce una riga di trattenuta non nel formato verificato '
         '(es. senza aliquota/importo attaccati)', () {
       final testo = _testoSintetico.replaceFirst(
         ' CONTRIBUTO EBILOG0,50 3,50',
@@ -539,7 +554,8 @@ void main() {
       expect(risultato.permessiGoduti, risultato.rolGoduti);
     });
 
-    test('estrae ex festività (maturate, godute, residue) dal terzo blocco '
+    test(
+        'estrae ex festività (maturate, godute, residue) dal terzo blocco '
         'ratei dopo il tag "(ORE)" di chiusura del ROL', () {
       final risultato = parser.parse(_testoSintetico);
 
@@ -552,7 +568,8 @@ void main() {
       expect(risultato.exFestivitaResidue, closeTo(5.00, 0.001));
     });
 
-    test('disambigua il blocco ex festività a 3 numeri quando il "Goduto" '
+    test(
+        'disambigua il blocco ex festività a 3 numeri quando il "Goduto" '
         'del mese è zero e la cella è lasciata vuota invece di stampare '
         '"0,00" (visto su un PDF reale: residuo = residuo A.P. + maturato, '
         'non maturato - goduto)', () {
@@ -567,12 +584,39 @@ void main() {
       expect(risultato.exFestivitaResidue, closeTo(32.00, 0.001));
     });
 
-    test('scarta i dati ferie se il valore "maturato" è implausibile '
+    test(
+        'scarta i dati ferie se il valore "maturato" è implausibile '
         '(numero residuo anno precedente incollato senza spazio, visto su '
         'alcuni PDF reali)', () {
       final testo = _testoSintetico.replaceFirst(
         '6,00 2,00 9,17 (GIORNI)',
         '670003,67 2,00 1,67 (GIORNI)',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.ferieMaturate, 0);
+      expect(risultato.ferieGodute, 0);
+      expect(risultato.ferieResidue, 0);
+      expect(
+        risultato.warnings.any((w) => w.contains('dati ferie scartati')),
+        isTrue,
+      );
+    });
+
+    test(
+        'scarta (con warning) un blocco ferie a 4 valori il cui bilancio '
+        '"residuo = residuo A.P. + maturato - goduto" non torna, anche '
+        'quando i singoli valori sono tutti individualmente plausibili '
+        '(< 1000) — a differenza del caso a 3 valori sopra, prima di questo '
+        'fix il caso a 4 valori non veniva verificato affatto e i dati '
+        'venivano accettati in silenzio (dati fittizi, regressione)', () {
+      // 4 token puliti e separati (a differenza del test sopra, nessuna
+      // concatenazione dentro un singolo token): 23,50 (residuo A.P.),
+      // 1.234,56 (maturato), 22,67 (goduto), 7,17 (residuo). Bilancio atteso
+      // 23,50 + 1.234,56 - 22,67 = 1.235,39, ben lontano da 7,17.
+      final testo = _testoSintetico.replaceFirst(
+        '6,00 2,00 9,17 (GIORNI)',
+        '23,50 1.234,56 22,67 7,17 (GIORNI)',
       );
       final risultato = parser.parse(testo);
 
@@ -601,7 +645,8 @@ void main() {
       );
     });
 
-    test('NON scarta un residuo ROL alto ma legittimo (es. 150 ore accumulate '
+    test(
+        'NON scarta un residuo ROL alto ma legittimo (es. 150 ore accumulate '
         'in più anni senza godimento) — soglia di implausibilità alzata a '
         '1000 per non confondere questo caso con un artefatto di '
         'estrazione', () {
@@ -630,15 +675,14 @@ void main() {
       expect(risultato.exFestivitaGodute, 0);
       expect(risultato.exFestivitaResidue, 0);
       expect(
-        risultato.warnings
-            .any((w) => w.contains('dati ex festività scartati')),
+        risultato.warnings.any((w) => w.contains('dati ex festività scartati')),
         isTrue,
       );
     });
 
-    test('legge gli ultimi 3 numeri del blocco ex festività anche con un '
-        '"residuo anno precedente" davanti (con spazio, non concatenato)',
-        () {
+    test(
+        'legge gli ultimi 3 numeri del blocco ex festività anche con un '
+        '"residuo anno precedente" davanti (con spazio, non concatenato)', () {
       final testo = _testoSintetico.replaceFirst(
         '12,00 (ORE)8,00 3,00 5,00 (ORE)',
         '12,00 (ORE)1,50 5,00 3,00 8,00 (ORE)',
@@ -689,7 +733,8 @@ void main() {
       );
     });
 
-    test('testo vuoto o non riconosciuto produce campi nulli/zero e warning', () {
+    test('testo vuoto o non riconosciuto produce campi nulli/zero e warning',
+        () {
       final risultato = parser.parse('testo qualunque non riconoscibile');
 
       expect(risultato.periodo, isNull);
@@ -731,7 +776,8 @@ void main() {
       );
     });
 
-    test('warning "periodo non trovato" quando manca sia il mese per esteso '
+    test(
+        'warning "periodo non trovato" quando manca sia il mese per esteso '
         'sia "Mens.supplementare"', () {
       final testo = _testoSintetico.replaceFirst('MARZO 2026', '');
       final risultato = parser.parse(testo);
@@ -740,7 +786,8 @@ void main() {
       expect(risultato.warnings, contains('periodo non trovato'));
     });
 
-    test('warning "lordo non trovato" quando nessuna riga di competenza '
+    test(
+        'warning "lordo non trovato" quando nessuna riga di competenza '
         'è riconoscibile', () {
       final testo = _testoSintetico
           .replaceFirst('20,000 50,00000 1.000,00\n', '')
@@ -766,12 +813,12 @@ void main() {
       final testo = _testoSintetico.replaceFirst(
         '3,000 10,00000 30,00\n',
         '3,000 10,00000 30,00\n'
-        '*\n'
-        '*\n'
-        '*\n'
-        'Storno retribuzione\n'
-        'GIORNI\n'
-        '1,000 1050,00000 -1050,00\n',
+            '*\n'
+            '*\n'
+            '*\n'
+            'Storno retribuzione\n'
+            'GIORNI\n'
+            '1,000 1050,00000 -1050,00\n',
       );
       final risultato = parser.parse(testo);
 
@@ -787,8 +834,7 @@ void main() {
       );
     });
 
-    test('warning "trattenuta INPS non trovata" quando la riga INPS manca',
-        () {
+    test('warning "trattenuta INPS non trovata" quando la riga INPS manca', () {
       final testo = _testoSintetico.replaceFirst(
         'INPS1.050,00 5,84061,32',
         '1.050,00 5,84061,32',
@@ -799,8 +845,7 @@ void main() {
       expect(risultato.warnings, contains('trattenuta INPS non trovata'));
     });
 
-    test('warning "netto non trovato" quando manca "Firma per quietanza"',
-        () {
+    test('warning "netto non trovato" quando manca "Firma per quietanza"', () {
       final testo = _testoSintetico.replaceFirst('Firma per quietanza', '');
       final risultato = parser.parse(testo);
 
@@ -836,7 +881,8 @@ void main() {
       );
     });
 
-    test('calcola correttamente "Altre trattenute (IRPEF + varie)" come '
+    test(
+        'calcola correttamente "Altre trattenute (IRPEF + varie)" come '
         'lordo - netto - INPS - trattenute nominate extra', () {
       // Nel testo sintetico invariato lordo (1050.00) - netto (988.68) -
       // INPS (61.32) - CONTRIBUTO EBILOG (3.50) è negativo, quindi la voce
@@ -851,8 +897,7 @@ void main() {
       expect(risultato.lordo, closeTo(1050.00, 0.001));
       expect(risultato.netto, closeTo(950.00, 0.001));
       expect(risultato.trattenute['INPS'], closeTo(61.32, 0.001));
-      expect(
-          risultato.trattenute['CONTRIBUTO EBILOG'], closeTo(3.50, 0.001));
+      expect(risultato.trattenute['CONTRIBUTO EBILOG'], closeTo(3.50, 0.001));
       // 1050.00 - 950.00 - 61.32 - 3.50
       expect(
         risultato.trattenute['Altre trattenute (IRPEF + varie)'],
@@ -860,18 +905,19 @@ void main() {
       );
     });
 
-    test('propaga il segno "-" su una voce di competenza negativa (storno/'
+    test(
+        'propaga il segno "-" su una voce di competenza negativa (storno/'
         'conguaglio a debito) invece di scartarlo, riflettendosi in '
         'computeLordo', () {
       final testo = _testoSintetico.replaceFirst(
         '3,000 10,00000 30,00\n',
         '3,000 10,00000 30,00\n'
-        '*\n'
-        '*\n'
-        '*\n'
-        'Storno retribuzione\n'
-        'GIORNI\n'
-        '1,000 50,00000 -50,00\n',
+            '*\n'
+            '*\n'
+            '*\n'
+            'Storno retribuzione\n'
+            'GIORNI\n'
+            '1,000 50,00000 -50,00\n',
       );
       final risultato = parser.parse(testo);
 
@@ -883,7 +929,8 @@ void main() {
       expect(risultato.lordo, closeTo(1000.00, 0.001));
     });
 
-    test('propaga il segno "-" su una trattenuta negativa (conguaglio a '
+    test(
+        'propaga il segno "-" su una trattenuta negativa (conguaglio a '
         'credito) nel formato verificato, senza scartarlo', () {
       final testo = _testoSintetico.replaceFirst(
         'CONTRIBUTO EBILOG0,50 3,50',
@@ -897,8 +944,7 @@ void main() {
       );
     });
 
-    test('somma più righe "Straordinario" invece di leggere solo la prima',
-        () {
+    test('somma più righe "Straordinario" invece di leggere solo la prima', () {
       final testo = _testoSintetico.replaceFirst(
         'Ferie godute',
         'Straordinario notturno (50%)\nORE\n2,000\nFerie godute',
@@ -922,7 +968,8 @@ void main() {
       expect(risultato.oreLavorate, closeTo(200, 0.001));
     });
 
-    test('warning "netto superiore al lordo" quando il netto estratto '
+    test(
+        'warning "netto superiore al lordo" quando il netto estratto '
         'supera il lordo', () {
       final testo = _testoSintetico.replaceFirst(
         '1.050,00 61,32-988,68',
@@ -972,7 +1019,8 @@ void main() {
       expect(risultato.straordinari, closeTo(0.25, 0.001));
     });
 
-    test('esclude "Permessi riduz. orario goduti" dalle competenze anche su '
+    test(
+        'esclude "Permessi riduz. orario goduti" dalle competenze anche su '
         'questo testo fedele al layout reale', () {
       final risultato = parser.parse(_testoCompetenzeReali);
 
@@ -984,7 +1032,8 @@ void main() {
       );
     });
 
-    test('non riconosce una riga di trattenuta senza tag GIORNI/ORE come '
+    test(
+        'non riconosce una riga di trattenuta senza tag GIORNI/ORE come '
         'voce di competenza (es. "Rata Addizionale Regionale")', () {
       final risultato = parser.parse(_testoCompetenzeReali);
 
@@ -997,7 +1046,8 @@ void main() {
     });
   });
 
-  group('BustaPagaRegexParser - ore lavorate lette direttamente dal blocco '
+  group(
+      'BustaPagaRegexParser - ore lavorate lette direttamente dal blocco '
       'Q.T.A. ("ORE LAV.")', () {
     const parser = BustaPagaRegexParser();
 
@@ -1015,7 +1065,8 @@ void main() {
       );
     });
 
-    test('usa il fallback (stima giorni×8) con il warning esplicito quando '
+    test(
+        'usa il fallback (stima giorni×8) con il warning esplicito quando '
         'il blocco Q.T.A. non è riconoscibile nel testo', () {
       final risultato = parser.parse(_testoSintetico);
 
@@ -1079,7 +1130,8 @@ void main() {
     });
   });
 
-  group('BustaPagaRegexParser - ambiguità ex festività quando il "goduto" '
+  group(
+      'BustaPagaRegexParser - ambiguità ex festività quando il "goduto" '
       'candidato è zero (bug corretto)', () {
     const parser = BustaPagaRegexParser();
 
@@ -1109,7 +1161,8 @@ void main() {
       );
     });
 
-    test('non ambiguo (comportamento invariato) quando il "goduto" '
+    test(
+        'non ambiguo (comportamento invariato) quando il "goduto" '
         'candidato non è zero, anche se la struttura del blocco è la '
         'stessa (3 numeri dopo il tag ROL)', () {
       final risultato = parser.parse(_testoSintetico);
@@ -1128,14 +1181,16 @@ void main() {
       '2026)', () {
     const parser = BustaPagaRegexParser();
 
-    test('estrae INPS come trattenuta nominata con l\'importo mensile '
+    test(
+        'estrae INPS come trattenuta nominata con l\'importo mensile '
         'corretto (90,11)', () {
       final risultato = parser.parse(_testoRealeLuglio2026);
 
       expect(risultato.trattenute['INPS'], closeTo(90.11, 0.001));
     });
 
-    test('estrae "CONTRIBUTO EBILOG" come trattenuta nominata con l\'importo '
+    test(
+        'estrae "CONTRIBUTO EBILOG" come trattenuta nominata con l\'importo '
         'corretto (3,50)', () {
       final risultato = parser.parse(_testoRealeLuglio2026);
 
@@ -1156,13 +1211,13 @@ void main() {
       final risultato = parser.parse(_testoRealeLuglio2026);
 
       expect(
-        risultato.trattenute.keys
-            .any((k) => k.toUpperCase().contains('FIS')),
+        risultato.trattenute.keys.any((k) => k.toUpperCase().contains('FIS')),
         isFalse,
       );
     });
 
-    test('non produce falsi positivi dai blocchi Q.T.A./IRPEF/TFR tra INPS '
+    test(
+        'non produce falsi positivi dai blocchi Q.T.A./IRPEF/TFR tra INPS '
         'e "Firma per quietanza" (es. nessuna chiave "U.D." o sigle simili '
         'da quel segmento)', () {
       final risultato = parser.parse(_testoRealeLuglio2026);
@@ -1181,7 +1236,8 @@ void main() {
       '"totale competenze" stampato sul PDF (Fix 4)', () {
     const parser = BustaPagaRegexParser();
 
-    test('nessun warning quando il lordo calcolato coincide (entro '
+    test(
+        'nessun warning quando il lordo calcolato coincide (entro '
         'tolleranza) col totale competenze stampato sul PDF reale', () {
       final risultato = parser.parse(_testoRealeLuglio2026);
 
@@ -1192,7 +1248,8 @@ void main() {
       );
     });
 
-    test('segnala un warning esplicito (senza alterare il lordo calcolato) '
+    test(
+        'segnala un warning esplicito (senza alterare il lordo calcolato) '
         'quando una voce di competenza mancata/alterata fa divergere '
         'computeLordo dal totale competenze stampato sul PDF', () {
       // Altera l'importo di una voce di competenza reale (7,67 -> 5,00):
@@ -1221,7 +1278,8 @@ void main() {
       'vedi doc su _testoRealeLuglio2026', () {
     const parser = BustaPagaRegexParser();
 
-    test('estrae correttamente OGNI campo di BustaPagaEstratti dal testo '
+    test(
+        'estrae correttamente OGNI campo di BustaPagaEstratti dal testo '
         'reale', () {
       final risultato = parser.parse(_testoRealeLuglio2026);
 
@@ -1293,7 +1351,8 @@ void main() {
       // PDF (1.543,13, subito dopo "ORE LAV." nel blocco Q.T.A.) coincide
       // col lordo calcolato — nessun warning di divergenza.
       expect(
-        risultato.warnings.any((w) => w.contains('diverge dal totale competenze')),
+        risultato.warnings
+            .any((w) => w.contains('diverge dal totale competenze')),
         isFalse,
       );
 
@@ -1372,8 +1431,7 @@ void main() {
           // deduzione).
           expect(risultato.tipo, TipoBustaPaga.tredicesima);
           expect(
-            risultato.warnings
-                .any((w) => w.contains('tipo mensilità dedotto')),
+            risultato.warnings.any((w) => w.contains('tipo mensilità dedotto')),
             isFalse,
           );
 
@@ -1396,7 +1454,8 @@ void main() {
       '_testoRealeQuattordicesimaGiugno2026', () {
     const parser = BustaPagaRegexParser();
 
-    test('estrae correttamente OGNI campo di BustaPagaEstratti dal testo '
+    test(
+        'estrae correttamente OGNI campo di BustaPagaEstratti dal testo '
         'reale', () {
       final risultato = parser.parse(_testoRealeQuattordicesimaGiugno2026);
 
@@ -1464,6 +1523,221 @@ void main() {
       expect(
         risultato.warnings,
         contains('ore lavorate non determinabili'),
+      );
+    });
+  });
+
+  group('RateoCategoria', () {
+    test('vuoto (default di RateiEstrattiDaCoordinate) non ha alcun valore',
+        () {
+      expect(RateoCategoria.vuoto.haAlmenoUnValore, isFalse);
+    });
+
+    test(
+        'haAlmenoUnValore è true anche con un solo campo impostato, pure '
+        'se il valore stesso è 0 (0,00 stampato è un dato letto, non una '
+        'cella vuota)', () {
+      expect(const RateoCategoria(goduto: 0).haAlmenoUnValore, isTrue);
+      expect(
+        const RateoCategoria(residuoAnnoPrecedente: 3.5).haAlmenoUnValore,
+        isTrue,
+      );
+    });
+  });
+
+  group(
+      'BustaPagaRegexParser - parametro opzionale "ratei" (letti per '
+      'COORDINATE da PdfImportService, vedi RateiEstrattiDaCoordinate in '
+      'testa al file sorgente)', () {
+    const parser = BustaPagaRegexParser();
+
+    test(
+        'senza il parametro "ratei" (esplicitamente null) il comportamento '
+        'resta identico al solo percorso testuale — retrocompatibilità con '
+        'tutte le chiamate a un solo argomento già testate sopra', () {
+      final risultato = parser.parse(_testoSintetico, null);
+
+      expect(risultato.ferieMaturate, closeTo(6.00, 0.001));
+      expect(risultato.ferieGodute, closeTo(2.00, 0.001));
+      expect(risultato.ferieResidue, closeTo(9.17, 0.001));
+    });
+
+    test(
+        'una categoria di "ratei" con almeno un valore ha priorità sul '
+        'percorso testuale, anche quando il testo indica valori diversi', () {
+      const ratei = RateiEstrattiDaCoordinate(
+        ferie: RateoCategoria(maturato: 99.00, goduto: 50.00, residuo: 49.00),
+      );
+      final risultato = parser.parse(_testoSintetico, ratei);
+
+      // Valori dalle coordinate, non i 6,00/2,00/9,17 del testo sintetico.
+      expect(risultato.ferieMaturate, closeTo(99.00, 0.001));
+      expect(risultato.ferieGodute, closeTo(50.00, 0.001));
+      expect(risultato.ferieResidue, closeTo(49.00, 0.001));
+      // ROL non fornito da "ratei" (RateoCategoria.vuoto di default): resta
+      // il percorso testuale.
+      expect(risultato.rolMaturati, closeTo(8.00, 0.001));
+    });
+
+    test(
+        'categorie diverse ricadono indipendentemente sul percorso '
+        'testuale quando "ratei" non ha dati per quella specifica categoria '
+        '— fallback per categoria, non tutto-o-niente', () {
+      const ratei = RateiEstrattiDaCoordinate(
+        rol: RateoCategoria(maturato: 40.00, goduto: 10.00, residuo: 30.00),
+      );
+      final risultato = parser.parse(_testoSintetico, ratei);
+
+      // Ferie ed ex festività: nessun dato in "ratei" per queste categorie
+      // -> stessi valori del percorso testuale di sempre.
+      expect(risultato.ferieMaturate, closeTo(6.00, 0.001));
+      expect(risultato.exFestivitaMaturate, closeTo(8.00, 0.001));
+      // ROL: valori dalle coordinate.
+      expect(risultato.rolMaturati, closeTo(40.00, 0.001));
+      expect(risultato.rolGoduti, closeTo(10.00, 0.001));
+      expect(risultato.rolResidui, closeTo(30.00, 0.001));
+    });
+
+    test(
+        'un "goduto" esplicitamente letto come 0,00 (cella con "0,00" '
+        'stampato, non una cella vuota) ha comunque priorità sul percorso '
+        'testuale — è la distinzione "cella vuota" (null in RateoCategoria, '
+        'ricade sul testo) vs "0,00 letto" (0, ha comunque priorità)', () {
+      const ratei = RateiEstrattiDaCoordinate(
+        // Nel testo sintetico ferieGodute è 2,00: qui forziamo
+        // esplicitamente 0 dalle coordinate e verifichiamo che vinca.
+        ferie: RateoCategoria(maturato: 6.00, goduto: 0, residuo: 4.00),
+      );
+      final risultato = parser.parse(_testoSintetico, ratei);
+
+      expect(risultato.ferieGodute, 0);
+      expect(risultato.ferieResidue, closeTo(4.00, 0.001));
+    });
+
+    test(
+        'recupera dati ferie che il percorso testuale scarterebbe come '
+        'implausibili (scenario reale: PDF di un mese in cui il "residuo '
+        'anno precedente" resta incollato senza spazio al valore ferie nel '
+        'testo linearizzato, es. Gennaio 2026 — vedi piano sessione) — '
+        '"ratei" ha priorità e il ramo testuale/il suo warning non vengono '
+        'nemmeno valutati per questa categoria', () {
+      final testo = _testoSintetico.replaceFirst(
+        '6,00 2,00 9,17 (GIORNI)',
+        '670003,67 2,00 1,67 (GIORNI)',
+      );
+      const ratei = RateiEstrattiDaCoordinate(
+        ferie: RateoCategoria(
+          residuoAnnoPrecedente: 7.17,
+          maturato: 1.83,
+          goduto: 0,
+          residuo: 9.00,
+        ),
+      );
+      final risultato = parser.parse(testo, ratei);
+
+      expect(risultato.ferieMaturate, closeTo(1.83, 0.001));
+      expect(risultato.ferieGodute, 0);
+      expect(risultato.ferieResidue, closeTo(9.00, 0.001));
+      expect(
+        risultato.warnings.any((w) => w.contains('dati ferie scartati')),
+        isFalse,
+      );
+    });
+
+    test(
+        'scarta (0/0/0) e segnala un valore implausibile letto dalle '
+        'coordinate (>= 1000, stessa soglia del percorso testuale)', () {
+      const ratei = RateiEstrattiDaCoordinate(
+        ferie: RateoCategoria(maturato: 1500.00, goduto: 2.00, residuo: 9.00),
+      );
+      final risultato = parser.parse(_testoSintetico, ratei);
+
+      expect(risultato.ferieMaturate, 0);
+      expect(risultato.ferieGodute, 0);
+      expect(risultato.ferieResidue, 0);
+      expect(
+        risultato.warnings.any((w) =>
+            w.contains('dati ferie scartati') && w.contains('coordinate')),
+        isTrue,
+      );
+    });
+
+    test(
+        'segnala (ma NON scarta) un\'incoerenza di bilancio residuo = '
+        'residuo anno precedente + maturato - goduto sui dati letti dalle '
+        'coordinate: i valori restano quelli letti, non vengono azzerati', () {
+      const ratei = RateiEstrattiDaCoordinate(
+        rol: RateoCategoria(
+          residuoAnnoPrecedente: 1.00,
+          maturato: 5.00,
+          goduto: 1.00,
+          // Atteso 5,00 (1,00+5,00-1,00): scostamento volutamente oltre
+          // tolleranza.
+          residuo: 40.00,
+        ),
+      );
+      final risultato = parser.parse(_testoSintetico, ratei);
+
+      expect(risultato.rolMaturati, closeTo(5.00, 0.001));
+      expect(risultato.rolGoduti, closeTo(1.00, 0.001));
+      expect(risultato.rolResidui, closeTo(40.00, 0.001));
+      expect(
+        risultato.warnings.any((w) => w.contains('il bilancio residuo')),
+        isTrue,
+      );
+    });
+
+    test(
+        'permessiGoduti (== ROL goduti in questo layout) riflette il '
+        'valore ROL letto dalle coordinate quando presente', () {
+      const ratei = RateiEstrattiDaCoordinate(
+        rol: RateoCategoria(maturato: 40.00, goduto: 15.00, residuo: 25.00),
+      );
+      final risultato = parser.parse(_testoSintetico, ratei);
+
+      expect(risultato.permessiGoduti, closeTo(15.00, 0.001));
+    });
+
+    test(
+        'coerente col ground-truth reale (Luglio 2026): passare "ratei" con '
+        'gli stessi valori già letti dal percorso testuale su quel PDF non '
+        'cambia il risultato finale, nessun warning aggiuntivo', () {
+      const rateiLuglio2026 = RateiEstrattiDaCoordinate(
+        ferie: RateoCategoria(
+          residuoAnnoPrecedente: 7.17,
+          maturato: 12.83,
+          goduto: 4.00,
+          residuo: 16.00,
+        ),
+        rol: RateoCategoria(
+          residuoAnnoPrecedente: 14.87,
+          maturato: 23.33,
+          goduto: 11.50,
+          residuo: 26.70,
+        ),
+        exFestivita: RateoCategoria(
+          residuoAnnoPrecedente: 13.33,
+          maturato: 18.67,
+          goduto: 0,
+          residuo: 32.00,
+        ),
+      );
+
+      final risultato = parser.parse(_testoRealeLuglio2026, rateiLuglio2026);
+
+      expect(risultato.ferieMaturate, closeTo(12.83, 0.001));
+      expect(risultato.ferieGodute, closeTo(4.00, 0.001));
+      expect(risultato.ferieResidue, closeTo(16.00, 0.001));
+      expect(risultato.rolMaturati, closeTo(23.33, 0.001));
+      expect(risultato.rolGoduti, closeTo(11.50, 0.001));
+      expect(risultato.rolResidui, closeTo(26.70, 0.001));
+      expect(risultato.exFestivitaMaturate, closeTo(18.67, 0.001));
+      expect(risultato.exFestivitaGodute, 0);
+      expect(risultato.exFestivitaResidue, closeTo(32.00, 0.001));
+      expect(
+        risultato.warnings
+            .any((w) => w.contains('bilancio') || w.contains('implausibile')),
+        isFalse,
       );
     });
   });

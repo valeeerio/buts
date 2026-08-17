@@ -46,6 +46,161 @@ const _tipoLabels = {
   TipoBustaPaga.quattordicesima: '14esima',
 };
 
+/// Label "Marzo 2026" per una data di periodo, usata solo dal diff (vedi
+/// [buildBustaPagaEditDiff]) — estratta da `_BustaPagaDetailScreenState` come
+/// funzione di livello file (non usa alcuno stato dell'istanza) insieme al
+/// diff stesso, per la stessa ragione di testabilità.
+String _periodoLabelForDate(DateTime data) {
+  final formatted = DateFormat('MMMM yyyy', 'it_IT').format(data);
+  return formatted[0].toUpperCase() + formatted.substring(1);
+}
+
+/// Costruisce l'elenco leggibile delle differenze fra due versioni della
+/// stessa busta paga, mostrato nel popup "Hai modificato i seguenti dati,
+/// confermi?" prima di salvare una modifica inline (vedi
+/// `_BustaPagaDetailScreenState._save`/`_buildDiff`, l'unico punto di
+/// chiamata reale nell'app).
+///
+/// Funzione pura di [vecchia]/[nuova] (nessuna dipendenza da stato del
+/// widget): estratta a livello di file — invece di restare un metodo privato
+/// della `State` — solo per poter essere testata direttamente, senza dover
+/// pilotare l'intera schermata attraverso Riverpod/Drift.
+/// `@visibleForTesting`: non è pensata per essere chiamata da altrove
+/// nell'app.
+///
+/// Ogni importo (Netto/Lordo, trattenute, importi di competenza) passa
+/// sempre da un helper di formattazione con segno di
+/// `lib/utils/busta_paga_formatting.dart` (`formatEuroConSegno` per
+/// Netto/Lordo/competenze, `formatTrattenuta` per le trattenute — quella
+/// convenzione INVERTE il segno mostrato, propria delle sole trattenute), mai
+/// da "€ " concatenato a mano davanti a `formatEuro`: sia le trattenute
+/// (conguaglio/storno a credito, es. "Differenza di arrotondamento") sia le
+/// voci di competenza (storno a debito, vedi `_rigaVoceCompetenza` in
+/// `busta_paga_regex_parser.dart`) possono avere un valore negativo, e
+/// `formatEuro` da solo antepone già un "-" al numero — una concatenazione
+/// manuale produrrebbe un doppio segno fuorviante ("€ -0,14") — bug reale
+/// corretto qui, non un'ipotesi.
+@visibleForTesting
+List<String> buildBustaPagaEditDiff(BustaPaga vecchia, BustaPaga nuova) {
+  final diff = <String>[];
+
+  void addIfChanged(String label, double oldValue, double newValue,
+      {String Function(double) format = formatNumber}) {
+    if (format(oldValue) != format(newValue)) {
+      diff.add('$label: ${format(oldValue)} → ${format(newValue)}');
+    }
+  }
+
+  if (_periodoLabelForDate(vecchia.periodo) !=
+      _periodoLabelForDate(nuova.periodo)) {
+    diff.add(
+      'Periodo: ${_periodoLabelForDate(vecchia.periodo)} → '
+      '${_periodoLabelForDate(nuova.periodo)}',
+    );
+  }
+  if (vecchia.tipo != nuova.tipo) {
+    diff.add(
+      'Tipo: ${_tipoLabels[vecchia.tipo]} → ${_tipoLabels[nuova.tipo]}',
+    );
+  }
+  // `formatEuroConSegno`, non `formatEuro` nudo: Netto/Lordo sono
+  // normalmente non negativi ma possono eccezionalmente esserlo (netto se
+  // le trattenute superano il lordo, vedi doc di `formatEuroConSegno`) —
+  // stesso helper già usato per questi due campi nella hero card
+  // (`lordoDisplay`/`nettoDisplay`), per coerenza di stile col resto di
+  // questo popup (che mostra sempre "€ " per ogni altro importo) e senza
+  // rischio di doppio segno.
+  addIfChanged('Netto', vecchia.netto, nuova.netto,
+      format: formatEuroConSegno);
+  addIfChanged('Lordo', vecchia.lordo, nuova.lordo,
+      format: formatEuroConSegno);
+  addIfChanged('Straordinari', vecchia.straordinari, nuova.straordinari);
+  addIfChanged('Ferie maturate', vecchia.ferieMaturate, nuova.ferieMaturate);
+  addIfChanged('Ferie godute', vecchia.ferieGodute, nuova.ferieGodute);
+  addIfChanged('Ferie residue', vecchia.ferieResidue, nuova.ferieResidue);
+  addIfChanged('ROL maturati', vecchia.rolMaturati, nuova.rolMaturati);
+  addIfChanged('ROL goduti', vecchia.rolGoduti, nuova.rolGoduti);
+  addIfChanged('ROL residui', vecchia.rolResidui, nuova.rolResidui);
+  addIfChanged(
+      'Permessi goduti', vecchia.permessiGoduti, nuova.permessiGoduti);
+  addIfChanged('Permessi (mese)', vecchia.permessiGodutiMese,
+      nuova.permessiGodutiMese);
+  addIfChanged('Ex festività maturate', vecchia.exFestivitaMaturate,
+      nuova.exFestivitaMaturate);
+  addIfChanged('Ex festività godute', vecchia.exFestivitaGodute,
+      nuova.exFestivitaGodute);
+  addIfChanged('Ex festività residue', vecchia.exFestivitaResidue,
+      nuova.exFestivitaResidue);
+  addIfChanged('Ore lavorate', vecchia.oreLavorate, nuova.oreLavorate);
+
+  final chiavi = {...vecchia.trattenute.keys, ...nuova.trattenute.keys};
+  for (final chiave in chiavi) {
+    final prima = vecchia.trattenute[chiave];
+    final dopo = nuova.trattenute[chiave];
+    // `formatTrattenuta`: stesso helper già usato dalla riga di sola
+    // lettura (`_trattenutaRow`) e dal prefisso di `trattenutaEditRow`, così
+    // questo popup resta coerente con come lo stesso valore è mostrato
+    // ovunque altrove in questa schermata — vedi doc del bug sopra.
+    if (prima == null && dopo != null) {
+      diff.add('Trattenuta $chiave: aggiunta (${formatTrattenuta(dopo)})');
+    } else if (prima != null && dopo == null) {
+      diff.add(
+          'Trattenuta $chiave: rimossa (era ${formatTrattenuta(prima)})');
+    } else if (prima != null &&
+        dopo != null &&
+        formatEuro(prima) != formatEuro(dopo)) {
+      diff.add(
+        'Trattenuta $chiave: ${formatTrattenuta(prima)} → '
+        '${formatTrattenuta(dopo)}',
+      );
+    }
+  }
+
+  // Stesso pattern del diff trattenute, chiave sulla descrizione (unica per
+  // voce nell'uso reale di questo layout busta paga).
+  final vecchieCompetenze = {
+    for (final v in vecchia.competenze) v.descrizione: v
+  };
+  final nuoveCompetenze = {
+    for (final v in nuova.competenze) v.descrizione: v
+  };
+  final descrizioniCompetenze = {
+    ...vecchieCompetenze.keys,
+    ...nuoveCompetenze.keys
+  };
+  // Quantità ASSENTE (vedi `VoceCompetenza.quantita`) mostrata come "—" nel
+  // diff, stessa convenzione di sola lettura/editing — mai "0", fuorviante.
+  String formatQuantita(double? v) => v == null ? '—' : formatNumber(v);
+  for (final descrizione in descrizioniCompetenze) {
+    final prima = vecchieCompetenze[descrizione];
+    final dopo = nuoveCompetenze[descrizione];
+    // `formatEuroConSegno`, non `formatTrattenuta`: a differenza delle
+    // trattenute, qui il segno mostrato deve coincidere con quello del
+    // valore (vedi doc del bug sopra), come per Netto/Lordo.
+    if (prima == null && dopo != null) {
+      diff.add('Competenza $descrizione: aggiunta '
+          '(${formatQuantita(dopo.quantita)}, '
+          '${formatEuroConSegno(dopo.importo)})');
+    } else if (prima != null && dopo == null) {
+      diff.add('Competenza $descrizione: rimossa '
+          '(era ${formatQuantita(prima.quantita)}, '
+          '${formatEuroConSegno(prima.importo)})');
+    } else if (prima != null &&
+        dopo != null &&
+        (formatQuantita(prima.quantita) != formatQuantita(dopo.quantita) ||
+            formatEuro(prima.importo) != formatEuro(dopo.importo))) {
+      diff.add(
+        'Competenza $descrizione: ${formatQuantita(prima.quantita)}, '
+        '${formatEuroConSegno(prima.importo)} → '
+        '${formatQuantita(dopo.quantita)}, '
+        '${formatEuroConSegno(dopo.importo)}',
+      );
+    }
+  }
+
+  return diff;
+}
+
 /// Vista di dettaglio di una busta paga: hero con i dati principali, tabella
 /// riepilogativa di Ferie/ROL/Permessi e sezioni di dettaglio per documento,
 /// importi e trattenute. La barra flottante in basso permette di confermare
@@ -95,11 +250,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   late List<TrattenutaEditRow> _trattenuteEdit;
   late List<VoceCompetenzaEditRow> _competenzeEdit;
 
-  String _periodoLabelForDate(DateTime data) {
-    final formatted = DateFormat('MMMM yyyy', 'it_IT').format(data);
-    return formatted[0].toUpperCase() + formatted.substring(1);
-  }
-
   /// Popola tutti i controller di editing dai valori correnti (letti dal
   /// provider) e attiva la modalità modifica.
   void _enterEditing(BustaPaga corrente) {
@@ -136,8 +286,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     _trattenuteEdit = corrente.trattenute.isEmpty
         ? [TrattenutaEditRow()]
         : corrente.trattenute.entries
-            .map((e) => TrattenutaEditRow(
-                chiave: e.key, importo: formatEuro(e.value)))
+            .map((e) => TrattenutaEditRow(chiave: e.key, importo: e.value))
             .toList();
     for (final row in _trattenuteEdit) {
       _attachTrattenutaListeners(row);
@@ -148,7 +297,12 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
         : corrente.competenze
             .map((v) => VoceCompetenzaEditRow(
                   descrizione: v.descrizione,
-                  quantita: formatNumber(v.quantita),
+                  // Vuoto (non "0") quando la quantità è ASSENTE, stessa
+                  // convenzione già in uso per `importo == 0` subito sotto —
+                  // preserva l'assenza al salvataggio senza modifiche, vedi
+                  // `VoceCompetenzaEditRow.quantitaValue`.
+                  quantita:
+                      v.quantita == null ? '' : formatNumber(v.quantita!),
                   importo: v.importo == 0 ? '' : formatEuro(v.importo),
                 ))
             .toList();
@@ -193,7 +347,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     for (final row in _trattenuteEdit) {
       final chiave = row.chiave.text.trim();
       if (chiave.isEmpty) continue;
-      trattenute[chiave] = _parse(row.importo);
+      trattenute[chiave] = row.valoreConSegno;
     }
     return trattenute;
   }
@@ -486,101 +640,15 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     );
   }
 
-  List<String> _buildDiff(BustaPaga vecchia, BustaPaga nuova) {
-    final diff = <String>[];
-
-    void addIfChanged(String label, double oldValue, double newValue,
-        {String Function(double) format = formatNumber}) {
-      if (format(oldValue) != format(newValue)) {
-        diff.add('$label: ${format(oldValue)} → ${format(newValue)}');
-      }
-    }
-
-    if (_periodoLabelForDate(vecchia.periodo) !=
-        _periodoLabelForDate(nuova.periodo)) {
-      diff.add(
-        'Periodo: ${_periodoLabelForDate(vecchia.periodo)} → '
-        '${_periodoLabelForDate(nuova.periodo)}',
-      );
-    }
-    if (vecchia.tipo != nuova.tipo) {
-      diff.add(
-        'Tipo: ${_tipoLabels[vecchia.tipo]} → ${_tipoLabels[nuova.tipo]}',
-      );
-    }
-    addIfChanged('Netto', vecchia.netto, nuova.netto, format: formatEuro);
-    addIfChanged('Lordo', vecchia.lordo, nuova.lordo, format: formatEuro);
-    addIfChanged('Straordinari', vecchia.straordinari, nuova.straordinari);
-    addIfChanged('Ferie maturate', vecchia.ferieMaturate, nuova.ferieMaturate);
-    addIfChanged('Ferie godute', vecchia.ferieGodute, nuova.ferieGodute);
-    addIfChanged('Ferie residue', vecchia.ferieResidue, nuova.ferieResidue);
-    addIfChanged('ROL maturati', vecchia.rolMaturati, nuova.rolMaturati);
-    addIfChanged('ROL goduti', vecchia.rolGoduti, nuova.rolGoduti);
-    addIfChanged('ROL residui', vecchia.rolResidui, nuova.rolResidui);
-    addIfChanged(
-        'Permessi goduti', vecchia.permessiGoduti, nuova.permessiGoduti);
-    addIfChanged('Permessi (mese)', vecchia.permessiGodutiMese,
-        nuova.permessiGodutiMese);
-    addIfChanged('Ex festività maturate', vecchia.exFestivitaMaturate,
-        nuova.exFestivitaMaturate);
-    addIfChanged('Ex festività godute', vecchia.exFestivitaGodute,
-        nuova.exFestivitaGodute);
-    addIfChanged('Ex festività residue', vecchia.exFestivitaResidue,
-        nuova.exFestivitaResidue);
-    addIfChanged('Ore lavorate', vecchia.oreLavorate, nuova.oreLavorate);
-
-    final chiavi = {...vecchia.trattenute.keys, ...nuova.trattenute.keys};
-    for (final chiave in chiavi) {
-      final prima = vecchia.trattenute[chiave];
-      final dopo = nuova.trattenute[chiave];
-      if (prima == null && dopo != null) {
-        diff.add('Trattenuta $chiave: aggiunta (€ ${formatEuro(dopo)})');
-      } else if (prima != null && dopo == null) {
-        diff.add('Trattenuta $chiave: rimossa (era € ${formatEuro(prima)})');
-      } else if (prima != null &&
-          dopo != null &&
-          formatEuro(prima) != formatEuro(dopo)) {
-        diff.add(
-          'Trattenuta $chiave: € ${formatEuro(prima)} → € ${formatEuro(dopo)}',
-        );
-      }
-    }
-
-    // Stesso pattern del diff trattenute, chiave sulla descrizione (unica per
-    // voce nell'uso reale di questo layout busta paga).
-    final vecchieCompetenze = {
-      for (final v in vecchia.competenze) v.descrizione: v
-    };
-    final nuoveCompetenze = {
-      for (final v in nuova.competenze) v.descrizione: v
-    };
-    final descrizioniCompetenze = {
-      ...vecchieCompetenze.keys,
-      ...nuoveCompetenze.keys
-    };
-    for (final descrizione in descrizioniCompetenze) {
-      final prima = vecchieCompetenze[descrizione];
-      final dopo = nuoveCompetenze[descrizione];
-      if (prima == null && dopo != null) {
-        diff.add('Competenza $descrizione: aggiunta '
-            '(${formatNumber(dopo.quantita)}, € ${formatEuro(dopo.importo)})');
-      } else if (prima != null && dopo == null) {
-        diff.add('Competenza $descrizione: rimossa '
-            '(era ${formatNumber(prima.quantita)}, € ${formatEuro(prima.importo)})');
-      } else if (prima != null &&
-          dopo != null &&
-          (formatNumber(prima.quantita) != formatNumber(dopo.quantita) ||
-              formatEuro(prima.importo) != formatEuro(dopo.importo))) {
-        diff.add(
-          'Competenza $descrizione: ${formatNumber(prima.quantita)}, '
-          '€ ${formatEuro(prima.importo)} → ${formatNumber(dopo.quantita)}, '
-          '€ ${formatEuro(dopo.importo)}',
-        );
-      }
-    }
-
-    return diff;
-  }
+  /// Costruisce l'elenco leggibile delle differenze fra due versioni della
+  /// stessa busta paga per il popup di conferma prima di salvare una
+  /// modifica inline. Logica vera e propria estratta nella funzione di
+  /// livello file [buildBustaPagaEditDiff] (non un metodo di questa `State`)
+  /// per essere testabile senza dover pilotare l'intera schermata attraverso
+  /// Riverpod/Drift — questo resta un sottile delegato, unico punto di
+  /// chiamata reale nell'app.
+  List<String> _buildDiff(BustaPaga vecchia, BustaPaga nuova) =>
+      buildBustaPagaEditDiff(vecchia, nuova);
 
   @override
   void dispose() {
@@ -620,10 +688,10 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                         StatoVerificaBustaPaga.confermato,
                     periodoLabel: periodoLabelVista,
                     isEditing: _isEditing,
-                    lordoDisplay: formatEuro(_isEditing
+                    lordoDisplay: formatEuroConSegno(_isEditing
                         ? _valoriDerivatiEditing(corrente).lordo
                         : corrente.lordo),
-                    nettoDisplay: formatEuro(_isEditing
+                    nettoDisplay: formatEuroConSegno(_isEditing
                         ? _valoriDerivatiEditing(corrente).netto
                         : corrente.netto),
                     onTapPeriodo: _isEditing ? _pickPeriodo : null,

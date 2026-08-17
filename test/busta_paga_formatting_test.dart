@@ -65,6 +65,69 @@ void main() {
     });
   });
 
+  group('formatNumberFixed', () {
+    // Regressione: le tabelle di riepilogo sotto i grafici di Statistiche
+    // (`buste_paga_statistiche_screen.dart`, `_formatStatNumber`) usavano
+    // `value.toStringAsFixed(2)` — locale-INDIPENDENTE, quindi sempre col
+    // PUNTO come separatore decimale e senza separatore delle migliaia
+    // ("€ 1435.40", "€ 16184.60", "9.13"), incoerente col formato italiano
+    // (virgola decimale, punto delle migliaia) usato nel resto dell'app.
+    // Valori reali osservati in app dopo l'import di 12 buste paga.
+    test('valori reali osservati nella tabella Netto/Lordo (Media/Totale)',
+        () {
+      expect(formatNumberFixed(1435.40), '1.435,40');
+      expect(formatNumberFixed(16184.60), '16.184,60');
+    });
+
+    test('valore reale osservato nella tabella Netto/Lordo (Minimo)', () {
+      expect(formatNumberFixed(1382.00), '1.382,00');
+    });
+
+    test('valori reali osservati nella tabella Ferie e permessi (Media)', () {
+      expect(formatNumberFixed(9.13), '9,13');
+      expect(formatNumberFixed(18.82), '18,82');
+      expect(formatNumberFixed(1.15), '1,15');
+    });
+
+    test('valore reale osservato nella tabella Ferie e permessi (Minimo)',
+        () {
+      expect(formatNumberFixed(1.67), '1,67');
+    });
+
+    test('valori reali osservati nella tabella Straordinario (Media/Totale)',
+        () {
+      expect(formatNumberFixed(1.70), '1,70');
+      expect(formatNumberFixed(17.00), '17,00');
+    });
+
+    test(
+        'valore sopra le mille unità: punto come separatore delle migliaia, '
+        'virgola come decimale', () {
+      expect(formatNumberFixed(16184.60), '16.184,60');
+      expect(formatNumberFixed(12345.6), '12.345,60');
+      expect(formatNumberFixed(1000), '1.000,00');
+    });
+
+    test(
+        'valore intero: mantiene sempre due decimali fissi, a differenza di '
+        'formatNumber che li omette per i valori esatti', () {
+      expect(formatNumberFixed(17.0), '17,00');
+      expect(formatNumberFixed(16184.0), '16.184,00');
+      // formatNumber (usato per altre quantità, es. Ferie/ROL in editing)
+      // omette invece i decimali per un intero: le due funzioni hanno scopi
+      // diversi, non un bug se producono output diversi per lo stesso valore.
+      expect(formatNumber(17.0), '17');
+    });
+
+    test(
+        'stessa formattazione numerica di formatEuro (stesso pattern "#,##0.00", '
+        'senza simbolo valuta)', () {
+      for (final valore in [1435.40, 16184.60, 9.13, 17.0]) {
+        expect(formatNumberFixed(valore), formatEuro(valore));
+      }
+    });
+  });
+
   group('formatEuro / parseItalianNumber round trip (trattenute)', () {
     // Regressione per il bug critico riscontrato dall'utente dopo l'import
     // del PDF di Giugno 2026: il Netto salvato risultava -€15.754,84 invece

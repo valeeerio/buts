@@ -75,6 +75,26 @@ void main() {
     test('lista vuota produce 0', () {
       expect(computeStraordinari(const []), 0);
     });
+
+    // Regressione bug "quantità 0 su voci che non hanno quantità":
+    // `VoceCompetenza.quantita` è nullable (righe senza tag GIORNI/ORE/RATEI
+    // sul PDF, es. "930 Trattamento integrativo", non hanno alcuna
+    // quantità) — mai osservato per una voce di straordinario reale (sempre
+    // tag "ORE"), ma `computeStraordinari` deve comunque gestire il caso
+    // senza eccezioni, trattando l'assenza come 0 nella somma.
+    test('una quantità ASSENTE (null) in una voce di straordinario conta '
+        'come 0 nella somma, nessuna eccezione', () {
+      const competenze = [
+        VoceCompetenza(
+            descrizione: 'Straordinario diurno (30%)',
+            quantita: 3.0,
+            importo: 30.0),
+        VoceCompetenza(
+            descrizione: 'Straordinario festivo', quantita: null, importo: 0),
+      ];
+
+      expect(computeStraordinari(competenze), closeTo(3.0, 0.001));
+    });
   });
 
   group('computeNetto', () {

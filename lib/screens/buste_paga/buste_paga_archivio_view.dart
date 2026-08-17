@@ -18,13 +18,20 @@ import '../../widgets/liquid_glass_surface.dart';
 import '../../widgets/spring_button.dart';
 import '../../widgets/swipe_delete_background.dart';
 
-/// Filtra le buste paga per periodo (nome mese e/o anno, case-insensitive).
-/// Query vuota (dopo trim) restituisce l'elenco invariato.
+/// Filtra le buste paga per periodo (nome mese, anno e/o etichetta di tipo,
+/// case-insensitive). Query vuota (dopo trim) restituisce l'elenco
+/// invariato. Confronta con [bustaPagaPeriodoDisplay] (non [periodoLabel]):
+/// per le mensili le due funzioni producono la stessa stringa ("Agosto
+/// 2026"), ma solo [bustaPagaPeriodoDisplay] include l'etichetta di tipo per
+/// 13esima/14esima ("13esima 2026") — [periodoLabel] da sola non faceva mai
+/// matchare una ricerca per "13esima"/"14esima", bug reale corretto qui, non
+/// un'ipotesi.
 List<BustaPaga> _filtered(List<BustaPaga> sorted, String query) {
   final normalized = query.toLowerCase().trim();
   if (normalized.isEmpty) return sorted;
   return sorted
-      .where((b) => periodoLabel(b).toLowerCase().contains(normalized))
+      .where(
+          (b) => bustaPagaPeriodoDisplay(b).toLowerCase().contains(normalized))
       .toList();
 }
 
@@ -115,7 +122,7 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
       context: context,
       title: 'Elimina busta paga',
       message: 'Sei sicuro di voler eliminare la busta paga di '
-          '${periodoLabel(bustaPaga)}?',
+          '${bustaPagaPeriodoDisplay(bustaPaga)}?',
       actions: [
         AppAlertAction(
           icon: CupertinoIcons.xmark,
@@ -136,17 +143,25 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
 
   /// Rimuove una busta paga gestendo l'eventuale fallimento della scrittura
   /// Drift: `remove` fa già il revert ottimistico dello stato in caso di
-  /// errore (la busta paga ricompare nell'elenco), qui serve solo avvisare
-  /// l'utente che l'eliminazione non è andata a buon fine.
-  Future<void> _removeBustaPaga(
+  /// errore (la busta paga ricompare nell'elenco). Ritorna `true`/`false` in
+  /// base all'esito — richiamata da `confirmDismiss` (vedi
+  /// [_confermaEElimina]), non più da `onDismissed`: un `Dismissible` che
+  /// anima via la riga (`onDismissed`) e poi la fa ricomparire per un
+  /// rollback ottimistico fallito genera l'errore Flutter "A dismissed
+  /// Dismissible widget is still part of the tree" — bug reale corretto qui,
+  /// non un'ipotesi. Ritornando `false` da `confirmDismiss` in caso di
+  /// errore, `Dismissible` non rimuove mai il widget dall'albero (anima la
+  /// riga di ritorno in posizione), restando sempre coerente con lo stato.
+  Future<bool> _removeBustaPaga(
     BuildContext context,
     WidgetRef ref,
     String id,
   ) async {
     try {
       await ref.read(busteRepositoryProvider.notifier).remove(id);
+      return true;
     } catch (_) {
-      if (!context.mounted) return;
+      if (!context.mounted) return false;
       final accent =
           CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
       showAppAlertDialog<void>(
@@ -162,7 +177,23 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
           ),
         ],
       );
+      return false;
     }
+  }
+
+  /// `confirmDismiss` condiviso da hero e righe elenco: conferma esplicita
+  /// (alert), poi l'eliminazione vera e propria — entrambe le fasi sono
+  /// completate PRIMA che `Dismissible` rimuova il widget dall'albero (vedi
+  /// doc di [_removeBustaPaga] sul perché non si usa più `onDismissed`).
+  Future<bool> _confermaEElimina(
+    BuildContext context,
+    WidgetRef ref,
+    BustaPaga bustaPaga,
+  ) async {
+    final confermato = await _confirmaEliminazione(context, bustaPaga);
+    if (!confermato) return false;
+    if (!context.mounted) return false;
+    return _removeBustaPaga(context, ref, bustaPaga.id);
   }
 
   /// Righe di un gruppo di buste paga (swipe-to-delete + tap per il
@@ -184,8 +215,7 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
           return Dismissible(
             key: ValueKey('row-${bustaPaga.id}'),
             direction: DismissDirection.endToStart,
-            confirmDismiss: (_) => _confirmaEliminazione(context, bustaPaga),
-            onDismissed: (_) => _removeBustaPaga(context, ref, bustaPaga.id),
+            confirmDismiss: (_) => _confermaEElimina(context, ref, bustaPaga),
             background:
                 const SwipeDeleteBackground(radius: AppRadius.glassSmall),
             child: BustaPagaListItem(
@@ -204,15 +234,29 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
   /// `_bustePagaSliverList(extra)`, chiusa di default (`anno` non in
   /// `_extraEspansi`). Niente sticky header annidato (non supportato da
   /// `flutter_sticky_header`), tutto sotto lo stesso header "$anno".
-  Widget _yearSliver(BuildContext context, WidgetRef ref, int anno, List<BustaPaga> buste) {
+  ///
+  /// `buste` è già la lista **per questo anno nella vista corrente** (dopo
+  /// un eventuale filtro di ricerca, vedi [_filtered]/`build`), non il
+  /// totale assoluto dell'anno: se in questa vista non c'è nessuna mensile
+  /// (`normali` vuoto) la sotto-sezione "Extra" resta sempre espansa
+  /// indipendentemente da `_extraEspansi`, altrimenti — con `_extraEspansi`
+  /// chiuso di default — `SliverMainAxisGroup` riceverebbe zero sliver e
+  /// l'intero anno apparirebbe vuoto sotto il suo header: capita sia quando
+  /// un anno ha solo 13esima/14esima in archivio, sia quando una ricerca
+  /// filtra via tutte le mensili di un anno lasciando solo un risultato
+  /// dentro gli Extra — bug reale corretto qui, non un'ipotesi (vedi
+  /// CLAUDE.md/istruzioni task).
+  Widget _yearSliver(
+      BuildContext context, WidgetRef ref, int anno, List<BustaPaga> buste) {
     // Ordine fisso per tipo (13esima sempre prima della 14esima), non
     // cronologico per mese come le mensilità: il mese registrato su
     // ciascuna può variare da un anno all'altro, l'ordine per tipo resta
     // prevedibile in ogni sezione "Extra".
     final extra = buste.where((b) => b.tipo != TipoBustaPaga.mensile).toList()
       ..sort((a, b) => a.tipo.index.compareTo(b.tipo.index));
-    final normali = buste.where((b) => b.tipo == TipoBustaPaga.mensile).toList();
-    final espansa = _extraEspansi.contains(anno);
+    final normali =
+        buste.where((b) => b.tipo == TipoBustaPaga.mensile).toList();
+    final espansa = normali.isEmpty || _extraEspansi.contains(anno);
 
     return SliverMainAxisGroup(
       slivers: [
@@ -300,8 +344,7 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
             child: Dismissible(
               key: ValueKey('hero-${ultima.id}'),
               direction: DismissDirection.endToStart,
-              confirmDismiss: (_) => _confirmaEliminazione(context, ultima),
-              onDismissed: (_) => _removeBustaPaga(context, ref, ultima.id),
+              confirmDismiss: (_) => _confermaEElimina(context, ref, ultima),
               background: const SwipeDeleteBackground(radius: AppRadius.glass),
               child: BustaPagaSummaryHero(
                 bustaPaga: ultima,
@@ -380,8 +423,17 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
                                   ),
                                 ),
                               ),
+                              // Toggle mostrato solo se l'anno ha ENTRAMBI
+                              // mensili ed Extra nella vista corrente:
+                              // altrimenti (solo Extra, vedi `_yearSliver`)
+                              // la sotto-sezione resta sempre espansa e non
+                              // c'è nulla da collassare — un toggle
+                              // interattivo lì potrebbe far ricomparire la
+                              // sezione vuota che questo fix corregge.
                               if (byYear[anno]!.any(
-                                  (b) => b.tipo != TipoBustaPaga.mensile))
+                                      (b) => b.tipo != TipoBustaPaga.mensile) &&
+                                  byYear[anno]!.any(
+                                      (b) => b.tipo == TipoBustaPaga.mensile))
                                 _extraToggle(context, anno,
                                     _extraEspansi.contains(anno)),
                             ],

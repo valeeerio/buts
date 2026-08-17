@@ -12,16 +12,41 @@
 ///   decimali ("69,65818"), gli importi 2 decimali ("1.532,48") — questo
 ///   evita ambiguità nel separare numeri concatenati senza spazi;
 /// - il blocco "ratei" (ferie/ROL/ex festività) usa i tag letterali
-///   "(GIORNI)"/"(ORE)" come ancore non numeriche, permettendo di
-///   catturare solo i 3 numeri (maturati/goduti/residui) immediatamente
-///   prima del tag, ignorando il residuo-anno-precedente che li precede
-///   incollato ad altri numeri senza spazio (fonte di ambiguità, non ci
-///   serve comunque).
+///   "(GIORNI)"/"(ORE)" come ancore non numeriche per delimitare i 3
+///   blocchi (Ferie/ROL/Ex festività) sui cui cercare un numero VARIABILE
+///   di valori (2-4, a seconda di quali celle il cedolino lascia vuote quel
+///   mese invece di stampare "0,00" — vedi `_interpretaBloccoRatei`),
+///   invece di pretendere un conteggio fisso.
 ///
 /// Se il layout del software payroll cambia, questi pattern smettono di
 /// funzionare silenziosamente (ritornano `null`/campi a 0) — è un limite
 /// noto e accettato: l'alternativa (LLM locale) è stata valutata e scartata
 /// per ora, vedi BACKLOG.md.
+///
+/// Per ferie/ROL/ex festività esiste anche una fonte alternativa, più
+/// affidabile quando disponibile: [RateiEstrattiDaCoordinate], letta da
+/// `PdfImportService` per COORDINATE (X/Y) dalla pagina invece che dal
+/// testo linearizzato di cui sopra — quest'ultimo perde l'allineamento a
+/// colonna della tabella "RATEI" (celle vuote che spariscono, numeri di
+/// colonne diverse che finiscono incollati senza separatore), mentre la
+/// posizione di ogni numero sulla pagina resta univoca. Passata come
+/// argomento opzionale a [BustaPagaRegexParser.parse]: se presente ha
+/// priorità sul percorso testuale sopra descritto, categoria per categoria.
+///
+/// Analogamente, per competenze/lordo/trattenute/netto esiste
+/// [VociEstratteDaCoordinate]: voci della tabella
+/// "VOCE/DESCRIZIONE/.../TRATTENUTE/COMPETENZE", contributi C/DIPENDENTE,
+/// trattenuta IRPEF e riga totali, letti anch'essi per COORDINATE dalla
+/// stessa pagina invece che dal testo linearizzato — che qui perde la
+/// distinzione fra le colonne TRATTENUTE e COMPETENZE (concatenate senza
+/// separatore riconoscibile), oltre a non leggere affatto le righe prive di
+/// tag GIORNI/ORE/RATEI (es. "930 Trattamento integrativo DL 3/2020").
+/// Passata come terzo argomento opzionale a [BustaPagaRegexParser.parse]:
+/// quando [VociEstratteDaCoordinate.haDatiSufficienti], ha priorità sul
+/// percorso testuale per questi campi — a differenza di
+/// [RateiEstrattiDaCoordinate] qui la scelta è tutto-o-niente, non per
+/// singolo campo (vedi doc su [VociEstratteDaCoordinate.haDatiSufficienti]
+/// per il perché).
 library;
 
 import '../models/busta_paga.dart';
@@ -89,6 +114,208 @@ class BustaPagaEstratti {
     this.tipo = TipoBustaPaga.mensile,
     required this.warnings,
   });
+}
+
+/// Un singolo rateo (maturato/goduto/residuo, più l'eventuale residuo
+/// dell'anno precedente) di una delle 3 categorie della tabella "RATEI" del
+/// PDF (Ferie / Permessi R.O.L. / Ex festività), letto per COORDINATE (X/Y)
+/// dalla pagina invece che dal testo linearizzato — vedi doc di libreria in
+/// testa al file, [RateiEstrattiDaCoordinate] e l'uso in
+/// [BustaPagaRegexParser.parse].
+///
+/// Ogni campo è singolarmente nullable: `null` significa "cella non
+/// determinata con sufficiente confidenza" (colonna/riga non riconosciuta
+/// nel documento), non "letta e zero" — un cedolino lascia scritto "0,00"
+/// solo per alcune celle, altre le lascia proprio vuote: la lettura per
+/// coordinate distingue correttamente "cella vuota = 0" da "colonna non
+/// trovata affatto = dato mancante", a differenza del percorso testuale.
+class RateoCategoria {
+  /// "RESIDUI A.P." — residuo dell'anno precedente: solo un dato
+  /// intermedio per la verifica di bilancio in [BustaPagaRegexParser.parse]
+  /// (mai esposto in [BustaPagaEstratti]/`BustaPaga`).
+  final double? residuoAnnoPrecedente;
+  final double? maturato;
+
+  /// Somma delle due sotto-colonne "GODUTI A.P." e "GODUTI A.C." della
+  /// tabella (vedi intestazione "GODUTI" sopra "A.P."/"A.C." nel PDF):
+  /// `null` solo se NESSUNA delle due sotto-colonne è stata letta, non se
+  /// una delle due manca (in quel caso la mancante conta come 0 nella
+  /// somma).
+  final double? goduto;
+  final double? residuo;
+
+  const RateoCategoria({
+    this.residuoAnnoPrecedente,
+    this.maturato,
+    this.goduto,
+    this.residuo,
+  });
+
+  /// Nessun campo determinato — equivalente a "riga di categoria non
+  /// trovata nella tabella" (etichetta assente o pagina non riconosciuta),
+  /// il default di [RateiEstrattiDaCoordinate] per ciascuna categoria.
+  static const vuoto = RateoCategoria();
+
+  /// `true` se almeno un campo è stato letto — usato da
+  /// [BustaPagaRegexParser.parse] per decidere se questa categoria ha dati
+  /// per coordinate da preferire al percorso testuale, oppure se ricadere
+  /// su quest'ultimo.
+  bool get haAlmenoUnValore =>
+      residuoAnnoPrecedente != null ||
+      maturato != null ||
+      goduto != null ||
+      residuo != null;
+}
+
+/// Ratei (Ferie, Permessi R.O.L., Ex festività) letti per coordinate dalla
+/// tabella "RATEI" del PDF (vedi `PdfImportService`), passati come input
+/// OPZIONALE a [BustaPagaRegexParser.parse]: quando una categoria ha
+/// [RateoCategoria.haAlmenoUnValore], è la fonte autoritativa per quella
+/// categoria; altrimenti [BustaPagaRegexParser.parse] ricade sul percorso
+/// testuale per quella categoria. Non passare questo argomento a `parse`
+/// (default `null`) lascia il comportamento esattamente com'era prima
+/// dell'introduzione di questo tipo: solo testo.
+class RateiEstrattiDaCoordinate {
+  final RateoCategoria ferie;
+  final RateoCategoria rol;
+  final RateoCategoria exFestivita;
+
+  const RateiEstrattiDaCoordinate({
+    this.ferie = RateoCategoria.vuoto,
+    this.rol = RateoCategoria.vuoto,
+    this.exFestivita = RateoCategoria.vuoto,
+  });
+}
+
+/// Colonna della tabella "VOCE / DESCRIZIONE / ... / TRATTENUTE / COMPETENZE"
+/// in cui è stampato l'importo di una riga, letta per COORDINATE (X) — vedi
+/// [RigaVoceCoordinate].
+enum ColonnaVoceCoordinate { trattenute, competenze }
+
+/// Una singola riga della tabella voci del PDF (layout "JOB"), letta per
+/// COORDINATE (X/Y) invece che dal testo linearizzato — vedi
+/// [VociEstratteDaCoordinate] e `PdfImportService.classificaVociDaCoordinate`
+/// (in `pdf_import_service.dart`) per il perché: il testo linearizzato perde
+/// la distinzione fra le colonne TRATTENUTE e COMPETENZE (entrambe finiscono
+/// concatenate senza un separatore riconoscibile), mentre la posizione X di
+/// ogni importo sulla pagina resta univoca.
+///
+/// [flagN] riflette il flag "N" (colonna più a destra della tabella,
+/// intestazione "N*" — legenda del PDF: "N - Considerato nel netto in
+/// busta") stampato come "*" su questa riga: SOLO le righe con questo flag
+/// entrano nel lordo/nelle trattenute (vedi uso in
+/// [BustaPagaRegexParser.parse]) — alcune righe della colonna COMPETENZE sono
+/// puramente informative (es. "Addizionale Regionale Dovuta", un dato
+/// dell'anno precedente stampato per promemoria) e non vanno sommate,
+/// distinguibili SOLO tramite questo flag — non esiste un prefisso testuale
+/// affidabile della descrizione per escluderle, a differenza di "Ferie
+/// godute"/"Permessi riduz." sul percorso testuale.
+class RigaVoceCoordinate {
+  final String codice;
+  final String descrizione;
+
+  /// Tag letterale della riga ("GIORNI"/"ORE"/"RATEI"), se presente — righe
+  /// come "930 Trattamento integrativo DL 3/2020" non hanno alcun tag (né
+  /// quantità), a differenza delle righe "ordinarie" del cedolino.
+  final String? tag;
+
+  /// Quantità (colonna "Quantita'"), `null` quando la riga non ne stampa
+  /// alcuna (righe senza tag, vedi [tag] — es. "930 Trattamento integrativo
+  /// DL 3/2020") — distinto da 0 stampato esplicitamente, propagato così
+  /// com'è in [VoceCompetenza.quantita] (vedi [BustaPagaRegexParser
+  /// ._competenzeDaCoordinate]).
+  final double? quantita;
+
+  /// Importo della riga, dalla colonna [colonna].
+  final double importo;
+  final ColonnaVoceCoordinate colonna;
+  final bool flagN;
+
+  const RigaVoceCoordinate({
+    required this.codice,
+    required this.descrizione,
+    this.tag,
+    required this.quantita,
+    required this.importo,
+    required this.colonna,
+    required this.flagN,
+  });
+}
+
+/// Riga totali del cedolino (fondo della prima pagina, dopo "Firma per
+/// quietanza"): TOTALE COMPETENZE / TOTALE TRATTENUTE / ARR. PRECED. /
+/// ARR. ATTUALE / NETTO IN BUSTA, letta per COORDINATE — usata sia come
+/// fonte diretta del netto sia come riferimento per la verifica incrociata
+/// contro i valori ricalcolati dalle singole righe (vedi
+/// [BustaPagaRegexParser.parse]).
+///
+/// Identità verificata su PDF reali (sempre esatta, mai un'approssimazione):
+/// `nettoInBusta == totaleCompetenze - totaleTrattenute - arrPreced + arrAttuale`.
+class TotaliCoordinate {
+  final double totaleCompetenze;
+  final double totaleTrattenute;
+
+  /// Differenza di arrotondamento riportata dal mese precedente/al mese
+  /// attuale — pochi centesimi, 0 quando il cedolino non la stampa quel mese
+  /// (cella assente quel mese, non "0,00" stampato — a differenza di
+  /// [RateoCategoria] non serve distinguere le due cose per questi due
+  /// campi: l'assenza è comunque 0 ai fini del calcolo del netto).
+  final double arrPreced;
+  final double arrAttuale;
+  final double nettoInBusta;
+
+  const TotaliCoordinate({
+    required this.totaleCompetenze,
+    required this.totaleTrattenute,
+    this.arrPreced = 0,
+    this.arrAttuale = 0,
+    required this.nettoInBusta,
+  });
+}
+
+/// Voci del cedolino (tabella "VOCE/DESCRIZIONE/.../TRATTENUTE/COMPETENZE",
+/// contributi C/DIPENDENTE, IRPEF trattenuta, riga totali) lette per
+/// COORDINATE dalla prima pagina del PDF — vedi
+/// `PdfImportService.classificaVociDaCoordinate` e la doc di libreria in
+/// testa al file. Passata come argomento OPZIONALE a
+/// [BustaPagaRegexParser.parse]: quando [haDatiSufficienti], è la fonte
+/// preferita per competenze/trattenute/lordo/netto, altrimenti
+/// [BustaPagaRegexParser.parse] ricade sul percorso testuale per questi
+/// campi (a differenza di [RateiEstrattiDaCoordinate], qui la scelta è
+/// tutto-o-niente e non per singola categoria: competenze/trattenute/netto
+/// sono troppo interdipendenti — in particolare la verifica aritmetica
+/// Σtrattenute==TOTALE TRATTENUTE — perché abbia senso mescolare fonti
+/// diverse campo per campo).
+class VociEstratteDaCoordinate {
+  final List<RigaVoceCoordinate> righe;
+
+  /// Quota C/DIPENDENTE di ciascun contributo (INPS, CONTRIBUTO EBILOG,
+  /// FONDO INTEGR. SALARIALE - FIS, ecc.), chiave = descrizione del
+  /// contributo così come stampata sul PDF. La quota C/DITTA (a carico del
+  /// datore di lavoro, MAI una trattenuta del dipendente) non è mai inclusa
+  /// qui — vedi `PdfImportService.classificaVociDaCoordinate`.
+  final Map<String, double> contributiDipendente;
+
+  /// Trattenuta IRPEF (riga "IRPEF + IMP. SOST."), `null` se non
+  /// riconosciuta.
+  final double? irpefTrattenuta;
+
+  /// Riga totali, `null` se non riconosciuta.
+  final TotaliCoordinate? totali;
+
+  const VociEstratteDaCoordinate({
+    this.righe = const [],
+    this.contributiDipendente = const {},
+    this.irpefTrattenuta,
+    this.totali,
+  });
+
+  /// `true` quando ci sono abbastanza dati per preferire questo percorso al
+  /// testo linearizzato: almeno una riga di voce E la riga totali (serve da
+  /// riferimento per la verifica aritmetica di
+  /// [BustaPagaRegexParser.parse] — senza di essa non c'è modo di sapere se
+  /// le righe lette bastano a ricostruire correttamente lordo/trattenute).
+  bool get haDatiSufficienti => righe.isNotEmpty && totali != null;
 }
 
 class BustaPagaRegexParser {
@@ -164,57 +391,25 @@ class BustaPagaRegexParser {
     r'Permessi\s+riduz\.?\s*orario\s+goduti[^\n]*\n\s*(?:ORE|GIORNI)\s*\n\s*(\d+,\d{3})',
   );
 
-  // NOTA (bug noto, non ancora corretto qui): come per `_ratesExFestivita`
-  // sotto, se il "Goduto" del mese è zero il cedolino lascia la cella VUOTA
-  // invece di stampare "0,00" — il blocco avrebbe quindi solo 3 numeri reali
-  // (invece di maturato/goduto/residuo) i cui primi due sarebbero in realtà
-  // [residuo A.P., maturato], con goduto implicito a zero. Non applicato qui
-  // perché non riprodotto su un PDF reale per Ferie in questa sessione (a
-  // differenza di Ex festività) e perché `_ratesRol` richiede una struttura a
-  // 4 numeri fissa (vedi sotto) che renderebbe la disambiguazione più
-  // invasiva da verificare senza un caso reale — da rivedere in una sessione
-  // futura se si osserva lo stesso sintomo.
-  static final _ratesFerie = RegExp(
-    r'(\d+,\d{2})\s+(\d+,\d{2})\s+(\d+,\d{2})\s*\(GIORNI\)',
-  );
+  // Percorso testuale di fallback per ferie/ROL/ex festività (usato quando
+  // `ratei` — lettura per coordinate, vedi doc di libreria in testa al file
+  // — non è fornito o non ha dati per una categoria). I tre blocchi sono
+  // delimitati dai tag letterali "(GIORNI)" (chiude Ferie) e "(ORE)" (chiude
+  // ROL il primo, Ex festività il secondo) — cercati con `indexOf` semplice
+  // sulle STRINGHE, non con una regex sui numeri: i confini dei blocchi non
+  // devono dipendere dal successo del parsing dei numeri di un blocco
+  // precedente (in particolare Ex festività non dipende più dal blocco ROL,
+  // a differenza di prima — vedi `parse()`).
+  static const _tagGiorni = '(GIORNI)';
+  static const _tagOre = '(ORE)';
 
-  // NOTA (bug noto, non ancora corretto qui): a differenza di `_ratesFerie`
-  // e `_ratesExFestivita`, questa regex assume sempre esattamente 4 numeri
-  // tra "(GIORNI)" e "(ORE)" (il primo, il residuo anno precedente, scartato
-  // senza cattura) — se un mese avesse "Goduto" a zero e quindi cella vuota
-  // (stesso rischio descritto sopra per `_ratesFerie` e in
-  // `_ratesExFestivita`), il blocco avrebbe solo 3 numeri e questa regex non
-  // troverebbe alcun match (nessun dato ROL estratto), non un dato errato.
-  // Non riprodotto su un PDF reale in questa sessione: da rivedere in una
-  // sessione futura se si osserva il sintomo.
-  static final _ratesRol = RegExp(
-    r'\(GIORNI\)\s*\d+,\d{2}\s+(\d+,\d{2})\s+(\d+,\d{2})\s+(\d+,\d{2})\s*\(ORE\)',
-  );
-
-  // Terzo blocco ratei "EX FESTIVITA'" (vedi intestazione tabella nel PDF:
-  // FERIE / PERMESSI (R.O.L.) / EX FESTIVITA'), stessa struttura
-  // maturato/goduto/residuo di ferie/ROL. Cercato SOLO nel testo subito dopo
-  // la fine del match ROL (non con un regex libero su tutto il documento)
-  // per evitare di agganciare tag "(ORE)" di sezioni successive non
-  // correlate — stesso principio di scoping già usato per le trattenute
-  // verificate.
-  //
-  // Il blocco reale può presentarsi in due forme distinte, entrambe viste su
-  // PDF reali:
-  // - 4 numeri "residuo A.P., maturato, goduto, residuo totale" — il
-  //   gruppo 1 (opzionale) cattura il residuo A.P. che viene scartato, i
-  //   gruppi 2/3/4 sono maturato/goduto/residuo;
-  // - 3 numeri soli quando il cedolino lascia una cella VUOTA invece di
-  //   stampare "0,00" — ambiguo tra due letture (quale cella è vuota), la
-  //   disambiguazione aritmetica è fatta in Dart dopo il match (vedi punto
-  //   di lettura in `parse()`), non qui nella regex.
-  // Il gruppo opzionale è greedy: su un blocco a 4 numeri il primo tentativo
-  // di match (a partire dalla posizione del primo numero) cattura sempre
-  // correttamente tutti e 4, senza bisogno di backtracking sull'euristica
-  // "ultimi 3 prima del tag" usata in precedenza.
-  static final _ratesExFestivita = RegExp(
-    r'(?:(\d+,\d{2})\s+)?(\d+,\d{2})\s+(\d+,\d{2})\s+(\d+,\d{2})\s*\(ORE\)',
-  );
+  // Un singolo numero di rateo (2 decimali) — usato per estrarre TUTTI i
+  // valori grezzi di un blocco delimitato dai tag sopra (2, 3 o 4 a seconda
+  // di quali celle il cedolino lascia vuote quel mese invece di stampare
+  // "0,00"), a differenza delle vecchie regex a conteggio fisso che
+  // smettevano di funzionare non appena il numero di valori per riga
+  // cambiava.
+  static final _numeroRateo = RegExp(r'\d+,\d{2}');
 
   // Un valore di rateo (giorni/ore maturati/goduti/residui in un mese)
   // implausibilmente grande indica che il regex ha catturato un numero
@@ -232,6 +427,265 @@ class BustaPagaRegexParser {
   // (dell'ordine di 670000+) — 1000 lascia comunque un ampio margine da
   // entrambi i lati.
   bool _valoreRateoImplausibile(double v) => v.abs() >= 1000;
+
+  // Numeri grezzi (sinistra->destra) del blocco Ferie: a differenza di
+  // ROL/Ex festività (delimitati da tag su ENTRAMBI i lati, vedi
+  // `_valoriBloccoDelimitato` sotto), Ferie è il PRIMO blocco della tabella
+  // ratei e non ha un'ancora testuale non numerica sulla sinistra — è
+  // preceduto invece da un'altra riga della tabella (retribuzione
+  // oraria/mensile) i cui valori restano incollati SENZA spazio all'ultimo
+  // valore Ferie quando quest'ultimo la segue immediatamente (artefatto di
+  // `extractText()`, non un problema del PDF: vedi doc di libreria in testa
+  // al file). Cammina a ritroso nei token separati da whitespace a partire
+  // dal tag "(GIORNI)", raccogliendo l'ULTIMO numero di ciascun token (per
+  // tollerare un token "incollato" — es. "06/12/241.509,8100022,670007,17"
+  // — il cui numero utile è sempre quello più vicino al blocco Ferie reale,
+  // cioè il più a destra: le cifre iniziali spurie non alterano il valore
+  // numerico anche quando lo "rubano" come zeri iniziali, es. "0007,17" =
+  // 7,17), fino al primo token privo di un numero riconoscibile (confine
+  // col testo non numerico che precede, es. "-CCNL") o dopo aver raccolto 4
+  // valori (il massimo possibile: residuo A.P., maturato, goduto, residuo).
+  List<double> _valoriFerieARitroso(String testoPrimaDiGiorni) {
+    final token = testoPrimaDiGiorni.trim().split(RegExp(r'\s+'));
+    final raccolti = <double>[];
+    for (var i = token.length - 1; i >= 0 && raccolti.length < 4; i--) {
+      if (token[i].isEmpty) continue;
+      final matches = _numeroRateo.allMatches(token[i]);
+      if (matches.isEmpty) break;
+      raccolti.insert(0, _toDouble(matches.last.group(0)!));
+    }
+    return raccolti;
+  }
+
+  // Numeri grezzi (sinistra->destra) di un blocco ROL/Ex festività,
+  // delimitato dai tag su ENTRAMBI i lati (a differenza di Ferie sopra):
+  // nessun rischio di "incollarsi" a testo non correlato, il segmento è già
+  // esattamente il contenuto delle celle.
+  List<double> _valoriBloccoDelimitato(String testoFraTag) => _numeroRateo
+      .allMatches(testoFraTag)
+      .map((m) => _toDouble(m.group(0)!))
+      .toList();
+
+  // Interpreta gli 0-4 numeri grezzi (nell'ordine di apparizione nel testo)
+  // di un blocco ratei (Ferie, ROL o Ex festività) nella terna
+  // maturato/goduto/residuo — generalizza a tutte e 3 le categorie la
+  // disambiguazione a 3 numeri nata per le sole ex festività (bilancio
+  // "residuo = residuo A.P. + maturato - goduto", tolleranza 0,05):
+  // - 4 valori: lettura posizionale [residuo A.P., maturato, goduto,
+  //   residuo] — il conteggio stesso individua il significato di ogni
+  //   posizione (comportamento posizionale invariato rispetto a prima di
+  //   questo fix, che già leggeva così ROL/Ex festività). Il bilancio è
+  //   verificato anche qui, ma SOLO quando il chiamante passa
+  //   `verificaBilancio4Valori: true` (vedi doc sul parametro sotto): se non
+  //   torna, `maturato` torna `double.infinity` (stessa sentinella del caso
+  //   a 3 valori sotto) — mai un dato accettato in silenzio quando la
+  //   verifica è attiva e non torna;
+  // - 3 valori: due letture posizionali possibili — [maturato, goduto,
+  //   residuo] (nessun residuo A.P.) oppure [residuo A.P. (scartato),
+  //   maturato, residuo] (nessun goduto, cella lasciata vuota) —
+  //   disambiguate col bilancio (SEMPRE verificato qui, a differenza del
+  //   caso a 4 valori sopra: con soli 3 numeri il bilancio è l'UNICO modo di
+  //   scegliere fra le due letture, non un controllo opzionale aggiuntivo);
+  //   se NESSUNA delle due torna, `maturato` torna `double.infinity`
+  //   (sentinella: il chiamante la tratta come valore implausibile via
+  //   `_valoreRateoImplausibile`, stesso meccanismo di sempre); se tornano
+  //   ENTRAMBE (caso degenere goduto=0, le due condizioni diventano
+  //   aritmeticamente identiche) `ambiguo` è `true` e il chiamante deve
+  //   segnalarlo esplicitamente, non scegliere in silenzio;
+  // - 2 valori: [maturato, residuo], residuo A.P. e goduto impliciti a
+  //   zero — visto sui PDF reali quando nessuno dei due è presente quel
+  //   mese;
+  // - 0 o 1 valori: dati insufficienti, `null` ("non trovati").
+  //
+  // [verificaBilancio4Valori] esiste perché il caso a 4 valori NON è
+  // ugualmente rischioso per tutte e 3 le categorie. ROL/Ex festività (vedi
+  // `_valoriBloccoDelimitato`) sono delimitati da tag SU ENTRAMBI I LATI: i
+  // 4 numeri raccolti sono sempre esattamente il contenuto delle celle,
+  // senza rischio di includerne uno estraneo — imporre lì il bilancio
+  // scarterebbe dati legittimi che quel controllo non è mai stato pensato
+  // per validare (es. un residuo alto ma legittimo accumulato in più anni
+  // senza godimento, vedi test dedicato). Ferie invece cammina a ritroso
+  // tramite `_valoriFerieARitroso`, priva di un'ancora testuale sul lato
+  // sinistro del blocco: il valore raccolto in posizione "residuo A.P." può
+  // essere un numero incollato SENZA spazio a una riga precedente non
+  // correlata (vedi doc di libreria in testa al file) — per questa SOLA
+  // categoria un bilancio che non torna è un segnale utile che uno dei 4
+  // numeri raccolti non è quello giusto, quindi il chiamante Ferie in
+  // `parse()` passa `true`; ROL/Ex festività lasciano il default `false`.
+  ({double maturato, double goduto, double residuo, bool ambiguo})?
+      _interpretaBloccoRatei(
+    List<double> valori, {
+    bool verificaBilancio4Valori = false,
+  }) {
+    switch (valori.length) {
+      case 0:
+      case 1:
+        return null;
+      case 2:
+        return (
+          maturato: valori[0],
+          goduto: 0,
+          residuo: valori[1],
+          ambiguo: false,
+        );
+      case 3:
+        final n1 = valori[0], n2 = valori[1], n3 = valori[2];
+        const tolleranza = 0.05;
+        final mancaResiduoAP = (n3 - (n1 - n2)).abs() <= tolleranza;
+        final mancaGoduto = (n3 - (n1 + n2)).abs() <= tolleranza;
+        if (mancaResiduoAP && mancaGoduto) {
+          return (maturato: 0, goduto: 0, residuo: 0, ambiguo: true);
+        } else if (mancaResiduoAP) {
+          return (maturato: n1, goduto: n2, residuo: n3, ambiguo: false);
+        } else if (mancaGoduto) {
+          return (maturato: n2, goduto: 0, residuo: n3, ambiguo: false);
+        } else {
+          return (
+            maturato: double.infinity,
+            goduto: 0,
+            residuo: 0,
+            ambiguo: false,
+          );
+        }
+      default:
+        // 4 (o più: tronca alle ultime 4, le più vicine al tag di
+        // chiusura) — lettura posizionale [residuo A.P., maturato, goduto,
+        // residuo] (vedi doc sopra la firma per il perché la verifica di
+        // bilancio è condizionata a [verificaBilancio4Valori]).
+        final ultimi4 =
+            valori.length > 4 ? valori.sublist(valori.length - 4) : valori;
+        final residuoAnnoPrecedente4 = ultimi4[0];
+        final maturato4 = ultimi4[1];
+        final goduto4 = ultimi4[2];
+        final residuo4 = ultimi4[3];
+        if (verificaBilancio4Valori &&
+            (residuo4 - (residuoAnnoPrecedente4 + maturato4 - goduto4)).abs() >
+                0.05) {
+          // Bilancio non verificato: stessa sentinella del caso a 3 valori
+          // sopra, mai un dato accettato in silenzio.
+          return (
+            maturato: double.infinity,
+            goduto: 0,
+            residuo: 0,
+            ambiguo: false,
+          );
+        }
+        return (
+          maturato: maturato4,
+          goduto: goduto4,
+          residuo: residuo4,
+          ambiguo: false,
+        );
+    }
+  }
+
+  // Valori finali (maturato/goduto/residuo) di una categoria letta per
+  // coordinate: implausibilità e bilancio sono verificati anche qui (stessa
+  // tolleranza/soglia del percorso testuale) — le coordinate non soffrono
+  // dell'artefatto "numeri incollati" del testo linearizzato, ma un
+  // controllo di coerenza costa poco ed evita di fidarsi ciecamente di una
+  // lettura comunque derivata dal riconoscimento di un layout di pagina.
+  // Un'incoerenza di bilancio (ma valori singolarmente plausibili) NON
+  // scarta il dato: aggiunge solo un warning, gli stessi valori letti
+  // restano quelli salvati (stesso principio del controllo incrociato
+  // lordo/totale competenze più sotto in `parse()`).
+  ({double maturato, double goduto, double residuo}) _assegnaDaCoordinate(
+    RateoCategoria dati,
+    List<String> warnings,
+    String categoria,
+  ) {
+    final residuoAnnoPrecedente = dati.residuoAnnoPrecedente ?? 0;
+    final maturato = dati.maturato ?? 0;
+    final goduto = dati.goduto ?? 0;
+    final residuo = dati.residuo ?? 0;
+    if (_valoreRateoImplausibile(maturato) ||
+        _valoreRateoImplausibile(goduto) ||
+        _valoreRateoImplausibile(residuo)) {
+      warnings.add(
+        'dati $categoria scartati: valore implausibile letto dalle '
+        'coordinate del PDF, verifica manualmente',
+      );
+      return (maturato: 0, goduto: 0, residuo: 0);
+    }
+    if ((residuo - (residuoAnnoPrecedente + maturato - goduto)).abs() > 0.05) {
+      warnings.add(
+        'dati $categoria: il bilancio residuo = residuo anno precedente + '
+        'maturato - goduto non torna sui valori letti dalle coordinate '
+        'del PDF (differenza oltre la tolleranza), verifica manualmente',
+      );
+    }
+    return (maturato: maturato, goduto: goduto, residuo: residuo);
+  }
+
+  // Chiave usata nella mappa `trattenute` per modellare esplicitamente la
+  // differenza di arrotondamento ARR. PRECED./ARR. ATTUALE del percorso a
+  // coordinate (vedi `_trattenuteDaCoordinate`) — MAI nascosta in un residuo
+  // generico "Altre trattenute" come nel percorso testuale storico.
+  static const _chiaveArrotondamento =
+      'Differenza di arrotondamento (mese precedente/attuale)';
+
+  // Competenze lette per coordinate: solo le righe in colonna COMPETENZE con
+  // flag N (vedi doc su [RigaVoceCoordinate.flagN]) — le righe senza flag N
+  // sono puramente informative (es. "823 Addizionale Regionale Dovuta") e
+  // non vanno sommate al lordo.
+  List<VoceCompetenza> _competenzeDaCoordinate(VociEstratteDaCoordinate voci) {
+    return [
+      for (final riga in voci.righe)
+        if (riga.colonna == ColonnaVoceCoordinate.competenze && riga.flagN)
+          VoceCompetenza(
+            descrizione: riga.descrizione,
+            quantita: riga.quantita,
+            importo: riga.importo,
+          ),
+    ];
+  }
+
+  // Trattenute lette per coordinate: quote C/DIPENDENTE dei contributi +
+  // IRPEF + righe della tabella voci in colonna TRATTENUTE con flag N (es.
+  // "828 Rata Addizionale Regionale") + una voce esplicita per la
+  // differenza di arrotondamento ARR. PRECED./ARR. ATTUALE (vedi doc di
+  // libreria in testa al file: "mai nascosta nel residuo 'Altre
+  // trattenute'"), aggiunta solo quando non trascurabile. Solo chiamata
+  // quando `voci.haDatiSufficienti` (quindi `voci.totali` non nullo).
+  Map<String, double> _trattenuteDaCoordinate(
+    VociEstratteDaCoordinate voci,
+    List<String> warnings,
+  ) {
+    final trattenute = <String, double>{...voci.contributiDipendente};
+
+    if (voci.irpefTrattenuta != null) {
+      trattenute['IRPEF'] = voci.irpefTrattenuta!;
+    } else {
+      warnings.add(
+        'trattenuta IRPEF non trovata dalle coordinate del PDF, verifica manualmente',
+      );
+    }
+
+    for (final riga in voci.righe) {
+      if (riga.colonna == ColonnaVoceCoordinate.trattenute && riga.flagN) {
+        trattenute[riga.descrizione] = riga.importo;
+      }
+    }
+
+    final totali = voci.totali!;
+    final arrotondamento = totali.arrPreced - totali.arrAttuale;
+    if (arrotondamento.abs() > 0.005) {
+      trattenute[_chiaveArrotondamento] = arrotondamento;
+    }
+
+    final sommaTrattenuteNominate = trattenute.entries
+        .where((e) => e.key != _chiaveArrotondamento)
+        .fold(0.0, (somma, e) => somma + e.value);
+    if ((sommaTrattenuteNominate - totali.totaleTrattenute).abs() > 0.05) {
+      warnings.add(
+        'trattenute calcolate (€${sommaTrattenuteNominate.toStringAsFixed(2)}) '
+        'divergono dal totale trattenute stampato sul PDF '
+        '(€${totali.totaleTrattenute.toStringAsFixed(2)}): verifica manualmente',
+      );
+    }
+
+    return trattenute;
+  }
 
   // Ore lavorate reali ("ORE LAV.", campo del blocco "Q.T.A." del
   // cedolino, distinto da "SETT. RETR."/"GG. RETR."/"GG. LAV." sulla
@@ -336,7 +790,11 @@ class BustaPagaRegexParser {
     return null;
   }
 
-  BustaPagaEstratti parse(String testo) {
+  BustaPagaEstratti parse(
+    String testo, [
+    RateiEstrattiDaCoordinate? ratei,
+    VociEstratteDaCoordinate? voci,
+  ]) {
     final warnings = <String>[];
 
     // --- periodo ---
@@ -383,34 +841,48 @@ class BustaPagaRegexParser {
       }
     }
 
-    // --- competenze: voci individuali, escludendo ferie/permessi (già
-    // modellati altrove). Combina il pattern mensile (tag "GIORNI"/"ORE") e
-    // quello delle mensilità supplementari (tag "RATEI", vedi
-    // `_rigaVoceCompetenzaSupplementare`) — non si sovrappongono mai sullo
-    // stesso testo perché i tag sono letteralmente diversi. ---
-    final competenze = <VoceCompetenza>[];
-    int? primaCompetenzaMatchStart;
+    // --- competenze: preferisce le coordinate quando disponibili e
+    // sufficienti (vedi doc su [VociEstratteDaCoordinate]: il testo
+    // linearizzato perde la distinzione fra le colonne TRATTENUTE e
+    // COMPETENZE, oltre a non leggere affatto le righe senza tag
+    // GIORNI/ORE/RATEI), altrimenti il percorso testuale storico —
+    // escludendo ferie/permessi già modellati altrove, combinando il
+    // pattern mensile (tag "GIORNI"/"ORE") e quello delle mensilità
+    // supplementari (tag "RATEI", vedi `_rigaVoceCompetenzaSupplementare`,
+    // che non si sovrappongono mai sullo stesso testo perché i tag sono
+    // letteralmente diversi). `primaCompetenzaMatchStart` è calcolato
+    // SEMPRE dal testo, indipendentemente da quale fonte alimenta poi
+    // `competenze`: serve solo per delimitare `zonaRatei` più sotto. ---
     final matchCompetenze = [
       ..._rigaVoceCompetenza.allMatches(testo),
       ..._rigaVoceCompetenzaSupplementare.allMatches(testo),
     ]..sort((a, b) => a.start.compareTo(b.start));
-    for (final m in matchCompetenze) {
-      if (primaCompetenzaMatchStart == null || m.start < primaCompetenzaMatchStart) {
-        primaCompetenzaMatchStart = m.start;
+    final primaCompetenzaMatchStart =
+        matchCompetenze.isEmpty ? null : matchCompetenze.first.start;
+
+    final usaVociCoordinate = voci != null && voci.haDatiSufficienti;
+
+    final List<VoceCompetenza> competenze;
+    if (usaVociCoordinate) {
+      competenze = _competenzeDaCoordinate(voci);
+    } else {
+      final testuali = <VoceCompetenza>[];
+      for (final m in matchCompetenze) {
+        final descrizione = m.group(1)!.trim();
+        final descrizioneLower = descrizione.toLowerCase();
+        final esclusa = _descrizioniEscluseDaCompetenze
+            .any((prefisso) => descrizioneLower.startsWith(prefisso));
+        if (esclusa) continue;
+        final quantita = _toDouble(m.group(2)!);
+        final importoGroup = m.group(3);
+        final importo = importoGroup != null ? _toDouble(importoGroup) : 0.0;
+        testuali.add(VoceCompetenza(
+          descrizione: descrizione,
+          quantita: quantita,
+          importo: importo,
+        ));
       }
-      final descrizione = m.group(1)!.trim();
-      final descrizioneLower = descrizione.toLowerCase();
-      final esclusa = _descrizioniEscluseDaCompetenze
-          .any((prefisso) => descrizioneLower.startsWith(prefisso));
-      if (esclusa) continue;
-      final quantita = _toDouble(m.group(2)!);
-      final importoGroup = m.group(3);
-      final importo = importoGroup != null ? _toDouble(importoGroup) : 0.0;
-      competenze.add(VoceCompetenza(
-        descrizione: descrizione,
-        quantita: quantita,
-        importo: importo,
-      ));
+      competenze = testuali;
     }
 
     // --- lordo / straordinari: derivati dalla lista competenze (unica
@@ -423,7 +895,8 @@ class BustaPagaRegexParser {
     // +1000,00 e uno storno -1000,00), non un sintomo di "nessuna riga
     // riconosciuta".
     if (competenze.isEmpty) {
-      warnings.add('lordo non trovato (nessuna riga di competenza riconosciuta)');
+      warnings
+          .add('lordo non trovato (nessuna riga di competenza riconosciuta)');
     }
 
     // --- permessi riduz. orario goduti nel mese: somma tutte le righe
@@ -471,27 +944,46 @@ class BustaPagaRegexParser {
     if (oreLavorate == null) {
       double giorniOrdinari = 0;
       for (final voce in competenze) {
-        if (voce.descrizione.trim().toLowerCase().startsWith('retribuzione ordinaria')) {
-          giorniOrdinari += voce.quantita;
+        if (voce.descrizione
+            .trim()
+            .toLowerCase()
+            .startsWith('retribuzione ordinaria')) {
+          // `?? 0`: mai osservata una "Retribuzione ordinaria" priva di
+          // quantità (sempre tag "GIORNI" sul PDF), rete di sicurezza
+          // richiesta comunque dal tipo nullable di `quantita`.
+          giorniOrdinari += voce.quantita ?? 0;
         }
       }
       if (giorniOrdinari > 0) {
         oreLavorate = giorniOrdinari * 8;
-        warnings.add('ore lavorate stimate da giorni×8, non lette direttamente');
+        warnings
+            .add('ore lavorate stimate da giorni×8, non lette direttamente');
       } else {
         warnings.add('ore lavorate non determinabili');
       }
     }
 
-    // --- controllo incrociato: il "totale competenze" stampato dal software
-    // payroll subito dopo "ORE LAV." nel blocco Q.T.A. (vedi
-    // _totaleCompetenzeDopoOreLavorate) contro il lordo calcolato dalla
-    // somma delle voci di competenza. Solo quando "ore lavorate" è stato
-    // letto direttamente da un match non ambiguo (stesso ancoraggio, stessa
-    // garanzia di scoping): con un match ambiguo o assente non c'è una
-    // posizione affidabile da cui cercare il terzo numero. Non altera mai
-    // `lordo`, solo segnala una divergenza. ---
-    if (oreLavorateMatches.length == 1) {
+    // --- controllo incrociato: il "totale competenze" stampato sul PDF
+    // contro il lordo calcolato dalla somma delle voci di competenza. Sul
+    // percorso a coordinate la fonte è la riga totali (Y≈796, vedi
+    // [TotaliCoordinate]); sul percorso testuale, il numero stampato dal
+    // software payroll subito dopo "ORE LAV." nel blocco Q.T.A. (vedi
+    // _totaleCompetenzeDopoOreLavorate), disponibile solo quando "ore
+    // lavorate" è stato letto direttamente da un match non ambiguo (stesso
+    // ancoraggio, stessa garanzia di scoping) — con un match ambiguo o
+    // assente non c'è una posizione affidabile da cui cercare il terzo
+    // numero. In nessuno dei due casi si altera mai `lordo`, solo si
+    // segnala una divergenza. ---
+    if (usaVociCoordinate) {
+      final totaleStampato = voci.totali!.totaleCompetenze;
+      if ((totaleStampato - lordo).abs() > 0.05) {
+        warnings.add(
+          'lordo calcolato (€${lordo.toStringAsFixed(2)}) diverge dal '
+          'totale competenze stampato sul PDF (€${totaleStampato.toStringAsFixed(2)}): '
+          'verifica manualmente',
+        );
+      }
+    } else if (oreLavorateMatches.length == 1) {
       final dopoOreLavorate =
           segmentoQta.substring(oreLavorateMatches.first.end);
       final totaleMatch =
@@ -508,152 +1000,160 @@ class BustaPagaRegexParser {
       }
     }
 
-    // --- ferie / ROL / ex festività: cercati SOLO nel testo che precede la
-    // prima riga di competenza riconosciuta (vedi _rigaVoceCompetenza /
-    // _rigaVoceCompetenzaSupplementare) — senza questo scoping, un tag
-    // letterale "(GIORNI)"/"(ORE)" comparso per puro caso in una sezione
-    // successiva del documento (es. una nota fuori tabella) potrebbe essere
-    // scambiato per il blocco ratei reale, agganciandosi a numeri che non
-    // c'entrano nulla con Ferie/ROL/Ex festività. Su tutti i PDF/fixture
-    // reali disponibili (mensili E mensilità supplementari) il blocco ratei
-    // precede sempre la prima riga di competenza, quindi questo scoping non
-    // cambia il comportamento osservato. NOTA aggiornata dopo verifica su un
-    // PDF reale di una 14esima ("Mens.supplementare 6/2026"): a differenza
-    // dell'ipotesi precedente (non validata), il blocco ratei Ferie/ROL/Ex
-    // festività NON è assente sulle mensilità supplementari — è presente con
-    // la stessa struttura "(GIORNI)"/"(ORE)" del layout mensile, con i dati
-    // residui aggiornati al mese di erogazione.
+    // --- ferie / ROL / ex festività: fonte primaria [ratei] (lettura per
+    // coordinate, autoritativa quando presente per una categoria, vedi doc
+    // su [RateiEstrattiDaCoordinate]), altrimenti percorso testuale, cercato
+    // SOLO nel testo che precede la prima riga di competenza riconosciuta
+    // (vedi _rigaVoceCompetenza / _rigaVoceCompetenzaSupplementare) — senza
+    // questo scoping, un tag letterale "(GIORNI)"/"(ORE)" comparso per puro
+    // caso in una sezione successiva del documento (es. una nota fuori
+    // tabella) potrebbe essere scambiato per il blocco ratei reale,
+    // agganciandosi a numeri che non c'entrano nulla con Ferie/ROL/Ex
+    // festività. Su tutti i PDF/fixture reali disponibili (mensili E
+    // mensilità supplementari) il blocco ratei precede sempre la prima riga
+    // di competenza, quindi questo scoping non cambia il comportamento
+    // osservato. NOTA aggiornata dopo verifica su un PDF reale di una
+    // 14esima ("Mens.supplementare 6/2026"): a differenza dell'ipotesi
+    // precedente (non validata), il blocco ratei Ferie/ROL/Ex festività NON
+    // è assente sulle mensilità supplementari — è presente con la stessa
+    // struttura "(GIORNI)"/"(ORE)" del layout mensile, con i dati residui
+    // aggiornati al mese di erogazione.
     final zonaRatei = primaCompetenzaMatchStart != null
         ? testo.substring(0, primaCompetenzaMatchStart)
         : testo;
 
-    // --- ferie / ROL (maturati, goduti, residui) ---
+    // Posizioni dei tag che delimitano i 3 blocchi, indipendenti dal
+    // successo del parsing dei NUMERI di un blocco precedente (in
+    // particolare, la posizione del tag di chiusura Ex festività non
+    // dipende più dal match ROL — vedi doc di libreria in testa al file).
+    final idxGiorni = zonaRatei.indexOf(_tagGiorni);
+    final idxOre1 = idxGiorni != -1
+        ? zonaRatei.indexOf(_tagOre, idxGiorni + _tagGiorni.length)
+        : -1;
+    final idxOre2 = idxOre1 != -1
+        ? zonaRatei.indexOf(_tagOre, idxOre1 + _tagOre.length)
+        : -1;
+
+    // --- ferie (maturate, godute, residue) ---
     double ferieMaturate = 0, ferieGodute = 0, ferieResidue = 0;
-    final ferieMatch = _ratesFerie.firstMatch(zonaRatei);
-    if (ferieMatch != null) {
-      final maturate = _toDouble(ferieMatch.group(1)!);
-      final godute = _toDouble(ferieMatch.group(2)!);
-      final residue = _toDouble(ferieMatch.group(3)!);
-      if (_valoreRateoImplausibile(maturate) ||
-          _valoreRateoImplausibile(godute) ||
-          _valoreRateoImplausibile(residue)) {
+    final ferieDaCoordinate = ratei?.ferie;
+    if (ferieDaCoordinate != null && ferieDaCoordinate.haAlmenoUnValore) {
+      final esito = _assegnaDaCoordinate(ferieDaCoordinate, warnings, 'ferie');
+      ferieMaturate = esito.maturato;
+      ferieGodute = esito.goduto;
+      ferieResidue = esito.residuo;
+    } else if (idxGiorni != -1) {
+      final interpretato = _interpretaBloccoRatei(
+        _valoriFerieARitroso(zonaRatei.substring(0, idxGiorni)),
+        // SOLO qui fra le 3 categorie: vedi doc su `verificaBilancio4Valori`
+        // sopra `_interpretaBloccoRatei` per il perché (ROL/Ex festività,
+        // più sotto, restano al default `false`).
+        verificaBilancio4Valori: true,
+      );
+      if (interpretato == null) {
+        warnings.add('dati ferie non trovati');
+      } else if (interpretato.ambiguo) {
+        warnings.add(
+          'dati ferie ambigui: impossibile stabilire quale cella sia '
+          'vuota (residuo anno precedente o goduto) quando il "goduto" '
+          'candidato è zero, verifica manualmente',
+        );
+      } else if (_valoreRateoImplausibile(interpretato.maturato) ||
+          _valoreRateoImplausibile(interpretato.goduto) ||
+          _valoreRateoImplausibile(interpretato.residuo)) {
         warnings.add(
           'dati ferie scartati: valore implausibile estratto (probabile '
           'numero residuo anno precedente incollato senza spazio), '
           'verifica manualmente',
         );
       } else {
-        ferieMaturate = maturate;
-        ferieGodute = godute;
-        ferieResidue = residue;
+        ferieMaturate = interpretato.maturato;
+        ferieGodute = interpretato.goduto;
+        ferieResidue = interpretato.residuo;
       }
     } else {
       warnings.add('dati ferie non trovati');
     }
 
+    // --- ROL (maturati, goduti, residui) ---
     double rolMaturati = 0, rolGoduti = 0, rolResidui = 0;
-    final rolMatch = _ratesRol.firstMatch(zonaRatei);
-    if (rolMatch != null) {
-      final maturati = _toDouble(rolMatch.group(1)!);
-      final goduti = _toDouble(rolMatch.group(2)!);
-      final residui = _toDouble(rolMatch.group(3)!);
-      if (_valoreRateoImplausibile(maturati) ||
-          _valoreRateoImplausibile(goduti) ||
-          _valoreRateoImplausibile(residui)) {
+    final rolDaCoordinate = ratei?.rol;
+    if (rolDaCoordinate != null && rolDaCoordinate.haAlmenoUnValore) {
+      final esito = _assegnaDaCoordinate(rolDaCoordinate, warnings, 'ROL');
+      rolMaturati = esito.maturato;
+      rolGoduti = esito.goduto;
+      rolResidui = esito.residuo;
+    } else if (idxGiorni != -1 && idxOre1 != -1) {
+      final interpretato = _interpretaBloccoRatei(
+        _valoriBloccoDelimitato(
+          zonaRatei.substring(idxGiorni + _tagGiorni.length, idxOre1),
+        ),
+      );
+      if (interpretato == null) {
+        warnings.add('dati ROL non trovati');
+      } else if (interpretato.ambiguo) {
+        warnings.add(
+          'dati ROL ambigui: impossibile stabilire quale cella sia vuota '
+          '(residuo anno precedente o goduto) quando il "goduto" '
+          'candidato è zero, verifica manualmente',
+        );
+      } else if (_valoreRateoImplausibile(interpretato.maturato) ||
+          _valoreRateoImplausibile(interpretato.goduto) ||
+          _valoreRateoImplausibile(interpretato.residuo)) {
         warnings.add(
           'dati ROL scartati: valore implausibile estratto (probabile '
           'numero residuo anno precedente incollato senza spazio), '
           'verifica manualmente',
         );
       } else {
-        rolMaturati = maturati;
-        rolGoduti = goduti;
-        rolResidui = residui;
+        rolMaturati = interpretato.maturato;
+        rolGoduti = interpretato.goduto;
+        rolResidui = interpretato.residuo;
       }
     } else {
       warnings.add('dati ROL non trovati');
     }
 
-    // --- ex festività (maturate, godute, residue): cercate solo nel testo
-    // subito dopo la fine del match ROL (all'interno della stessa zonaRatei
-    // scoped sopra), vedi _ratesExFestivita ---
-    double exFestivitaMaturate = 0, exFestivitaGodute = 0, exFestivitaResidue = 0;
-    if (rolMatch != null) {
-      final dopoRol = zonaRatei.substring(rolMatch.end);
-      final exFestivitaMatch = _ratesExFestivita.firstMatch(dopoRol);
-      if (exFestivitaMatch != null) {
-        double maturate, godute, residue;
-        if (exFestivitaMatch.group(1) != null) {
-          // 4 numeri: residuo A.P. (scartato), maturato, goduto, residuo —
-          // nessuna ambiguità.
-          maturate = _toDouble(exFestivitaMatch.group(2)!);
-          godute = _toDouble(exFestivitaMatch.group(3)!);
-          residue = _toDouble(exFestivitaMatch.group(4)!);
-        } else {
-          // Solo 3 numeri: il cedolino ha lasciato una cella vuota invece di
-          // stampare "0,00", ambiguo tra due letture — disambiguazione
-          // aritmetica (tolleranza per arrotondamenti) tra le due, vedi
-          // commento su _ratesExFestivita.
-          final n1 = _toDouble(exFestivitaMatch.group(2)!);
-          final n2 = _toDouble(exFestivitaMatch.group(3)!);
-          final n3 = _toDouble(exFestivitaMatch.group(4)!);
-          const tolleranza = 0.05;
-          // Bug noto e corretto: quando il "goduto" candidato (n2) è zero,
-          // le due condizioni sotto diventano matematicamente identiche
-          // (entrambe si riducono a "n3 == n1") — non è più possibile
-          // distinguere aritmeticamente quale cella sia realmente vuota
-          // (residuo A.P. o goduto). Verificale entrambe esplicitamente
-          // (non un semplice if/else in cascata) e, se sono entrambe
-          // soddisfatte, non scegliere in silenzio: segnala l'ambiguità.
-          final mancaResiduoAP = (n3 - (n1 - n2)).abs() <= tolleranza;
-          final mancaGoduto = (n3 - (n1 + n2)).abs() <= tolleranza;
-          if (mancaResiduoAP && mancaGoduto) {
-            // Nessun segnale testuale affidabile per disambiguare (a
-            // differenza del caso "3 vs 4 numeri", qui non c'è un'ancora
-            // non numerica da sfruttare): meglio segnalare l'incertezza
-            // che sbagliare in silenzio.
-            maturate = 0;
-            godute = 0;
-            residue = 0;
-            warnings.add(
-              'dati ex festività ambigui: impossibile stabilire quale '
-              'cella sia vuota (residuo anno precedente o goduto) quando '
-              'il "goduto" candidato è zero, verifica manualmente',
-            );
-          } else if (mancaResiduoAP) {
-            // Manca il residuo A.P. (es. neoassunto senza riporto):
-            // [maturato, goduto, residuo].
-            maturate = n1;
-            godute = n2;
-            residue = n3;
-          } else if (mancaGoduto) {
-            // Manca il goduto (cella vuota = 0,00): [residuo A.P.
-            // (scartato), maturato, residuo].
-            maturate = n2;
-            godute = 0;
-            residue = n3;
-          } else {
-            // Nessuna delle due interpretazioni torna aritmeticamente:
-            // tratta come dato implausibile, non indovinare.
-            maturate = double.infinity;
-            godute = 0;
-            residue = 0;
-          }
-        }
-        if (_valoreRateoImplausibile(maturate) ||
-            _valoreRateoImplausibile(godute) ||
-            _valoreRateoImplausibile(residue)) {
-          warnings.add(
-            'dati ex festività scartati: valore implausibile estratto, '
-            'verifica manualmente',
-          );
-        } else {
-          exFestivitaMaturate = maturate;
-          exFestivitaGodute = godute;
-          exFestivitaResidue = residue;
-        }
-      } else {
+    // --- ex festività (maturate, godute, residue) ---
+    double exFestivitaMaturate = 0,
+        exFestivitaGodute = 0,
+        exFestivitaResidue = 0;
+    final exFestivitaDaCoordinate = ratei?.exFestivita;
+    if (exFestivitaDaCoordinate != null &&
+        exFestivitaDaCoordinate.haAlmenoUnValore) {
+      final esito = _assegnaDaCoordinate(
+        exFestivitaDaCoordinate,
+        warnings,
+        'ex festività',
+      );
+      exFestivitaMaturate = esito.maturato;
+      exFestivitaGodute = esito.goduto;
+      exFestivitaResidue = esito.residuo;
+    } else if (idxOre1 != -1 && idxOre2 != -1) {
+      final interpretato = _interpretaBloccoRatei(
+        _valoriBloccoDelimitato(
+          zonaRatei.substring(idxOre1 + _tagOre.length, idxOre2),
+        ),
+      );
+      if (interpretato == null) {
         warnings.add('dati ex festività non trovati');
+      } else if (interpretato.ambiguo) {
+        warnings.add(
+          'dati ex festività ambigui: impossibile stabilire quale '
+          'cella sia vuota (residuo anno precedente o goduto) quando '
+          'il "goduto" candidato è zero, verifica manualmente',
+        );
+      } else if (_valoreRateoImplausibile(interpretato.maturato) ||
+          _valoreRateoImplausibile(interpretato.goduto) ||
+          _valoreRateoImplausibile(interpretato.residuo)) {
+        warnings.add(
+          'dati ex festività scartati: valore implausibile estratto, '
+          'verifica manualmente',
+        );
+      } else {
+        exFestivitaMaturate = interpretato.maturato;
+        exFestivitaGodute = interpretato.goduto;
+        exFestivitaResidue = interpretato.residuo;
       }
     } else {
       warnings.add('dati ex festività non trovati');
@@ -662,62 +1162,81 @@ class BustaPagaRegexParser {
     // goduti coincidono con i ROL goduti.
     final permessiGoduti = rolGoduti;
 
-    // --- trattenute: INPS letto direttamente, il resto aggregato
-    // (inpsMatch calcolato più sopra, riusato anche per lo scoping di "ore
-    // lavorate") ---
-    final trattenute = <String, double>{};
-    double inpsImporto = 0;
-    if (inpsMatch != null) {
-      inpsImporto = _toDouble(inpsMatch.group(3)!);
-      trattenute['INPS'] = inpsImporto;
-    } else {
-      warnings.add('trattenuta INPS non trovata');
-    }
-
-    // --- netto: ultimo numero della riga dopo "Firma per quietanza"
-    // (firmaIndex calcolato più sopra) ---
+    // --- trattenute / netto: preferisce le coordinate quando disponibili e
+    // sufficienti (stessa fonte già usata sopra per `competenze`/`lordo`,
+    // vedi doc su [VociEstratteDaCoordinate] — la scelta resta
+    // tutto-o-niente, non per singolo campo). ---
+    final Map<String, double> trattenute;
     double? netto;
-
-    // --- trattenute nominate verificate: SOLO nel segmento tra la fine del
-    // match INPS e l'inizio di "Firma per quietanza" (vedi
-    // _rigaTrattenutaVerificata) ---
-    double trattenuteNominateExtra = 0;
-    if (inpsMatch != null && firmaIndex != -1 && firmaIndex > inpsMatch.end) {
-      final segmento = testo.substring(inpsMatch.end, firmaIndex);
-      for (final m in _rigaTrattenutaVerificata.allMatches(segmento)) {
-        final nome = m.group(1)!.trim();
-        final importo = _toDouble(m.group(3)!);
-        trattenute[nome] = importo;
-        trattenuteNominateExtra += importo;
+    if (usaVociCoordinate) {
+      trattenute = _trattenuteDaCoordinate(voci, warnings);
+      // Netto "grezzo" di riferimento (riga totali del PDF): usato solo per
+      // il controllo di coerenza "netto superiore al lordo" più sotto e come
+      // termine di paragone nella verifica aritmetica finale — il valore
+      // restituito resta comunque quello derivato (`nettoDerivato`).
+      netto = voci.totali!.nettoInBusta;
+    } else {
+      // --- percorso testuale (INVARIATO): INPS letto direttamente, il resto
+      // aggregato (inpsMatch calcolato più sopra, riusato anche per lo
+      // scoping di "ore lavorate") ---
+      final trattenuteTestuali = <String, double>{};
+      double inpsImporto = 0;
+      if (inpsMatch != null) {
+        inpsImporto = _toDouble(inpsMatch.group(3)!);
+        trattenuteTestuali['INPS'] = inpsImporto;
+      } else {
+        warnings.add('trattenuta INPS non trovata');
       }
-    }
 
-    if (firmaIndex != -1) {
-      final dopoFirma = testo.substring(firmaIndex + 'Firma per quietanza'.length);
-      final righeDopoFirma = dopoFirma.split('\n').where((r) => r.trim().isNotEmpty);
-      if (righeDopoFirma.isNotEmpty) {
-        final rigaNetto = righeDopoFirma.first.trim();
-        final numeri = RegExp(r'-?[\d.]+,\d{2}').allMatches(rigaNetto).toList();
-        if (numeri.isNotEmpty) {
-          final ultimo = numeri.last.group(0)!;
-          // Il "-" davanti all'ultimo numero è quasi sempre un artefatto di
-          // estrazione (due celle concatenate), non un netto negativo.
-          if (ultimo.startsWith('-')) {
-            netto = _toDouble(ultimo.substring(1));
-            warnings.add('netto: segno "-" iniziale scartato come probabile artefatto di estrazione, verificare');
-          } else {
-            netto = _toDouble(ultimo);
+      // --- trattenute nominate verificate: SOLO nel segmento tra la fine
+      // del match INPS e l'inizio di "Firma per quietanza" (vedi
+      // _rigaTrattenutaVerificata) ---
+      double trattenuteNominateExtra = 0;
+      if (inpsMatch != null && firmaIndex != -1 && firmaIndex > inpsMatch.end) {
+        final segmento = testo.substring(inpsMatch.end, firmaIndex);
+        for (final m in _rigaTrattenutaVerificata.allMatches(segmento)) {
+          final nome = m.group(1)!.trim();
+          final importo = _toDouble(m.group(3)!);
+          trattenuteTestuali[nome] = importo;
+          trattenuteNominateExtra += importo;
+        }
+      }
+
+      // --- netto: ultimo numero della riga dopo "Firma per quietanza"
+      // (firmaIndex calcolato più sopra) ---
+      if (firmaIndex != -1) {
+        final dopoFirma =
+            testo.substring(firmaIndex + 'Firma per quietanza'.length);
+        final righeDopoFirma =
+            dopoFirma.split('\n').where((r) => r.trim().isNotEmpty);
+        if (righeDopoFirma.isNotEmpty) {
+          final rigaNetto = righeDopoFirma.first.trim();
+          final numeri =
+              RegExp(r'-?[\d.]+,\d{2}').allMatches(rigaNetto).toList();
+          if (numeri.isNotEmpty) {
+            final ultimo = numeri.last.group(0)!;
+            // Il "-" davanti all'ultimo numero è quasi sempre un artefatto
+            // di estrazione (due celle concatenate), non un netto negativo.
+            if (ultimo.startsWith('-')) {
+              netto = _toDouble(ultimo.substring(1));
+              warnings.add(
+                  'netto: segno "-" iniziale scartato come probabile artefatto di estrazione, verificare');
+            } else {
+              netto = _toDouble(ultimo);
+            }
           }
         }
       }
-    }
-    if (netto == null) warnings.add('netto non trovato');
+      if (netto == null) warnings.add('netto non trovato');
 
-    if (netto != null && lordo > 0 && inpsImporto > 0) {
-      final resto = lordo - netto - inpsImporto - trattenuteNominateExtra;
-      if (resto > 0.01) {
-        trattenute['Altre trattenute (IRPEF + varie)'] = double.parse(resto.toStringAsFixed(2));
+      if (netto != null && lordo > 0 && inpsImporto > 0) {
+        final resto = lordo - netto - inpsImporto - trattenuteNominateExtra;
+        if (resto > 0.01) {
+          trattenuteTestuali['Altre trattenute (IRPEF + varie)'] =
+              double.parse(resto.toStringAsFixed(2));
+        }
       }
+      trattenute = trattenuteTestuali;
     }
 
     if (netto != null && lordo > 0 && netto > lordo) {
@@ -725,12 +1244,29 @@ class BustaPagaRegexParser {
     }
 
     // Il valore finale di `netto` è sempre quello derivato (lordo -
-    // trattenute, incluso l'eventuale residuo "Altre trattenute" appena
-    // calcolato sopra) — non il valore grezzo letto dal PDF, che resta usato
-    // solo come input intermedio per calcolare quel residuo e per il
-    // controllo di coerenza "netto superiore al lordo" appena sopra.
+    // trattenute, incluso l'eventuale residuo "Altre trattenute"/la voce di
+    // arrotondamento calcolati sopra) — non il valore grezzo letto dal PDF,
+    // che resta usato solo come input intermedio e per il controllo di
+    // coerenza "netto superiore al lordo" appena sopra.
     final nettoDerivato =
         netto != null ? computeNetto(lordo, trattenute) : null;
+
+    // Verifica aritmetica aggiuntiva (solo percorso a coordinate, dove è
+    // attesa una riconciliazione esatta col netto stampato — vedi doc su
+    // [TotaliCoordinate]): se il netto derivato diverge comunque dal netto
+    // in busta stampato, segnala un warning invece di restituire un dato
+    // silenziosamente inconsistente (può succedere se una riga della
+    // tabella voci non è stata riconosciuta correttamente su un layout non
+    // ancora osservato).
+    if (usaVociCoordinate &&
+        nettoDerivato != null &&
+        (nettoDerivato - voci.totali!.nettoInBusta).abs() > 0.05) {
+      warnings.add(
+        'netto calcolato (€${nettoDerivato.toStringAsFixed(2)}) diverge dal '
+        'netto in busta stampato sul PDF (€${voci.totali!.nettoInBusta.toStringAsFixed(2)}): '
+        'verifica manualmente',
+      );
+    }
 
     return BustaPagaEstratti(
       periodo: periodo,

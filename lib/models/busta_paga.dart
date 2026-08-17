@@ -17,9 +17,18 @@ enum TipoBustaPaga { mensile, tredicesima, quattordicesima }
 /// contrattuale", "Straordinario diurno (30%)") estratta dal PDF o inserita
 /// manualmente nel form/dettaglio. `importo` è 0 quando la riga del PDF non
 /// riporta un importo monetario associato (es. righe di sola quantità).
+///
+/// `quantita` è invece NULLABLE: `null` quando la riga del PDF non riporta
+/// alcuna quantità (nessun tag GIORNI/ORE/RATEI, colonna quantità vuota —
+/// es. "930 Trattamento integrativo DL 3/2020", "942 Somma integrativa"),
+/// distinto da 0 stampato esplicitamente. Un "0" mostrato in UI per una riga
+/// che in realtà non ha alcuna quantità (giorni/ore) è fuorviante ("zero
+/// giorni/ore" invece di "nessuna quantità associata a questa voce") — va
+/// mostrato come assente (un trattino), sia in sola lettura sia in editing,
+/// vedi `BustaPagaCompetenzeSection`/`VoceCompetenzaEditRow`.
 class VoceCompetenza {
   final String descrizione;
-  final double quantita;
+  final double? quantita;
   final double importo;
 
   const VoceCompetenza({
@@ -49,10 +58,13 @@ double computeLordo(List<VoceCompetenza> competenze) =>
     competenze.fold(0.0, (somma, voce) => somma + voce.importo);
 
 /// Somma delle quantità (ore) delle voci di competenza "straordinario": lo
-/// "straordinari" derivato, stessa logica di [computeLordo].
+/// "straordinari" derivato, stessa logica di [computeLordo]. Una quantità
+/// ASSENTE (vedi [VoceCompetenza.quantita]) conta come 0 nella somma — un
+/// caso mai osservato per una voce di straordinario reale (sempre tag "ORE"
+/// sul PDF), ma il tipo nullable del campo richiede comunque di gestirlo.
 double computeStraordinari(List<VoceCompetenza> competenze) => competenze
     .where((voce) => voceEStraordinaria(voce.descrizione))
-    .fold(0.0, (somma, voce) => somma + voce.quantita);
+    .fold(0.0, (somma, voce) => somma + (voce.quantita ?? 0));
 
 /// Il "netto" derivato: [lordo] meno la somma di tutte le [trattenute],
 /// stessa logica di [computeLordo]/[computeStraordinari] — nessun clamp,

@@ -112,7 +112,22 @@ String formatNumber(double value) {
   return fixed.replaceAll('.', ',');
 }
 
-final NumberFormat _euroFormat = NumberFormat('#,##0.00', 'it_IT');
+final NumberFormat _fixedDecimalFormat = NumberFormat('#,##0.00', 'it_IT');
+
+/// Formatta un numero nel formato italiano con separatore delle migliaia
+/// (punto) e sempre esattamente due cifre decimali fisse (virgola) — a
+/// differenza di [formatNumber], che omette i decimali per i valori interi
+/// e non raggruppa le migliaia. Utile dove più valori formattati convivono
+/// nella stessa colonna/tabella e un numero di decimali incoerente (es.
+/// "9,13" sopra "16") renderebbe più difficile scansionarla a colpo
+/// d'occhio — usata dalle tabelle di riepilogo sotto i grafici in
+/// `buste_paga_statistiche_screen.dart` (ferie/permessi/straordinari, non
+/// importi in euro). Per importi in EURO usare [formatEuro] — stessa
+/// formattazione numerica, tenuta come funzione separata per chiarezza
+/// semantica nei punti di chiamata (valuta vs quantità generica).
+String formatNumberFixed(double value) {
+  return _fixedDecimalFormat.format(value);
+}
 
 /// Formatta un importo in EURO nel formato italiano: punto come separatore
 /// delle migliaia, virgola come separatore decimale, sempre esattamente due
@@ -122,7 +137,7 @@ final NumberFormat _euroFormat = NumberFormat('#,##0.00', 'it_IT');
 /// Riservata a netto, lordo, importi di competenze/trattenute e ogni altro
 /// valore espresso in euro.
 String formatEuro(double value) {
-  return _euroFormat.format(value);
+  return _fixedDecimalFormat.format(value);
 }
 
 /// Decide il prefisso con segno da mostrare per un importo di trattenuta, a
@@ -144,6 +159,23 @@ String trattenutaPrefix(double value) => value < 0 ? '+ € ' : '− € ';
 /// ("− € -3,50") — bug reale corretto qui, non un'ipotesi.
 String formatTrattenuta(double value) {
   return '${trattenutaPrefix(value)}${formatEuro(value.abs())}';
+}
+
+/// Formatta un importo in euro con prefisso "€ " anteponendo il segno "−"
+/// PRIMA del simbolo valuta per i valori negativi, invece di concatenare
+/// ingenuamente "€ " al risultato di [formatEuro] (che per un negativo
+/// produce già un "-" tutto suo, es. "€ -1.411,00" — un segno fuorviante,
+/// dopo il simbolo valuta invece che prima). Stessa coerenza già applicata a
+/// [formatTrattenuta]/[trattenutaPrefix], ma SENZA la loro inversione di
+/// segno (lì un valore positivo è "una trattenuta", quindi mostrato con "−";
+/// qui il segno mostrato corrisponde 1:1 al segno del valore, non è una
+/// trattenuta con convenzione invertita). Riservata a importi normalmente
+/// non negativi ma che possono eccezionalmente esserlo (es. il netto, se le
+/// trattenute superano il lordo) — bug reale corretto qui, non un'ipotesi.
+String formatEuroConSegno(double value) {
+  return value < 0
+      ? '− € ${formatEuro(value.abs())}'
+      : '€ ${formatEuro(value)}';
 }
 
 /// Converte un numero in formato italiano digitato dall'utente (punto come

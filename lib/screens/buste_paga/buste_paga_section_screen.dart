@@ -93,109 +93,139 @@ class _BustePagaSectionScreenState
 
   /// CTA "+": avvia direttamente l'import PDF, niente più form vuoto per
   /// inserimento manuale libero (vedi CLAUDE.md / piano sessione).
+  ///
+  /// Il guard di rientranza (`_importingPdf`) resta attivo per l'intera
+  /// durata del flusso — non solo per la selezione del file — dentro un
+  /// `try/finally`: senza questo, un tap sul "+" nella finestra tra la
+  /// chiusura del file picker e l'apertura effettiva del form (parsing,
+  /// controllo anti-duplicati, eventuale rinomina del file) apriva un
+  /// secondo file picker sopra il form — bug reale corretto qui, non
+  /// un'ipotesi. Il reset in `finally` copre anche i rami d'errore (return
+  /// anticipati) e non attende il pop del form: una volta chiamato
+  /// `Navigator.push`, il "+" sottostante non è comunque più raggiungibile
+  /// (coperto dalla schermata push-ata), quindi riabilitarlo súbito dopo non
+  /// crea alcuna finestra di doppio tap aggiuntiva, ed evita che resti
+  /// "in caricamento" fino a quando l'utente non chiude il form.
   Future<void> _startImport() async {
     if (_importingPdf) return;
     setState(() => _importingPdf = true);
-    final result = await _pdfImportService.pickAndImport();
-    if (!mounted) return;
-    setState(() => _importingPdf = false);
+    try {
+      final result = await _pdfImportService.pickAndImport();
+      if (!mounted) return;
 
-    switch (result.status) {
-      case PdfImportStatus.cancelled:
-        return;
-      case PdfImportStatus.noExtractableText:
-        _showImportError(
-          'PDF non supportato',
-          'Questo PDF sembra una scansione o un\'immagine, senza testo '
-              'selezionabile. In questa versione sono supportati solo PDF '
-              'testuali generati da un software paghe.',
-        );
-        return;
-      case PdfImportStatus.error:
-        _showImportError(
-          'Import non riuscito',
-          result.errorMessage ?? 'Si è verificato un errore imprevisto.',
-        );
-        return;
-      case PdfImportStatus.success:
-        break;
-    }
+      switch (result.status) {
+        case PdfImportStatus.cancelled:
+          return;
+        case PdfImportStatus.noExtractableText:
+          _showImportError(
+            'PDF non supportato',
+            'Questo PDF sembra una scansione o un\'immagine, senza testo '
+                'selezionabile. In questa versione sono supportati solo PDF '
+                'testuali generati da un software paghe.',
+          );
+          return;
+        case PdfImportStatus.error:
+          _showImportError(
+            'Import non riuscito',
+            result.errorMessage ?? 'Si è verificato un errore imprevisto.',
+          );
+          return;
+        case PdfImportStatus.success:
+          break;
+      }
 
-    final testo = result.extractedText;
-    final risultato =
-        testo == null ? null : _regexParser.parse(testo);
+      final testo = result.extractedText;
+      final risultato = testo == null
+          ? null
+          : _regexParser.parse(testo, result.ratei, result.voci);
 
-    if (risultato == null ||
-        (risultato.netto == null && risultato.periodo == null)) {
-      _showImportError(
-        'Formato non riconosciuto',
-        'Non è stato possibile riconoscere i dati principali in questo '
-            'PDF. Prova con un altro file oppure verifica che sia una '
-            'busta paga generata dal software paghe supportato.',
-      );
-      return;
-    }
-
-    final periodoEstratto = _periodoDaStringa(risultato.periodo);
-
-    // Controllo anti-duplicati subito dopo la scelta del file, prima di
-    // aprire il form di revisione: per le mensili anno+mese+tipo, per
-    // 13esima/14esima solo anno+tipo, stesso identico controllo già
-    // presente in `BustaPagaFormScreen._save()` (mantenuto lì come difesa
-    // in profondità, per il caso in cui l'utente cambi tipo/periodo mentre
-    // è già nel form). Il fallback del parser sul tipo (da "Mens.
-    // supplementare") rende ora affidabile bloccare qui, prima ancora di
-    // aprire il form.
-    if (periodoEstratto != null) {
-      final conflitto = ref.read(busteRepositoryProvider).any((b) {
-        if (b.tipo != risultato.tipo) return false;
-        if (risultato.tipo == TipoBustaPaga.mensile) {
-          return b.periodo.year == periodoEstratto.year &&
-              b.periodo.month == periodoEstratto.month;
-        }
-        return b.periodo.year == periodoEstratto.year;
-      });
-      if (conflitto) {
+      if (risultato == null ||
+          (risultato.netto == null && risultato.periodo == null)) {
+        // Il file è già stato copiato in `buste_paga_pdf/` da
+        // `pickAndImport()` prima ancora di arrivare qui: se il parser non
+        // riconosce i dati principali il form non si apre mai, va ripulito
+        // qui per non lasciare un PDF orfano su disco (vedi
+        // `BustePagaNotifier._sweepPdfOrfani` per la spazzata degli orfani
+        // già esistenti da prima di questo fix).
         await _pdfImportService.deleteFile(result.filePath!);
         if (!mounted) return;
         _showImportError(
-          'Busta paga già presente',
-          'Hai già una busta paga per '
-              '${periodoDisplayFor(periodo: periodoEstratto, tipo: risultato.tipo)} '
-              'in archivio. Per correggerla, modificala dal dettaglio invece '
-              'di reimportarla.',
+          'Formato non riconosciuto',
+          'Non è stato possibile riconoscere i dati principali in questo '
+              'PDF. Prova con un altro file oppure verifica che sia una '
+              'busta paga generata dal software paghe supportato.',
         );
         return;
       }
-    }
 
-    var fileOrigine = result.filePath!;
-    if (risultato.tipo != TipoBustaPaga.mensile && periodoEstratto != null) {
-      try {
-        fileOrigine = await _pdfImportService.rinominaPerSupplementare(
-          fileOrigine,
-          mese: periodoEstratto.month,
-          anno: periodoEstratto.year,
-        );
-      } catch (_) {
-        if (!mounted) return;
-        _showImportError(
-          'Import non riuscito',
-          'Impossibile preparare il file del documento, riprova.',
-        );
-        return;
+      final periodoEstratto = _periodoDaStringa(risultato.periodo);
+
+      // Controllo anti-duplicati subito dopo la scelta del file, prima di
+      // aprire il form di revisione: per le mensili anno+mese+tipo, per
+      // 13esima/14esima solo anno+tipo, stesso identico controllo già
+      // presente in `BustaPagaFormScreen._save()` (mantenuto lì come difesa
+      // in profondità, per il caso in cui l'utente cambi tipo/periodo mentre
+      // è già nel form). Il fallback del parser sul tipo (da "Mens.
+      // supplementare") rende ora affidabile bloccare qui, prima ancora di
+      // aprire il form.
+      if (periodoEstratto != null) {
+        final conflitto = ref.read(busteRepositoryProvider).any((b) {
+          if (b.tipo != risultato.tipo) return false;
+          if (risultato.tipo == TipoBustaPaga.mensile) {
+            return b.periodo.year == periodoEstratto.year &&
+                b.periodo.month == periodoEstratto.month;
+          }
+          return b.periodo.year == periodoEstratto.year;
+        });
+        if (conflitto) {
+          await _pdfImportService.deleteFile(result.filePath!);
+          if (!mounted) return;
+          _showImportError(
+            'Busta paga già presente',
+            'Hai già una busta paga per '
+                '${periodoDisplayFor(periodo: periodoEstratto, tipo: risultato.tipo)} '
+                'in archivio. Per correggerla, modificala dal dettaglio invece '
+                'di reimportarla.',
+          );
+          return;
+        }
       }
-    }
 
-    if (!mounted) return;
-    Navigator.of(context).push(
-      CupertinoPageRoute(
-        builder: (_) => BustaPagaFormScreen.daImport(
-          fileOrigine: fileOrigine,
-          estratti: risultato,
+      var fileOrigine = result.filePath!;
+      if (risultato.tipo != TipoBustaPaga.mensile && periodoEstratto != null) {
+        try {
+          fileOrigine = await _pdfImportService.rinominaPerSupplementare(
+            fileOrigine,
+            mese: periodoEstratto.month,
+            anno: periodoEstratto.year,
+          );
+        } catch (_) {
+          // La rinomina è fallita: `fileOrigine` non è stato riassegnato
+          // (l'`await` sopra non è arrivato a completare l'assignment),
+          // contiene quindi ancora il path del file copiato da
+          // `pickAndImport()` — va ripulito per non lasciare un orfano.
+          await _pdfImportService.deleteFile(fileOrigine);
+          if (!mounted) return;
+          _showImportError(
+            'Import non riuscito',
+            'Impossibile preparare il file del documento, riprova.',
+          );
+          return;
+        }
+      }
+
+      if (!mounted) return;
+      Navigator.of(context).push(
+        CupertinoPageRoute(
+          builder: (_) => BustaPagaFormScreen.daImport(
+            fileOrigine: fileOrigine,
+            estratti: risultato,
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      if (mounted) setState(() => _importingPdf = false);
+    }
   }
 
   /// Sostituisce il titolo "Archivio buste paga" con un campo di ricerca
@@ -255,12 +285,26 @@ class _BustePagaSectionScreenState
   /// Converte il periodo estratto dal parser (stringa `YYYY-MM`) in un
   /// `DateTime`, `null` se assente o malformato — stessa logica minimale di
   /// `_periodoFromEstratti` in `BustaPagaFormScreen`.
+  ///
+  /// Il mese è validato nell'intervallo 1-12: `DateTime(anno, mese)` da solo
+  /// accetta silenziosamente anche 0/13 e li normalizza rispettivamente a
+  /// dicembre dell'anno precedente/gennaio di quello successivo (es. un PDF
+  /// con "Mens.supplementare 13/2026" letto dal parser regex, il cui gruppo
+  /// mese non è a sua volta vincolato a 1-12) — un periodo silenziosamente
+  /// sbagliato invece di un mancato riconoscimento esplicito, bug reale
+  /// corretto qui, non un'ipotesi. Un periodo respinto qui torna `null`,
+  /// stesso trattamento di "periodo non trovato": il flusso di import
+  /// prosegue senza controllo anti-duplicati/rinomina basati sul periodo, e
+  /// il form che si apre subito dopo mostra comunque il warning "Periodo non
+  /// riconosciuto automaticamente" (vedi `_periodoFromEstratti` in
+  /// `BustaPagaFormScreen`, stesso fallback).
   DateTime? _periodoDaStringa(String? periodo) {
     if (periodo == null) return null;
     final parti = periodo.split('-');
     final anno = int.tryParse(parti.elementAtOrNull(0) ?? '');
     final mese = int.tryParse(parti.elementAtOrNull(1) ?? '');
     if (anno == null || mese == null) return null;
+    if (mese < 1 || mese > 12) return null;
     return DateTime(anno, mese);
   }
 
@@ -307,7 +351,8 @@ class _BustePagaSectionScreenState
     }();
 
     return Container(
-      color: CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
+      color:
+          CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
       child: Stack(
         children: [
           Column(
@@ -382,10 +427,10 @@ class _BustePagaSectionScreenState
                         child: CupertinoRangeSlider(
                           minDate: periodoRangeDisponibile.start,
                           maxDate: periodoRangeDisponibile.end,
-                          startValue:
-                              _periodoFiltro?.start ?? periodoRangeDisponibile.start,
-                          endValue:
-                              _periodoFiltro?.end ?? periodoRangeDisponibile.end,
+                          startValue: _periodoFiltro?.start ??
+                              periodoRangeDisponibile.start,
+                          endValue: _periodoFiltro?.end ??
+                              periodoRangeDisponibile.end,
                           onChanged: (range) =>
                               setState(() => _periodoFiltro = range),
                         ),
@@ -428,8 +473,8 @@ class _BustePagaSectionScreenState
                                     label: 'Cerca',
                                     button: true,
                                     child: SpringButton(
-                                      onPressed: () => setState(
-                                          () => _searchActive = true),
+                                      onPressed: () =>
+                                          setState(() => _searchActive = true),
                                       child: Container(
                                         width: 44,
                                         height: 44,
@@ -459,7 +504,8 @@ class _BustePagaSectionScreenState
                               searchActive: _searchActive,
                               query: _searchController.text,
                             ),
-                          _BustePagaTab.statistiche => BustePagaStatisticheScreen(
+                          _BustePagaTab.statistiche =>
+                            BustePagaStatisticheScreen(
                               periodoFiltro: _periodoFiltro,
                             ),
                         },
@@ -512,8 +558,8 @@ class _BustePagaSidecar extends StatelessWidget {
   Widget build(BuildContext context) {
     // Stesso colore della fascia di benvenuto in alto, usato per il "+" e
     // per il tab attivo.
-    final plusAccent = CupertinoDynamicColor.resolve(
-        AppColors.systemBlue, context);
+    final plusAccent =
+        CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
     final labelSecondary =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
 
@@ -558,8 +604,7 @@ class _BustePagaSidecar extends StatelessWidget {
               child: SpringButton(
                 onPressed: onAdd ?? () {},
                 child: ClipPath(
-                  clipper:
-                      const SquircleClipper(radius: AppRadius.glassSmall),
+                  clipper: const SquircleClipper(radius: AppRadius.glassSmall),
                   child: Container(
                     width: 48,
                     height: 48,

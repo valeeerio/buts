@@ -121,7 +121,12 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
           Expanded(
             flex: 2,
             child: Text(
-              formatNumber(voce.quantita),
+              // `—`: quantità ASSENTE (nessun tag GIORNI/ORE/RATEI sul PDF
+              // per questa riga, es. "930 Trattamento integrativo"), distinta
+              // da 0 stampato esplicitamente — vedi `VoceCompetenza.quantita`.
+              // Mostrare "0" sarebbe fuorviante ("zero giorni/ore" invece di
+              // "nessuna quantità associata").
+              voce.quantita == null ? '—' : formatNumber(voce.quantita!),
               style: valueStyle,
               textAlign: TextAlign.center,
             ),
