@@ -110,10 +110,8 @@ List<String> buildBustaPagaEditDiff(BustaPaga vecchia, BustaPaga nuova) {
   // (`lordoDisplay`/`nettoDisplay`), per coerenza di stile col resto di
   // questo popup (che mostra sempre "€ " per ogni altro importo) e senza
   // rischio di doppio segno.
-  addIfChanged('Netto', vecchia.netto, nuova.netto,
-      format: formatEuroConSegno);
-  addIfChanged('Lordo', vecchia.lordo, nuova.lordo,
-      format: formatEuroConSegno);
+  addIfChanged('Netto', vecchia.netto, nuova.netto, format: formatEuroConSegno);
+  addIfChanged('Lordo', vecchia.lordo, nuova.lordo, format: formatEuroConSegno);
   addIfChanged('Straordinari', vecchia.straordinari, nuova.straordinari);
   addIfChanged('Ferie maturate', vecchia.ferieMaturate, nuova.ferieMaturate);
   addIfChanged('Ferie godute', vecchia.ferieGodute, nuova.ferieGodute);
@@ -121,10 +119,9 @@ List<String> buildBustaPagaEditDiff(BustaPaga vecchia, BustaPaga nuova) {
   addIfChanged('ROL maturati', vecchia.rolMaturati, nuova.rolMaturati);
   addIfChanged('ROL goduti', vecchia.rolGoduti, nuova.rolGoduti);
   addIfChanged('ROL residui', vecchia.rolResidui, nuova.rolResidui);
+  addIfChanged('Permessi goduti', vecchia.permessiGoduti, nuova.permessiGoduti);
   addIfChanged(
-      'Permessi goduti', vecchia.permessiGoduti, nuova.permessiGoduti);
-  addIfChanged('Permessi (mese)', vecchia.permessiGodutiMese,
-      nuova.permessiGodutiMese);
+      'Permessi (mese)', vecchia.permessiGodutiMese, nuova.permessiGodutiMese);
   addIfChanged('Ex festività maturate', vecchia.exFestivitaMaturate,
       nuova.exFestivitaMaturate);
   addIfChanged('Ex festività godute', vecchia.exFestivitaGodute,
@@ -144,8 +141,7 @@ List<String> buildBustaPagaEditDiff(BustaPaga vecchia, BustaPaga nuova) {
     if (prima == null && dopo != null) {
       diff.add('Trattenuta $chiave: aggiunta (${formatTrattenuta(dopo)})');
     } else if (prima != null && dopo == null) {
-      diff.add(
-          'Trattenuta $chiave: rimossa (era ${formatTrattenuta(prima)})');
+      diff.add('Trattenuta $chiave: rimossa (era ${formatTrattenuta(prima)})');
     } else if (prima != null &&
         dopo != null &&
         formatEuro(prima) != formatEuro(dopo)) {
@@ -161,9 +157,7 @@ List<String> buildBustaPagaEditDiff(BustaPaga vecchia, BustaPaga nuova) {
   final vecchieCompetenze = {
     for (final v in vecchia.competenze) v.descrizione: v
   };
-  final nuoveCompetenze = {
-    for (final v in nuova.competenze) v.descrizione: v
-  };
+  final nuoveCompetenze = {for (final v in nuova.competenze) v.descrizione: v};
   final descrizioniCompetenze = {
     ...vecchieCompetenze.keys,
     ...nuoveCompetenze.keys
@@ -276,12 +270,12 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     _permessiGoduti = corrente.permessiGoduti;
     _permessiGodutiMese = corrente.permessiGodutiMese;
 
-    _exFestivitaMaturateCtrl = TextEditingController(
-        text: formatNumber(corrente.exFestivitaMaturate));
-    _exFestivitaGoduteCtrl = TextEditingController(
-        text: formatNumber(corrente.exFestivitaGodute));
-    _exFestivitaResidueCtrl = TextEditingController(
-        text: formatNumber(corrente.exFestivitaResidue));
+    _exFestivitaMaturateCtrl =
+        TextEditingController(text: formatNumber(corrente.exFestivitaMaturate));
+    _exFestivitaGoduteCtrl =
+        TextEditingController(text: formatNumber(corrente.exFestivitaGodute));
+    _exFestivitaResidueCtrl =
+        TextEditingController(text: formatNumber(corrente.exFestivitaResidue));
 
     _trattenuteEdit = corrente.trattenute.isEmpty
         ? [TrattenutaEditRow()]
@@ -301,8 +295,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                   // convenzione già in uso per `importo == 0` subito sotto —
                   // preserva l'assenza al salvataggio senza modifiche, vedi
                   // `VoceCompetenzaEditRow.quantitaValue`.
-                  quantita:
-                      v.quantita == null ? '' : formatNumber(v.quantita!),
+                  quantita: v.quantita == null ? '' : formatNumber(v.quantita!),
                   importo: v.importo == 0 ? '' : formatEuro(v.importo),
                 ))
             .toList();
@@ -687,7 +680,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                     isConfermato: corrente.statoVerifica ==
                         StatoVerificaBustaPaga.confermato,
                     periodoLabel: periodoLabelVista,
-                    isEditing: _isEditing,
                     lordoDisplay: formatEuroConSegno(_isEditing
                         ? _valoriDerivatiEditing(corrente).lordo
                         : corrente.lordo),
@@ -804,8 +796,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                                         i++)
                                       trattenutaEditRow(
                                         _trattenuteEdit[i],
-                                        onDismissed: () =>
-                                            _removeTrattenuta(i),
+                                        onDismissed: () => _removeTrattenuta(i),
                                       ),
                                     _aggiungiVoceButton(context),
                                   ]
@@ -935,7 +926,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       },
     );
   }
-
 }
 
 /// Barra flottante in basso: chip piatti senza superficie di vetro attorno

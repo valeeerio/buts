@@ -47,7 +47,6 @@ import 'liquid_glass_surface.dart';
 class BustaPagaHeroCard extends StatelessWidget {
   final bool isConfermato;
   final String periodoLabel;
-  final bool isEditing;
   final String lordoDisplay;
   final String nettoDisplay;
   final VoidCallback? onTapPeriodo;
@@ -57,7 +56,6 @@ class BustaPagaHeroCard extends StatelessWidget {
     super.key,
     required this.isConfermato,
     required this.periodoLabel,
-    required this.isEditing,
     required this.lordoDisplay,
     required this.nettoDisplay,
     this.onTapPeriodo,
@@ -79,8 +77,7 @@ class BustaPagaHeroCard extends StatelessWidget {
     final amountValueStyle =
         AppTextStyles.sectionTitle.copyWith(color: labelPrimary);
 
-    final labelStyle =
-        AppTextStyles.cardLabel.copyWith(color: labelSecondary);
+    final labelStyle = AppTextStyles.cardLabel.copyWith(color: labelSecondary);
 
     return LiquidGlassSurface(
       radius: AppRadius.glass,
@@ -137,8 +134,7 @@ class BustaPagaHeroCard extends StatelessWidget {
                           onTap: onTapTipo,
                           behavior: HitTestBehavior.opaque,
                           child: Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
                             child: Icon(CupertinoIcons.chevron_down,
                                 size: 12, color: labelSecondary),
                           ),
@@ -193,8 +189,7 @@ class BustaPagaHeroCard extends StatelessWidget {
                 ),
                 Container(
                   width: 0.5,
-                  margin:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                  margin: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
                   color: separator,
                 ),
                 Expanded(

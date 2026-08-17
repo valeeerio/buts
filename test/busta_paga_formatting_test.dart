@@ -49,8 +49,7 @@ void main() {
           expect(
             riletto,
             closeTo(valore, 0.001),
-            reason:
-                '$valore formattato come "$formattato" doveva rileggersi '
+            reason: '$valore formattato come "$formattato" doveva rileggersi '
                 'identico, non $riletto',
           );
         }
@@ -73,8 +72,7 @@ void main() {
     // ("€ 1435.40", "€ 16184.60", "9.13"), incoerente col formato italiano
     // (virgola decimale, punto delle migliaia) usato nel resto dell'app.
     // Valori reali osservati in app dopo l'import di 12 buste paga.
-    test('valori reali osservati nella tabella Netto/Lordo (Media/Totale)',
-        () {
+    test('valori reali osservati nella tabella Netto/Lordo (Media/Totale)', () {
       expect(formatNumberFixed(1435.40), '1.435,40');
       expect(formatNumberFixed(16184.60), '16.184,60');
     });
@@ -89,8 +87,7 @@ void main() {
       expect(formatNumberFixed(1.15), '1,15');
     });
 
-    test('valore reale osservato nella tabella Ferie e permessi (Minimo)',
-        () {
+    test('valore reale osservato nella tabella Ferie e permessi (Minimo)', () {
       expect(formatNumberFixed(1.67), '1,67');
     });
 
@@ -165,8 +162,7 @@ void main() {
           expect(
             riletto,
             closeTo(valore, 0.001),
-            reason:
-                '$valore formattato come "$formattato" doveva rileggersi '
+            reason: '$valore formattato come "$formattato" doveva rileggersi '
                 'identico, non $riletto',
           );
           sommaRiletta += riletto;
@@ -201,7 +197,8 @@ void main() {
       expect(formatTrattenuta(90.11), '− € 90,11');
     });
 
-    test('importo negativo (accredito/conguaglio): prefisso "+ €", valore '
+    test(
+        'importo negativo (accredito/conguaglio): prefisso "+ €", valore '
         'assoluto, mai un doppio segno', () {
       expect(formatTrattenuta(-3.50), '+ € 3,50');
       expect(formatTrattenuta(-3.50).contains('-'), isFalse);

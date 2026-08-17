@@ -31,7 +31,6 @@ Widget inlineNumberField(
   String? prefix,
   String? suffix,
   MainAxisAlignment rowAlignment = MainAxisAlignment.center,
-  bool allowNegative = false,
 }) {
   return Builder(
     builder: (context) {
@@ -45,8 +44,7 @@ Widget inlineNumberField(
         controller: controller,
         placeholder: '0',
         textAlign: TextAlign.center,
-        keyboardType: TextInputType.numberWithOptions(
-            decimal: true, signed: allowNegative),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
         decoration: const BoxDecoration(),
         padding: EdgeInsets.zero,
         style: resolvedStyle,
@@ -137,7 +135,8 @@ class TrattenutaEditRow {
 /// eliminare una busta paga in `BusteePagaArchivioView`), senza alert di
 /// conferma: qui si rimuove solo una riga dallo stato locale di
 /// modifica/import, ancora reversibile con "Annulla".
-Widget trattenutaEditRow(TrattenutaEditRow row, {required VoidCallback onDismissed}) {
+Widget trattenutaEditRow(TrattenutaEditRow row,
+    {required VoidCallback onDismissed}) {
   return Dismissible(
     key: ValueKey(row.id),
     direction: DismissDirection.endToStart,

@@ -84,78 +84,78 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
         ).createShader(rect);
       },
       child: CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.screenHorizontal,
-            AppSpacing.lg,
-            AppSpacing.screenHorizontal,
-            AppSpacing.md,
-          ),
-          sliver: SliverToBoxAdapter(
-            child: _ChartCard(
-              title: 'Netto e lordo nel tempo',
-              legend: const [
-                _LegendEntry(label: 'Netto', color: _nettoColor),
-                _LegendEntry(label: 'Lordo', color: _lordoColor),
-              ],
-              chart: _NettoLordoChart(
-                buste: filtrati,
-                busteNonConfermate: busteNonConfermate,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screenHorizontal,
+              AppSpacing.lg,
+              AppSpacing.screenHorizontal,
+              AppSpacing.md,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: _ChartCard(
+                title: 'Netto e lordo nel tempo',
+                legend: const [
+                  _LegendEntry(label: 'Netto', color: _nettoColor),
+                  _LegendEntry(label: 'Lordo', color: _lordoColor),
+                ],
+                chart: _NettoLordoChart(
+                  buste: filtrati,
+                  busteNonConfermate: busteNonConfermate,
+                ),
+                stats: _nettoLordoStats(filtrati),
               ),
-              stats: _nettoLordoStats(filtrati),
             ),
           ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.screenHorizontal,
-            0,
-            AppSpacing.screenHorizontal,
-            AppSpacing.md,
-          ),
-          sliver: SliverToBoxAdapter(
-            child: _ChartCard(
-              title: 'Ferie e permessi',
-              legend: const [
-                _LegendEntry(label: 'Ferie residue', color: _ferieColor),
-                _LegendEntry(label: 'Permessi residui', color: _rolColor),
-                _LegendEntry(
-                    label: 'Permessi orario goduti', color: _permessiColor),
-                _LegendEntry(
-                    label: 'Ex festività residue', color: _exFestivitaColor),
-              ],
-              chart: _FerieRolPermessiChart(
-                buste: filtrati,
-                busteNonConfermate: busteNonConfermate,
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screenHorizontal,
+              0,
+              AppSpacing.screenHorizontal,
+              AppSpacing.md,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: _ChartCard(
+                title: 'Ferie e permessi',
+                legend: const [
+                  _LegendEntry(label: 'Ferie residue', color: _ferieColor),
+                  _LegendEntry(label: 'Permessi residui', color: _rolColor),
+                  _LegendEntry(
+                      label: 'Permessi orario goduti', color: _permessiColor),
+                  _LegendEntry(
+                      label: 'Ex festività residue', color: _exFestivitaColor),
+                ],
+                chart: _FerieRolPermessiChart(
+                  buste: filtrati,
+                  busteNonConfermate: busteNonConfermate,
+                ),
+                stats: _ferieRolPermessiStats(filtrati),
               ),
-              stats: _ferieRolPermessiStats(filtrati),
             ),
           ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.screenHorizontal,
-            0,
-            AppSpacing.screenHorizontal,
-            AppSpacing.xl,
-          ),
-          sliver: SliverToBoxAdapter(
-            child: _ChartCard(
-              title: 'Straordinario per mese',
-              legend: const [
-                _LegendEntry(
-                    label: 'Ore straordinario', color: _straordinarioColor),
-              ],
-              chart: _StraordinarioChart(
-                buste: filtrati,
-                busteNonConfermate: busteNonConfermate,
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.screenHorizontal,
+              0,
+              AppSpacing.screenHorizontal,
+              AppSpacing.xl,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: _ChartCard(
+                title: 'Straordinario per mese',
+                legend: const [
+                  _LegendEntry(
+                      label: 'Ore straordinario', color: _straordinarioColor),
+                ],
+                chart: _StraordinarioChart(
+                  buste: filtrati,
+                  busteNonConfermate: busteNonConfermate,
+                ),
+                stats: _straordinarioStats(filtrati),
               ),
-              stats: _straordinarioStats(filtrati),
             ),
           ),
-        ),
-      ],
+        ],
       ),
     );
   }
@@ -176,8 +176,8 @@ class _NoDataMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final secondary = CupertinoDynamicColor.resolve(
-        AppColors.labelSecondary, context);
+    final secondary =
+        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
     final messaggio = busteNonConfermate <= 0
         ? 'Non ci sono dati'
         : busteNonConfermate == 1
@@ -254,8 +254,7 @@ class _ChartCard extends StatelessWidget {
               spacing: AppSpacing.md,
               runSpacing: AppSpacing.xs,
               children: [
-                for (final entry in legend)
-                  _LegendChip(entry: entry),
+                for (final entry in legend) _LegendChip(entry: entry),
               ],
             ),
             const SizedBox(height: AppSpacing.md),
@@ -299,8 +298,7 @@ class _StatsTable extends StatelessWidget {
         CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
     final dividerColor =
         CupertinoDynamicColor.resolve(AppColors.separator, context);
-    final headerStyle =
-        AppTextStyles.cardLabel.copyWith(color: labelColor);
+    final headerStyle = AppTextStyles.cardLabel.copyWith(color: labelColor);
     final labelStyle = AppTextStyles.cardLabel.copyWith(
       color: valueColor,
       fontWeight: FontWeight.w600,
@@ -318,7 +316,8 @@ class _StatsTable extends StatelessWidget {
     // "€ 1563.99 (mag '26)" in colonne strette): FittedBox lo restringe
     // fino a stare su una riga sola invece di lasciarlo wrappare — garanzia
     // strutturale indipendente dal numero di colonne del grafico.
-    Widget cell(String text, TextStyle style, {TextAlign align = TextAlign.center}) {
+    Widget cell(String text, TextStyle style,
+        {TextAlign align = TextAlign.center}) {
       return FittedBox(
         fit: BoxFit.scaleDown,
         alignment:
@@ -364,8 +363,8 @@ class _StatsTable extends StatelessWidget {
               children: withColumnDividers([
                 Expanded(
                   flex: 2,
-                  child: cell(data.righe[i].$1, labelStyle,
-                      align: TextAlign.left),
+                  child:
+                      cell(data.righe[i].$1, labelStyle, align: TextAlign.left),
                 ),
                 for (final valore in data.righe[i].$2)
                   Expanded(
@@ -385,16 +384,14 @@ class _StatsTable extends StatelessWidget {
 /// [buste] non vuota.
 BustaPaga _bustaConMinimo(
     List<BustaPaga> buste, double Function(BustaPaga) selettore) {
-  return buste.reduce(
-      (a, b) => selettore(a) <= selettore(b) ? a : b);
+  return buste.reduce((a, b) => selettore(a) <= selettore(b) ? a : b);
 }
 
 /// Trova la busta paga con il valore massimo secondo [selettore]. Richiede
 /// [buste] non vuota.
 BustaPaga _bustaConMassimo(
     List<BustaPaga> buste, double Function(BustaPaga) selettore) {
-  return buste.reduce(
-      (a, b) => selettore(a) >= selettore(b) ? a : b);
+  return buste.reduce((a, b) => selettore(a) >= selettore(b) ? a : b);
 }
 
 double _media(List<BustaPaga> buste, double Function(BustaPaga) selettore) {
@@ -430,29 +427,29 @@ _StatsTableData? _nettoLordoStats(List<BustaPaga> buste) {
       (
         'Media',
         [
-          '€ ${_formatStatNumber(_media(buste, (b) => b.netto))}',
-          '€ ${_formatStatNumber(_media(buste, (b) => b.lordo))}',
+          formatEuroConSegno(_media(buste, (b) => b.netto)),
+          formatEuroConSegno(_media(buste, (b) => b.lordo)),
         ],
       ),
       (
         'Minimo',
         [
-          '€ ${_formatStatNumber(minNetto.netto)} (${periodoAxisLabel(minNetto.periodo)})',
-          '€ ${_formatStatNumber(minLordo.lordo)} (${periodoAxisLabel(minLordo.periodo)})',
+          '${formatEuroConSegno(minNetto.netto)} (${periodoAxisLabel(minNetto.periodo)})',
+          '${formatEuroConSegno(minLordo.lordo)} (${periodoAxisLabel(minLordo.periodo)})',
         ],
       ),
       (
         'Massimo',
         [
-          '€ ${_formatStatNumber(maxNetto.netto)} (${periodoAxisLabel(maxNetto.periodo)})',
-          '€ ${_formatStatNumber(maxLordo.lordo)} (${periodoAxisLabel(maxLordo.periodo)})',
+          '${formatEuroConSegno(maxNetto.netto)} (${periodoAxisLabel(maxNetto.periodo)})',
+          '${formatEuroConSegno(maxLordo.lordo)} (${periodoAxisLabel(maxLordo.periodo)})',
         ],
       ),
       (
         'Totale',
         [
-          '€ ${_formatStatNumber(_totale(buste, (b) => b.netto))}',
-          '€ ${_formatStatNumber(_totale(buste, (b) => b.lordo))}',
+          formatEuroConSegno(_totale(buste, (b) => b.netto)),
+          formatEuroConSegno(_totale(buste, (b) => b.lordo)),
         ],
       ),
     ],
@@ -528,16 +525,26 @@ _StatsTableData? _straordinarioStats(List<BustaPaga> buste) {
   return (
     colonne: const ['Ore straordinario'],
     righe: [
-      ('Media', ['${_formatStatNumber(_media(buste, (b) => b.straordinari))} h/mese']),
+      (
+        'Media',
+        ['${_formatStatNumber(_media(buste, (b) => b.straordinari))} h/mese']
+      ),
       (
         'Minimo',
-        ['${_formatStatNumber(min.straordinari)} h (${periodoAxisLabel(min.periodo)})'],
+        [
+          '${_formatStatNumber(min.straordinari)} h (${periodoAxisLabel(min.periodo)})'
+        ],
       ),
       (
         'Massimo',
-        ['${_formatStatNumber(max.straordinari)} h (${periodoAxisLabel(max.periodo)})'],
+        [
+          '${_formatStatNumber(max.straordinari)} h (${periodoAxisLabel(max.periodo)})'
+        ],
       ),
-      ('Totale', ['${_formatStatNumber(_totale(buste, (b) => b.straordinari))} h']),
+      (
+        'Totale',
+        ['${_formatStatNumber(_totale(buste, (b) => b.straordinari))} h']
+      ),
     ],
   );
 }
@@ -802,10 +809,9 @@ AxisTitles _periodoBottomAxisTitles({
   // `intervalSteps`, la stessa distanza minima già usata per evitare
   // sovrapposizioni fra due tick regolari) a un confine, invece di mostrarli
   // entrambi adiacenti.
-  final shown = <int>{...gridIndices, ...confiniAnno}
-    ..removeWhere((i) =>
-        !confiniAnno.contains(i) &&
-        confiniAnno.any((c) => (i - c).abs() < intervalSteps));
+  final shown = <int>{...gridIndices, ...confiniAnno}..removeWhere((i) =>
+      !confiniAnno.contains(i) &&
+      confiniAnno.any((c) => (i - c).abs() < intervalSteps));
   return AxisTitles(
     sideTitles: SideTitles(
       showTitles: true,
@@ -846,8 +852,8 @@ AxisTitles _valueLeftAxisTitles({
           padding: const EdgeInsets.only(right: 6),
           child: Text(
             formatValue(value),
-            style: AppTextStyles.cardLabel.copyWith(
-                color: labelColor, fontSize: 10),
+            style: AppTextStyles.cardLabel
+                .copyWith(color: labelColor, fontSize: 10),
           ),
         );
       },
@@ -949,7 +955,7 @@ class _NettoLordoChart extends StatelessWidget {
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               leftTitles: _valueLeftAxisTitles(
                 labelColor: labelColor,
-                formatValue: (v) => '€${formatEuro(v)}',
+                formatValue: formatEuroConSegno,
               ),
               bottomTitles: _periodoBottomAxisTitles(
                 periodi: [for (final g in griglia) g.periodo],
@@ -999,8 +1005,8 @@ class _NettoLordoChart extends StatelessWidget {
     if (busta == null) return null;
     final label = spot.barIndex == 0 ? 'Netto' : 'Lordo';
     final text = showPeriodo
-        ? '${periodoAxisLabel(busta.periodo)}\n$label: €${formatEuro(spot.y)}'
-        : '$label: €${formatEuro(spot.y)}';
+        ? '${periodoAxisLabel(busta.periodo)}\n$label: ${formatEuroConSegno(spot.y)}'
+        : '$label: ${formatEuroConSegno(spot.y)}';
     return LineTooltipItem(
       text,
       AppTextStyles.cardLabel.copyWith(
@@ -1295,8 +1301,8 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
         0, (max, p) => (p.totale ?? 0) > max ? p.totale! : max);
     final maxIndex =
         punti.indexWhere((p) => p.totale != null && p.totale == maxValue);
-    final bounds = _niceAxisBounds(0, maxValue <= 0 ? 1 : maxValue * 1.2,
-        step: 20);
+    final bounds =
+        _niceAxisBounds(0, maxValue <= 0 ? 1 : maxValue * 1.2, step: 20);
 
     Widget buildPlot({required double width, required bool showLeftAxis}) {
       return SizedBox(
@@ -1320,8 +1326,7 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               leftTitles: showLeftAxis
                   ? _valueLeftAxisTitles(labelColor: labelColor)
-                  : const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
+                  : const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               bottomTitles: _periodoBottomAxisTitles(
                 periodi: [for (final p in punti) p.periodo],
                 availableWidth: width,
@@ -1399,8 +1404,7 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
       builder: (context, constraints) {
         final viewportWidth = constraints.maxWidth;
         final contentWidth = punti.length * _minGroupSlotWidth;
-        final needsScroll =
-            contentWidth > viewportWidth - _leftAxisWidth;
+        final needsScroll = contentWidth > viewportWidth - _leftAxisWidth;
 
         if (!needsScroll) {
           return buildPlot(width: viewportWidth, showLeftAxis: true);

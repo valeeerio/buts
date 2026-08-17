@@ -115,8 +115,9 @@ class _CupertinoRangeSliderState extends State<CupertinoRangeSlider>
   }
 
   DateTime _dateFor(double fraction) {
-    final monthsOffset =
-        (_totalMonths * fraction.clamp(0.0, 1.0)).round().clamp(0, _totalMonths);
+    final monthsOffset = (_totalMonths * fraction.clamp(0.0, 1.0))
+        .round()
+        .clamp(0, _totalMonths);
     return DateTime(widget.minDate.year, widget.minDate.month + monthsOffset);
   }
 
@@ -148,10 +149,10 @@ class _CupertinoRangeSliderState extends State<CupertinoRangeSlider>
     // La maniglia attiva è quella più vicina al punto toccato — permette di
     // afferrare l'una o l'altra toccando in un punto qualunque della barra,
     // non solo esattamente sul pallino.
-    final handle = (fraction - _startFraction).abs() <=
-            (fraction - _endFraction).abs()
-        ? _Handle.start
-        : _Handle.end;
+    final handle =
+        (fraction - _startFraction).abs() <= (fraction - _endFraction).abs()
+            ? _Handle.start
+            : _Handle.end;
     _activeHandle = handle;
     _lastHapticMonthOffset = (_totalMonths * fraction).round();
     _scaleController.animateTo(
@@ -248,10 +249,10 @@ class _CupertinoRangeSliderState extends State<CupertinoRangeSlider>
 
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onHorizontalDragStart: (details) => _handleDragStart(
-                    details.localPosition.dx, usableWidth),
-                onHorizontalDragUpdate: (details) => _handleDragUpdate(
-                    details.localPosition.dx, usableWidth),
+                onHorizontalDragStart: (details) =>
+                    _handleDragStart(details.localPosition.dx, usableWidth),
+                onHorizontalDragUpdate: (details) =>
+                    _handleDragUpdate(details.localPosition.dx, usableWidth),
                 onHorizontalDragEnd: (_) => _handleDragEnd(),
                 onHorizontalDragCancel: _handleDragEnd,
                 child: Stack(
@@ -264,8 +265,7 @@ class _CupertinoRangeSliderState extends State<CupertinoRangeSlider>
                         height: _trackHeight,
                         decoration: BoxDecoration(
                           color: trackColor,
-                          borderRadius:
-                              BorderRadius.circular(_trackHeight / 2),
+                          borderRadius: BorderRadius.circular(_trackHeight / 2),
                         ),
                       ),
                     ),
@@ -277,8 +277,7 @@ class _CupertinoRangeSliderState extends State<CupertinoRangeSlider>
                         height: _trackHeight,
                         decoration: BoxDecoration(
                           color: accent,
-                          borderRadius:
-                              BorderRadius.circular(_trackHeight / 2),
+                          borderRadius: BorderRadius.circular(_trackHeight / 2),
                         ),
                       ),
                     ),
@@ -347,8 +346,7 @@ class _RangeThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent =
-        CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
     // `CupertinoColors.white` letterale invece di un token `AppColors`: il
     // thumb va risolto esplicitamente comunque tramite
     // `CupertinoDynamicColor.resolve` (convenzione di progetto per ogni
@@ -367,7 +365,8 @@ class _RangeThumb extends StatelessWidget {
         border: Border.all(color: accent, width: 2),
         boxShadow: [
           BoxShadow(
-            color: CupertinoColors.black.withValues(alpha: active ? 0.28 : 0.15),
+            color:
+                CupertinoColors.black.withValues(alpha: active ? 0.28 : 0.15),
             blurRadius: active ? 10 : 4,
             offset: const Offset(0, 1),
           ),

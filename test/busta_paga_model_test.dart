@@ -20,7 +20,8 @@ void main() {
       expect(computeLordo(competenze), closeTo(1050.0, 0.001));
     });
 
-    test('ignora correttamente le voci con importo 0 (es. righe senza '
+    test(
+        'ignora correttamente le voci con importo 0 (es. righe senza '
         'importo associato)', () {
       const competenze = [
         VoceCompetenza(
@@ -64,9 +65,7 @@ void main() {
     test('è case-insensitive sul prefisso "straordinario"', () {
       const competenze = [
         VoceCompetenza(
-            descrizione: 'STRAORDINARIO FESTIVO',
-            quantita: 4.0,
-            importo: 40.0),
+            descrizione: 'STRAORDINARIO FESTIVO', quantita: 4.0, importo: 40.0),
       ];
 
       expect(computeStraordinari(competenze), closeTo(4.0, 0.001));
@@ -82,7 +81,8 @@ void main() {
     // quantità) — mai osservato per una voce di straordinario reale (sempre
     // tag "ORE"), ma `computeStraordinari` deve comunque gestire il caso
     // senza eccezioni, trattando l'assenza come 0 nella somma.
-    test('una quantità ASSENTE (null) in una voce di straordinario conta '
+    test(
+        'una quantità ASSENTE (null) in una voce di straordinario conta '
         'come 0 nella somma, nessuna eccezione', () {
       const competenze = [
         VoceCompetenza(
@@ -108,7 +108,8 @@ void main() {
       expect(computeNetto(1050.0, const {}), closeTo(1050.0, 0.001));
     });
 
-    test('trattenute che superano il lordo producono un netto negativo, '
+    test(
+        'trattenute che superano il lordo producono un netto negativo, '
         'senza clamp', () {
       const trattenute = {'INPS': 600.0, 'IRPEF': 600.0};
 

@@ -55,8 +55,7 @@ class BustaPagaSummaryHero extends StatelessWidget {
                         Container(
                           width: 8,
                           height: 8,
-                          margin:
-                              const EdgeInsets.only(right: AppSpacing.sm),
+                          margin: const EdgeInsets.only(right: AppSpacing.sm),
                           decoration: BoxDecoration(
                             color: statoColor,
                             shape: BoxShape.circle,

@@ -51,7 +51,8 @@ void main() {
       expect(riletto.single.quantita, 0.0);
     });
 
-    test('toSql scrive un null JSON letterale (non una stringa "null") per '
+    test(
+        'toSql scrive un null JSON letterale (non una stringa "null") per '
         'una quantità assente', () {
       const competenze = [
         VoceCompetenza(descrizione: 'X', quantita: null, importo: 1.0),
@@ -77,7 +78,8 @@ void main() {
       expect(riletto.single.importo, closeTo(100.0, 0.001));
     });
 
-    test('stringa vuota (nessuna competenza salvata) produce una lista '
+    test(
+        'stringa vuota (nessuna competenza salvata) produce una lista '
         'vuota, nessuna eccezione', () {
       expect(converter.fromSql(''), isEmpty);
     });

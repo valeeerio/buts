@@ -212,8 +212,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                   // Vuoto (non "0") quando la quantità è ASSENTE, stessa
                   // convenzione già in uso per `importo == 0` subito sotto —
                   // vedi `VoceCompetenzaEditRow.quantitaValue`.
-                  quantita:
-                      v.quantita == null ? '' : formatNumber(v.quantita!),
+                  quantita: v.quantita == null ? '' : formatNumber(v.quantita!),
                   importo: v.importo == 0 ? '' : formatEuro(v.importo),
                 ))
             .toList();
@@ -619,7 +618,6 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                       BustaPagaHeroCard(
                         isConfermato: false,
                         periodoLabel: _periodoLabel,
-                        isEditing: true,
                         lordoDisplay: formatEuroConSegno(
                             computeLordo(_competenzeCorrenti)),
                         nettoDisplay: formatEuroConSegno(computeNetto(

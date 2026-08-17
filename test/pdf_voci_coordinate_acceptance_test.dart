@@ -60,7 +60,8 @@ void main() {
   });
 
   for (final path in percorsi) {
-    test('estrazione per coordinate coerente con i totali stampati: '
+    test(
+        'estrazione per coordinate coerente con i totali stampati: '
         '${p.basename(path)}', () {
       final bytes = File(path).readAsBytesSync();
       final estratti = importService.estraiDaBytes(bytes);
@@ -117,8 +118,7 @@ void main() {
       // dalle asserzioni sopra), è comunque un sintomo da correggere, non
       // da ignorare silenziosamente.
       final warningsRilevanti = risultato.warnings
-          .where(
-              (w) => w.contains('diverge') || w.contains('dalle coordinate'))
+          .where((w) => w.contains('diverge') || w.contains('dalle coordinate'))
           .toList();
       expect(
         warningsRilevanti,
@@ -136,7 +136,8 @@ void main() {
       // generici di un provvedimento fiscale nazionale (DL 3/2020) e di una
       // voce standard di cedolino, non dati personali. ---
       const descrizioniCorrotteNote = ['Fe stivita', 'Tr attamento'];
-      for (final descrizione in risultato.competenze.map((v) => v.descrizione)) {
+      for (final descrizione
+          in risultato.competenze.map((v) => v.descrizione)) {
         for (final corrotta in descrizioniCorrotteNote) {
           expect(
             descrizione.contains(corrotta),

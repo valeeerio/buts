@@ -98,7 +98,8 @@ void main() {
 
       final diff = buildBustaPagaEditDiff(vecchia, nuova);
 
-      expect(diff, contains('Competenza Storno a debito: rimossa (era —, − € 50,00)'));
+      expect(diff,
+          contains('Competenza Storno a debito: rimossa (era —, − € 50,00)'));
       expect(diff.any((r) => r.contains('€ -')), isFalse,
           reason: 'doppio segno "€ -" nel diff: $diff');
     });

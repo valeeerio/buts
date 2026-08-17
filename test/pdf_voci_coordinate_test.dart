@@ -178,8 +178,7 @@ void main() {
       expect(risultato.righe.single.descrizione, 'AAABBB');
     });
 
-    test(
-        'gap appena SOPRA la soglia (1.01pt): la supera → CON spazio', () {
+    test('gap appena SOPRA la soglia (1.01pt): la supera → CON spazio', () {
       final risultato = classificaVociDaCoordinate([
         parola('2', top: 360.0, left: xCodiceSinistro, right: xCodiceDestro),
         parola('CCC', top: 360.0, left: 50.0, right: 60.0),
@@ -205,11 +204,11 @@ void main() {
   });
 
   group('tabella voci — riga senza tag né quantità con flag N', () {
-    test('930 Trattamento integrativo: quantità ASSENTE (null, non 0), flag '
+    test(
+        '930 Trattamento integrativo: quantità ASSENTE (null, non 0), flag '
         'N letto', () {
       final risultato = classificaVociDaCoordinate([
-        parola('930',
-            top: 310.0, left: xCodiceSinistro, right: xCodiceDestro),
+        parola('930', top: 310.0, left: xCodiceSinistro, right: xCodiceDestro),
         parola('Trattamento', top: 310.0, left: 50.0, right: 110.0),
         parola('integrativo', top: 310.0, left: 115.0, right: 170.0),
         parola('100,00', top: 310.0, left: 480.0, right: xCompetenzeDestro),
@@ -237,8 +236,7 @@ void main() {
       '(esclusa dal lordo altrove, tramite flagN)', () {
     test('823 Addizionale Regionale Dovuta: presente ma con flagN false', () {
       final risultato = classificaVociDaCoordinate([
-        parola('823',
-            top: 320.0, left: xCodiceSinistro, right: xCodiceDestro),
+        parola('823', top: 320.0, left: xCodiceSinistro, right: xCodiceDestro),
         parola('Addizionale', top: 320.0, left: 50.0, right: 110.0),
         parola('Regionale', top: 320.0, left: 115.0, right: 160.0),
         parola('Dovuta', top: 320.0, left: 165.0, right: 200.0),
@@ -256,11 +254,9 @@ void main() {
   });
 
   group('tabella voci — riga in colonna TRATTENUTE con flag N', () {
-    test('828 Rata Addizionale Regionale: colonna trattenute, flagN true',
-        () {
+    test('828 Rata Addizionale Regionale: colonna trattenute, flagN true', () {
       final risultato = classificaVociDaCoordinate([
-        parola('828',
-            top: 330.0, left: xCodiceSinistro, right: xCodiceDestro),
+        parola('828', top: 330.0, left: xCodiceSinistro, right: xCodiceDestro),
         parola('Rata', top: 330.0, left: 50.0, right: 90.0),
         parola('Addizionale', top: 330.0, left: 95.0, right: 155.0),
         parola('Regionale', top: 330.0, left: 160.0, right: 205.0),
@@ -287,17 +283,14 @@ void main() {
         parola('Retribuzione', top: 300.0, left: 50.0, right: 110.0),
         parola('1.532,48', top: 300.0, left: 480.0, right: xCompetenzeDestro),
         parola('*', top: 300.0, left: 558.0, right: xFlagN),
-        parola('930',
-            top: 310.0, left: xCodiceSinistro, right: xCodiceDestro),
+        parola('930', top: 310.0, left: xCodiceSinistro, right: xCodiceDestro),
         parola('Trattamento', top: 310.0, left: 50.0, right: 110.0),
         parola('100,00', top: 310.0, left: 480.0, right: xCompetenzeDestro),
         parola('*', top: 310.0, left: 558.0, right: xFlagN),
-        parola('823',
-            top: 320.0, left: xCodiceSinistro, right: xCodiceDestro),
+        parola('823', top: 320.0, left: xCodiceSinistro, right: xCodiceDestro),
         parola('Addizionale', top: 320.0, left: 50.0, right: 110.0),
         parola('45,00', top: 320.0, left: 480.0, right: xCompetenzeDestro),
-        parola('828',
-            top: 330.0, left: xCodiceSinistro, right: xCodiceDestro),
+        parola('828', top: 330.0, left: xCodiceSinistro, right: xCodiceDestro),
         parola('Rata', top: 330.0, left: 50.0, right: 90.0),
         parola('9,39', top: 330.0, left: 450.0, right: xTrattenuteDestro),
         parola('*', top: 330.0, left: 558.0, right: xFlagN),
@@ -314,8 +307,7 @@ void main() {
         'riga con codice ma senza alcun importo (es. Permessi riduz. orario '
         'goduti, gestiti altrove) → esclusa (null)', () {
       final risultato = classificaVociDaCoordinate([
-        parola('210',
-            top: 340.0, left: xCodiceSinistro, right: xCodiceDestro),
+        parola('210', top: 340.0, left: xCodiceSinistro, right: xCodiceDestro),
         parola('Permessi', top: 340.0, left: 50.0, right: 100.0),
         parola('riduz.', top: 340.0, left: 105.0, right: 140.0),
         parola('orario', top: 340.0, left: 145.0, right: 180.0),
@@ -391,8 +383,7 @@ void main() {
     test('due contributi diversi restano voci distinte della mappa', () {
       final risultato = classificaVociDaCoordinate([
         parola('INPS', top: 610.0, left: 20.0, right: 50.0),
-        parola('88,18',
-            top: 610.0, left: 205.0, right: xContributoDipendente),
+        parola('88,18', top: 610.0, left: 205.0, right: xContributoDipendente),
         parola('CONTRIBUTO', top: 600.0, left: 20.0, right: 65.0),
         parola('EBILOG', top: 600.0, left: 70.0, right: 105.0),
         parola('0,50', top: 600.0, left: 205.0, right: xContributoDipendente),
@@ -566,8 +557,7 @@ void main() {
   });
 
   group('haDatiSufficienti', () {
-    test('true quando almeno una riga voce E la riga totali sono presenti',
-        () {
+    test('true quando almeno una riga voce E la riga totali sono presenti', () {
       final risultato = classificaVociDaCoordinate([
         parola('10', top: 300.0, left: xCodiceSinistro, right: xCodiceDestro),
         parola('Retribuzione', top: 300.0, left: 50.0, right: 110.0),

@@ -77,7 +77,8 @@ String bustaPagaPeriodoDisplay(BustaPaga bustaPaga) =>
 /// modalità modifica, dove periodo e tipo "in corso di modifica" vivono in
 /// controller/stato locali separati, non ancora ricomposti in un oggetto
 /// `BustaPaga`.
-String periodoDisplayFor({required DateTime periodo, required TipoBustaPaga tipo}) {
+String periodoDisplayFor(
+    {required DateTime periodo, required TipoBustaPaga tipo}) {
   final tipoLabel = tipoMensilitaLabel(tipo);
   if (tipoLabel == null) {
     final formatted = DateFormat('MMMM yyyy', 'it_IT').format(periodo);
