@@ -1,12 +1,16 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../models/busta_paga.dart';
 import '../../providers/buste_paga_provider.dart';
+import '../../providers/reminder_scheduler_provider.dart';
 import '../../services/busta_paga_regex_parser.dart';
 import '../../services/pdf_import_service.dart';
+import '../../services/reminder_notifications.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
@@ -50,8 +54,8 @@ class BustePagaSectionScreen extends ConsumerStatefulWidget {
       _BustePagaSectionScreenState();
 }
 
-class _BustePagaSectionScreenState
-    extends ConsumerState<BustePagaSectionScreen> {
+class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
+    with WidgetsBindingObserver {
   _BustePagaTab _tab = _BustePagaTab.archivio;
   final _pdfImportService = const PdfImportService();
   final _regexParser = const BustaPagaRegexParser();
@@ -66,9 +70,172 @@ class _BustePagaSectionScreenState
   ({DateTime start, DateTime end})? _periodoFiltro;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Copre il tap "a caldo" (app già in esecuzione quando l'utente tocca la
+    // notifica): `main()` gestisce già il cold start impostando
+    // `pendingImportRequest` PRIMA che questa schermata esista, quindi quel
+    // caso è coperto sotto, nello stesso `addPostFrameCallback`.
+    pendingImportRequest.addListener(_consumaPendingImportRequestSePresente);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      // Prima l'eventuale onboarding (spiega il promemoria all'utente),
+      // poi l'eventuale richiesta di import in sospeso: se l'app è stata
+      // aperta da un tap su notifica, l'onboarding è già stato completato
+      // in una sessione precedente (altrimenti la notifica non sarebbe mai
+      // stata schedulata), quindi in pratica non si accavallano mai — ma
+      // l'ordine resta comunque quello più sensato se dovesse succedere.
+      await _maybeShowReminderOnboarding();
+      if (!mounted) return;
+      _consumaPendingImportRequestSePresente();
+      // Chiamata iniziale di ri-scheduling: copre sia il caso in cui
+      // l'archivio sia già stato caricato dal provider prima di questo primo
+      // frame, sia il caso — più delicato — di un archivio genuinamente
+      // vuoto, per cui nessun evento di caricamento successivo arriverebbe
+      // a correggere una schedulazione mai fatta. Se invece l'archivio sta
+      // ancora caricando in modo asincrono (`BustePagaNotifier._initialize`),
+      // questa chiamata può operare temporaneamente su una lista vuota: il
+      // `ref.listen` più sotto, in `build`, ri-schedula da capo (cancellando
+      // prima tutto, vedi `PayslipReminderService.reschedule`) non appena lo
+      // stato reale arriva, quindi non lascia promemoria scorretti.
+      unawaited(_rescheduleReminders());
+    });
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    pendingImportRequest.removeListener(_consumaPendingImportRequestSePresente);
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_rescheduleReminders());
+    }
+  }
+
+  /// Se l'utente ha appena toccato una notifica di promemoria (a caldo,
+  /// osservato qui, o a freddo, già impostato da `main()` prima ancora che
+  /// questa schermata esistesse), riporta il flag a `false` e avvia
+  /// direttamente il flusso di import — stesso identico percorso del "+",
+  /// nessuna logica di import duplicata.
+  void _consumaPendingImportRequestSePresente() {
+    if (!pendingImportRequest.value) return;
+    pendingImportRequest.value = false;
+    _startImport();
+  }
+
+  Future<void> _rescheduleReminders() async {
+    final service = ref.read(payslipReminderServiceProvider);
+    if (service == null) return;
+    await service.reschedule(ref.read(busteRepositoryProvider));
+  }
+
+  /// Gancio di debug invisibile in una build di release: attivato dal
+  /// long-press sul "+" della sidecar (vedi `_BustePagaSidecar`, wired solo
+  /// sotto `kDebugMode` anche lì), schedula la notifica di prova via
+  /// `schedulaNotificaDiProvaPerDebug()` e conferma con un alert — senza
+  /// questo riscontro, verificare le notifiche su device richiederebbe
+  /// aspettare il vero 1°/8°/15° del mese.
+  Future<void> _avviaNotificaDiProvaDebug() async {
+    if (!kDebugMode) return;
+    final service = ref.read(payslipReminderServiceProvider);
+    if (service == null) return;
+    await service.schedulaNotificaDiProvaPerDebug();
+    if (!mounted) return;
+
+    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    await showAppAlertDialog<void>(
+      context: context,
+      title: 'Notifica di prova',
+      message: 'Arriverà tra circa 60 secondi. Metti l\'app in background '
+          'per vederla.',
+      actions: [
+        AppAlertAction(
+          icon: CupertinoIcons.checkmark_alt,
+          label: 'OK',
+          color: accent,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ],
+    );
+  }
+
+  /// Alert esplicativo una-tantum del promemoria mensile, mostrato al primo
+  /// frame finché `onboardingDaMostrare` resta `true`. `null` il servizio
+  /// (init delle notifiche fallita in `main()`, vedi
+  /// `payslipReminderServiceProvider`) significa semplicemente "nessun
+  /// promemoria disponibile in questa sessione": nessun alert, nessun
+  /// errore.
+  Future<void> _maybeShowReminderOnboarding() async {
+    final service = ref.read(payslipReminderServiceProvider);
+    if (service == null || !service.onboardingDaMostrare) return;
+    if (!mounted) return;
+
+    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final secondary =
+        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+
+    await showAppAlertDialog<void>(
+      context: context,
+      title: 'Promemoria busta paga',
+      message: 'Il 1° di ogni mese Buts può ricordarti di importare la '
+          'busta paga del mese appena concluso, con altri due solleciti '
+          'l\'8 e il 15 finché non risulta in archivio. Serve il permesso '
+          'di iOS per le notifiche.',
+      actions: [
+        AppAlertAction(
+          icon: CupertinoIcons.bell,
+          label: 'Attiva',
+          color: accent,
+          onPressed: () async {
+            Navigator.of(context).pop();
+            final concesso = await service.completaOnboarding();
+            if (!mounted) return;
+            await service.reschedule(ref.read(busteRepositoryProvider));
+            if (!concesso && mounted) {
+              _showPermessoNotificheNegatoAlert();
+            }
+          },
+        ),
+        AppAlertAction(
+          icon: CupertinoIcons.bell_slash,
+          label: 'Non ora',
+          color: secondary,
+          onPressed: () {
+            Navigator.of(context).pop();
+            service.rifiutaOnboarding();
+          },
+        ),
+      ],
+    );
+  }
+
+  /// Mostrato solo se l'utente ha accettato l'onboarding nell'app ma poi ha
+  /// negato il permesso nel prompt di sistema: iOS non lo ripropone mai una
+  /// seconda volta, va spiegato che si riattiva da Impostazioni.
+  void _showPermessoNotificheNegatoAlert() {
+    if (!mounted) return;
+    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    showAppAlertDialog<void>(
+      context: context,
+      title: 'Notifiche disattivate',
+      message: 'Il permesso è stato negato: iOS non lo richiede una '
+          'seconda volta. Per attivare il promemoria in futuro, vai su '
+          'Impostazioni > Buts > Notifiche.',
+      actions: [
+        AppAlertAction(
+          icon: CupertinoIcons.checkmark_alt,
+          label: 'OK',
+          color: accent,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ],
+    );
   }
 
   void _changeTab(_BustePagaTab tab) {
@@ -344,6 +511,16 @@ class _BustePagaSectionScreenState
         setState(() => _periodoFiltro = null);
       }
     });
+    // Ri-schedula i promemoria ad ogni cambiamento dell'archivio (import,
+    // modifica, eliminazione) — copre anche il momento in cui
+    // `BustePagaNotifier._initialize()` finisce di caricare lo stato reale
+    // dal DB, correggendo l'eventuale chiamata iniziale fatta su una lista
+    // ancora vuota (vedi `initState`/`_rescheduleReminders`).
+    ref.listen<List<BustaPaga>>(busteRepositoryProvider, (previous, next) {
+      final service = ref.read(payslipReminderServiceProvider);
+      if (service == null) return;
+      unawaited(service.reschedule(next));
+    });
     final periodoRangeDisponibile = ref.watch(periodoRangeDisponibileProvider);
     final dataLabel = () {
       final formatted = DateFormat('EEEE d MMMM', 'it_IT').format(now);
@@ -529,6 +706,8 @@ class _BustePagaSectionScreenState
                   onTabChanged: _changeTab,
                   onAdd: _importingPdf ? null : () => _startImport(),
                   importing: _importingPdf,
+                  onDebugLongPress:
+                      kDebugMode ? _avviaNotificaDiProvaDebug : null,
                 ),
               ),
             ),
@@ -547,11 +726,19 @@ class _BustePagaSidecar extends StatelessWidget {
   final VoidCallback? onAdd;
   final bool importing;
 
+  /// Gancio di debug (vedi `_BustePagaSectionScreenState._avviaNotificaDiProvaDebug`),
+  /// `null` fuori da `kDebugMode`: in quel caso nessun `GestureDetector` di
+  /// long-press viene istanziato attorno al "+", il gesto non esiste
+  /// proprio in una build di release, nessuna differenza visiva in
+  /// nessuna delle due build.
+  final VoidCallback? onDebugLongPress;
+
   const _BustePagaSidecar({
     required this.tab,
     required this.onTabChanged,
     required this.onAdd,
     required this.importing,
+    this.onDebugLongPress,
   });
 
   @override
@@ -601,29 +788,42 @@ class _BustePagaSidecar extends StatelessWidget {
             Semantics(
               label: 'Aggiungi busta paga',
               button: true,
-              child: SpringButton(
-                onPressed: onAdd ?? () {},
-                child: ClipPath(
-                  clipper: const SquircleClipper(radius: AppRadius.glassSmall),
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    color: plusAccent.withValues(alpha: 0.16),
-                    alignment: Alignment.center,
-                    child: importing
-                        ? CupertinoActivityIndicator(color: plusAccent)
-                        : Icon(
-                            CupertinoIcons.add,
-                            size: 24,
-                            color: plusAccent,
-                          ),
-                  ),
-                ),
-              ),
+              // Long-press per la notifica di prova: SOLO sotto kDebugMode
+              // (vedi `onDebugLongPress`), un GestureDetector aggiuntivo
+              // attorno al bottone "+", nessun cambiamento visivo — stessa
+              // icona, stesso colore, stesso layout in entrambe le build.
+              child: onDebugLongPress == null
+                  ? _plusButton(plusAccent)
+                  : GestureDetector(
+                      onLongPress: onDebugLongPress,
+                      child: _plusButton(plusAccent),
+                    ),
             ),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _plusButton(Color plusAccent) {
+    return SpringButton(
+      onPressed: onAdd ?? () {},
+      child: ClipPath(
+        clipper: const SquircleClipper(radius: AppRadius.glassSmall),
+        child: Container(
+          width: 48,
+          height: 48,
+          color: plusAccent.withValues(alpha: 0.16),
+          alignment: Alignment.center,
+          child: importing
+              ? CupertinoActivityIndicator(color: plusAccent)
+              : Icon(
+                  CupertinoIcons.add,
+                  size: 24,
+                  color: plusAccent,
+                ),
+        ),
+      ),
     );
   }
 }
