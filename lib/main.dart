@@ -1,23 +1,78 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'providers/reminder_scheduler_provider.dart';
 import 'screens/buste_paga/buste_paga_section_screen.dart';
+import 'services/payslip_reminder_service.dart';
+import 'services/reminder_notifications.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('it_IT');
-  runApp(const ButsApp());
+
+  final reminderScheduler = LocalNotificationsScheduler();
+  // `null` finché la costruzione sotto non va a buon fine: resta `null` se
+  // una qualunque delle chiamate nel `try` fallisce, e in tal caso
+  // `payslipReminderServiceProvider` NON viene sovrascritto più sotto — resta
+  // sul default `null` del provider (vedi `reminder_scheduler_provider.dart`).
+  // Questo è deliberatamente un guard diverso da quello di
+  // `reminderSchedulerProvider`, che viene sempre iniettato: qui un guasto
+  // (SharedPreferences non disponibile, plugin di notifiche non
+  // inizializzabile) non deve mai propagarsi come provider "rotto" da
+  // leggere più avanti — l'app deve aprirsi comunque sull'archivio, solo
+  // senza promemoria in questa sessione.
+  PayslipReminderService? payslipReminderService;
+  try {
+    // Ordine critico: `consumaLaunchDetails()` legge se l'app è stata aperta
+    // dal tap su una notifica mentre era terminata (cold start) e aggiorna
+    // `pendingImportRequest` di conseguenza — va fatto PRIMA di `runApp`,
+    // perché la schermata radice che osserverà quel valore (fase successiva)
+    // viene costruita subito dopo e non deve perdersi il segnale.
+    await reminderScheduler.init();
+    await reminderScheduler.consumaLaunchDetails();
+    final preferences = await SharedPreferences.getInstance();
+    payslipReminderService = PayslipReminderService(
+      scheduler: reminderScheduler,
+      preferences: preferences,
+    );
+  } catch (_) {
+    // Un promemoria rotto (permessi, plugin non disponibile, storage delle
+    // preferenze non disponibile, qualunque eccezione) non può impedire
+    // l'accesso all'archivio delle buste paga: l'app si avvia comunque,
+    // semplicemente senza notifiche funzionanti in questa sessione.
+  }
+
+  runApp(
+    ButsApp(
+      overrides: [
+        reminderSchedulerProvider.overrideWithValue(reminderScheduler),
+        if (payslipReminderService != null)
+          payslipReminderServiceProvider.overrideWithValue(
+            payslipReminderService,
+          ),
+      ],
+    ),
+  );
 }
 
 /// L'app è a sezione singola: Buste Paga è la root, nessuna sotto-navigazione
 /// radice (vedi CLAUDE.md).
 class ButsApp extends StatelessWidget {
-  const ButsApp({super.key});
+  const ButsApp({super.key, this.overrides = const []});
+
+  /// Override dei provider Riverpod da iniettare sul `ProviderScope` radice.
+  /// Vuoto di default (usato anche dai widget test, che non hanno bisogno di
+  /// un [ReminderScheduler] reale): `main()` lo popola con l'istanza di
+  /// [LocalNotificationsScheduler] già inizializzata prima di `runApp`, vedi
+  /// [reminderSchedulerProvider].
+  final List<Override> overrides;
 
   @override
   Widget build(BuildContext context) {
-    return const ProviderScope(
-      child: CupertinoApp(
+    return ProviderScope(
+      overrides: overrides,
+      child: const CupertinoApp(
         title: 'Buts',
         debugShowCheckedModeBanner: false,
         localizationsDelegates: [
