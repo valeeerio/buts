@@ -94,4 +94,11 @@ class AppColors {
     color: Color(0x14000000),
     darkColor: Color(0x4D000000),
   );
+
+  /// Scrim dietro `AppAlertDialog`: nero semi-trasparente, più opaco in dark
+  /// mode per staccare la card piatta dal contenuto sottostante.
+  static const alertBarrier = CupertinoDynamicColor.withBrightness(
+    color: Color(0x66000000),
+    darkColor: Color(0x99000000),
+  );
 }

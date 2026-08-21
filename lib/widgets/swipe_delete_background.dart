@@ -21,6 +21,15 @@ class SwipeDeleteBackground extends StatelessWidget {
       AppColors.systemRed,
       context,
     );
+    // `CupertinoColors.white` letterale invece di un token `AppColors`:
+    // l'icona va comunque risolta esplicitamente tramite
+    // `CupertinoDynamicColor.resolve` (convenzione di progetto per ogni
+    // colore), anche se il valore risultante coincide nei due temi — stesso
+    // pattern già usato in `cupertino_range_slider.dart` per il thumb.
+    final iconColor = CupertinoDynamicColor.resolve(
+      CupertinoColors.white,
+      context,
+    );
     return ClipPath(
       clipper: SquircleClipper(radius: radius),
       child: Container(
@@ -29,9 +38,9 @@ class SwipeDeleteBackground extends StatelessWidget {
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.lg,
         ),
-        child: const Icon(
+        child: Icon(
           CupertinoIcons.trash,
-          color: CupertinoColors.white,
+          color: iconColor,
         ),
       ),
     );

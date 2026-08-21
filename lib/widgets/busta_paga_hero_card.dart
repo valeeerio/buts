@@ -134,7 +134,8 @@ class BustaPagaHeroCard extends StatelessWidget {
                           onTap: onTapTipo,
                           behavior: HitTestBehavior.opaque,
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.xs),
                             child: Icon(CupertinoIcons.chevron_down,
                                 size: 12, color: labelSecondary),
                           ),

@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../models/busta_paga.dart';
@@ -99,7 +99,7 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
       // `ref.listen` più sotto, in `build`, ri-schedula da capo (cancellando
       // prima tutto, vedi `PayslipReminderService.reschedule`) non appena lo
       // stato reale arriva, quindi non lascia promemoria scorretti.
-      unawaited(_rescheduleReminders());
+      unawaited(_rescheduleRemindersSafe());
     });
   }
 
@@ -114,7 +114,24 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(_rescheduleReminders());
+      unawaited(_rescheduleRemindersSafe());
+    }
+  }
+
+  /// Wrapper di [_rescheduleReminders] che intercetta qualunque eccezione
+  /// invece di lasciarla propagare come errore non gestito — stesso spirito
+  /// del try/catch che avvolge già l'intero bootstrap del sistema di
+  /// promemoria in `main.dart`. Necessario perché questo metodo viene
+  /// sempre invocato tramite `unawaited()` (init, resume, `ref.listen`
+  /// sull'archivio): senza gestione esplicita, un guasto dello scheduler
+  /// nativo (plugin non disponibile, mismatch di scheduling, ecc.)
+  /// diventerebbe un'eccezione non gestita invece di degradare
+  /// silenziosamente il solo sottosistema dei promemoria.
+  Future<void> _rescheduleRemindersSafe() async {
+    try {
+      await _rescheduleReminders();
+    } catch (error, stackTrace) {
+      debugPrint('Reschedule promemoria fallito: $error\n$stackTrace');
     }
   }
 
@@ -365,6 +382,7 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
             fileOrigine,
             mese: periodoEstratto.month,
             anno: periodoEstratto.year,
+            tipo: risultato.tipo,
           );
         } catch (_) {
           // La rinomina è fallita: `fileOrigine` non è stato riassegnato
@@ -519,7 +537,11 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
     ref.listen<List<BustaPaga>>(busteRepositoryProvider, (previous, next) {
       final service = ref.read(payslipReminderServiceProvider);
       if (service == null) return;
-      unawaited(service.reschedule(next));
+      unawaited(
+        service.reschedule(next).catchError((Object error, StackTrace st) {
+          debugPrint('Reschedule promemoria fallito: $error\n$st');
+        }),
+      );
     });
     final periodoRangeDisponibile = ref.watch(periodoRangeDisponibileProvider);
     final dataLabel = () {

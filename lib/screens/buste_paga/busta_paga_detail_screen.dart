@@ -55,6 +55,46 @@ String _periodoLabelForDate(DateTime data) {
   return formatted[0].toUpperCase() + formatted.substring(1);
 }
 
+/// Calcola lordo/straordinari/netto derivati dalle competenze/trattenute
+/// correntemente in editing — usato sia dal valore mostrato live nell'hero
+/// (`build()`) sia dal salvataggio (`_save`), tramite
+/// `_BustaPagaDetailScreenState._valoriDerivatiEditing`.
+///
+/// Funzione pura (nessuna dipendenza da stato del widget): estratta a
+/// livello di file per la stessa ragione di testabilità di
+/// [buildBustaPagaEditDiff]. `@visibleForTesting`: non è pensata per essere
+/// chiamata da altrove nell'app.
+///
+/// Il fallback al vecchio lordo/straordinari (`corrente.lordo`/
+/// `corrente.straordinari`) si applica **solo** se [competenzeVuoteInPartenza]
+/// è vero **e** [competenze] è ancora vuota nello stato corrente — cioè una
+/// busta paga pre-migrazione mai riaperta in modifica, con competenze mai
+/// toccate durante la sessione di editing. Se l'utente parte da una lista
+/// vuota e aggiunge righe reali, o parte da una lista non vuota e la svuota
+/// esplicitamente (swipe-to-delete di tutte le righe), lordo/straordinari
+/// derivano sempre da `computeLordo(competenze)`/
+/// `computeStraordinari(competenze)` sullo stato corrente, coerentemente con
+/// l'invariante "lordo/straordinari derivati da competenze" di CLAUDE.md. Il
+/// netto segue la stessa condizione: si mantiene il vecchio valore solo
+/// quando anche il lordo usa il fallback e le [trattenute] correnti sono
+/// vuote; in ogni altro caso si ricalcola da lordo/trattenute correnti.
+@visibleForTesting
+({double lordo, double straordinari, double netto}) valoriDerivatiEditing({
+  required BustaPaga corrente,
+  required List<VoceCompetenza> competenze,
+  required Map<String, double> trattenute,
+  required bool competenzeVuoteInPartenza,
+}) {
+  final usaFallback = competenzeVuoteInPartenza && competenze.isEmpty;
+  final lordo = usaFallback ? corrente.lordo : computeLordo(competenze);
+  final straordinari =
+      usaFallback ? corrente.straordinari : computeStraordinari(competenze);
+  final netto = (usaFallback && trattenute.isEmpty)
+      ? corrente.netto
+      : computeNetto(lordo, trattenute);
+  return (lordo: lordo, straordinari: straordinari, netto: netto);
+}
+
 /// Costruisce l'elenco leggibile delle differenze fra due versioni della
 /// stessa busta paga, mostrato nel popup "Hai modificato i seguenti dati,
 /// confermi?" prima di salvare una modifica inline (vedi
@@ -244,6 +284,20 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   late List<TrattenutaEditRow> _trattenuteEdit;
   late List<VoceCompetenzaEditRow> _competenzeEdit;
 
+  /// `true` se la busta paga era priva di competenze **all'apertura** di
+  /// questa sessione di editing (busta paga pre-migrazione mai riaperta in
+  /// modifica, vedi CLAUDE.md — mai popolata). Distinto da
+  /// `_competenzeCorrenti.isEmpty`, che riflette invece lo stato *attuale*
+  /// dei controller e resta vero anche quando l'utente ha svuotato una lista
+  /// che all'apertura non lo era (swipe-to-delete su tutte le righe, o
+  /// descrizione dell'unica riga svuotata): in quel caso il fallback al
+  /// vecchio lordo/straordinari NON deve applicarsi, l'invariante
+  /// "lordo/straordinari derivati da competenze" (CLAUDE.md) impone di
+  /// ricalcolarli su una lista vuota (cioè 0) — bug reale corretto qui, non
+  /// un'ipotesi. Catturato una sola volta in [_enterEditing], mai
+  /// ricalcolato durante la sessione di editing.
+  late bool _competenzeVuoteInPartenza;
+
   /// Popola tutti i controller di editing dai valori correnti (letti dal
   /// provider) e attiva la modalità modifica.
   void _enterEditing(BustaPaga corrente) {
@@ -286,6 +340,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       _attachTrattenutaListeners(row);
     }
 
+    _competenzeVuoteInPartenza = corrente.competenze.isEmpty;
     _competenzeEdit = corrente.competenze.isEmpty
         ? [VoceCompetenzaEditRow()]
         : corrente.competenze
@@ -296,6 +351,13 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                   // preserva l'assenza al salvataggio senza modifiche, vedi
                   // `VoceCompetenzaEditRow.quantitaValue`.
                   quantita: v.quantita == null ? '' : formatNumber(v.quantita!),
+                  // `formatEuro` da solo antepone già un "-" per un importo
+                  // negativo (storno a debito, vedi doc di
+                  // `VoceCompetenzaEditRow.negativo`): il costruttore della
+                  // riga rileva quel segno dalla stringa, lo scorpora nel
+                  // proprio campo `negativo` e precompila il controller col
+                  // solo valore assoluto — nessun doppio segno col prefisso
+                  // "€ "/"− € " dinamico del widget di editing.
                   importo: v.importo == 0 ? '' : formatEuro(v.importo),
                 ))
             .toList();
@@ -507,27 +569,20 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   /// prima di salvare — vedi CLAUDE.md/istruzioni task per il comportamento
   /// dettagliato dei 3 esiti (invariato / conferma / annulla).
   /// Lordo/straordinari/netto derivati dalle competenze/trattenute
-  /// correntemente in editing, con lo stesso fallback usato sia dal valore
-  /// mostrato live nell'hero (`build()`) sia dal salvataggio (`_save`): se le
-  /// competenze sono vuote (busta paga pre-migrazione mai riaperta in
-  /// modifica, o utente che rimuove tutte le righe) si mantiene il lordo/
-  /// straordinari precedente invece di azzerarlo; se sia competenze sia
-  /// trattenute sono vuote si mantiene anche il netto precedente. Unica
-  /// fonte di verità: evita che il valore mostrato live diverga da quello
-  /// effettivamente salvabile (vedi istruzioni task).
+  /// correntemente in editing: wrapper sullo stato dell'istanza attorno alla
+  /// funzione pura di livello file [valoriDerivatiEditing] (vedi lì per il
+  /// comportamento del fallback), usato sia dal valore mostrato live
+  /// nell'hero (`build()`) sia dal salvataggio (`_save`) — unica fonte di
+  /// verità, evita che il valore mostrato live diverga da quello
+  /// effettivamente salvabile.
   ({double lordo, double straordinari, double netto}) _valoriDerivatiEditing(
       BustaPaga corrente) {
-    final competenze = _competenzeCorrenti;
-    final trattenute = _trattenuteCorrenti;
-    final lordo =
-        competenze.isEmpty ? corrente.lordo : computeLordo(competenze);
-    final straordinari = competenze.isEmpty
-        ? corrente.straordinari
-        : computeStraordinari(competenze);
-    final netto = (competenze.isEmpty && trattenute.isEmpty)
-        ? corrente.netto
-        : computeNetto(lordo, trattenute);
-    return (lordo: lordo, straordinari: straordinari, netto: netto);
+    return valoriDerivatiEditing(
+      corrente: corrente,
+      competenze: _competenzeCorrenti,
+      trattenute: _trattenuteCorrenti,
+      competenzeVuoteInPartenza: _competenzeVuoteInPartenza,
+    );
   }
 
   void _save(BustaPaga corrente) {

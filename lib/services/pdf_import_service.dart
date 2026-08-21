@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart';
 
+import '../models/busta_paga.dart';
 import 'busta_paga_regex_parser.dart';
 import 'pdf_path_resolver.dart';
 
@@ -229,7 +230,22 @@ class PdfImportService {
     final fileName =
         '${DateTime.now().millisecondsSinceEpoch}_${p.basename(sourceFileName)}';
     final targetFile = File(p.join(targetDir.path, fileName));
-    await targetFile.writeAsBytes(bytes);
+    try {
+      await targetFile.writeAsBytes(bytes);
+    } catch (e) {
+      // Scrittura fallita a metà: ripulisce l'eventuale file parziale
+      // rimasto su disco prima di ripropagare l'errore, stesso pattern di
+      // cleanup usato altrove in questo file per gli altri percorsi di
+      // errore (duplicato, formato non riconosciuto, rinomina fallita).
+      if (await targetFile.exists()) {
+        try {
+          await targetFile.delete();
+        } catch (_) {
+          // Best-effort: non deve mascherare l'errore originale.
+        }
+      }
+      rethrow;
+    }
     // Path RELATIVO alla Application Documents Directory (mai il prefisso
     // assoluto: su iOS include l'UUID del container sandbox, che cambia ad
     // ogni reinstallazione — vedi `pdf_path_resolver.dart`).
@@ -240,14 +256,24 @@ class PdfImportService {
   /// testo letterale della busta ("Mens.supplementare MM/YYYY"), "/" → "-"
   /// perché non valido in un nome file — al posto del nome scelto dal
   /// picker di sistema, spesso poco significativo (screenshot, export
-  /// generico).
+  /// generico). Il nome include anche [tipo] (13a/14a): il controllo
+  /// anti-duplicati confronta tipo+anno, non solo mese+anno, quindi due
+  /// buste paga di tipo diverso possono legittimamente avere lo stesso
+  /// mese/anno letto dal PDF — senza il tipo nel nome, la seconda
+  /// `File.rename()` sovrascriverebbe silenziosamente il file della prima.
   Future<String> rinominaPerSupplementare(
     String currentPath, {
     required int mese,
     required int anno,
+    required TipoBustaPaga tipo,
   }) async {
     final absolutePath = await resolvePdfAbsolutePath(currentPath);
-    final nuovoNomeFile = 'Mens.supplementare $mese-$anno.pdf';
+    final suffissoTipo = switch (tipo) {
+      TipoBustaPaga.tredicesima => '13a',
+      TipoBustaPaga.quattordicesima => '14a',
+      TipoBustaPaga.mensile => 'mensile',
+    };
+    final nuovoNomeFile = 'Mens.supplementare $mese-$anno ($suffissoTipo).pdf';
     final nuovoPercorso = p.join(p.dirname(absolutePath), nuovoNomeFile);
     await File(absolutePath).rename(nuovoPercorso);
     // Ritorna il nuovo path RELATIVO, coerente con `_copyToAppDocuments`.
@@ -673,6 +699,12 @@ RigaVoceCoordinate? _classificaRigaVoce(List<ParolaVoce> parole) {
         ? ColonnaVoceCoordinate.competenze
         : ColonnaVoceCoordinate.trattenute,
     flagN: flagN,
+    // Caso anomalo: entrambe le colonne valorizzate sulla stessa riga.
+    // `importoTrattenute` viene scartato in silenzio dalla riga sopra (solo
+    // `importoCompetenze` è usato quando presente) — segnalato qui perché
+    // `BustaPagaRegexParser.parse` possa aggiungere un warning esplicito.
+    entrambeColonneValorizzate:
+        importoCompetenze != null && importoTrattenute != null,
   );
 }
 

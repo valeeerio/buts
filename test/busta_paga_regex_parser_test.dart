@@ -1741,4 +1741,85 @@ void main() {
       );
     });
   });
+
+  group(
+      'voci lette per coordinate — riga con valori in ENTRAMBE le colonne '
+      'TRATTENUTE e COMPETENZE (Bug 3, caso anomalo)', () {
+    test(
+        'genera un warning esplicito invece di scartare in silenzio il '
+        'valore TRATTENUTE', () {
+      const parser = BustaPagaRegexParser();
+      const voci = VociEstratteDaCoordinate(
+        righe: [
+          RigaVoceCoordinate(
+            codice: '10',
+            descrizione: 'Retribuzione ordinaria',
+            tag: 'GIORNI',
+            quantita: 20.0,
+            importo: 1000.0,
+            colonna: ColonnaVoceCoordinate.competenze,
+            flagN: true,
+          ),
+          RigaVoceCoordinate(
+            codice: '999',
+            descrizione: 'Voce anomala',
+            quantita: null,
+            importo: 12.0,
+            colonna: ColonnaVoceCoordinate.competenze,
+            flagN: true,
+            entrambeColonneValorizzate: true,
+          ),
+        ],
+        totali: TotaliCoordinate(
+          totaleCompetenze: 1012.0,
+          totaleTrattenute: 0.0,
+          nettoInBusta: 1012.0,
+        ),
+      );
+
+      final risultato = parser.parse(_testoSintetico, null, voci);
+
+      expect(
+        risultato.warnings.any((w) =>
+            w.contains('Voce anomala') &&
+            w.contains('TRATTENUTE') &&
+            w.contains('COMPETENZE')),
+        isTrue,
+      );
+    });
+
+    test(
+        'nessuna riga con entrambe le colonne valorizzate → nessun warning '
+        'di questo tipo', () {
+      const parser = BustaPagaRegexParser();
+      const voci = VociEstratteDaCoordinate(
+        righe: [
+          RigaVoceCoordinate(
+            codice: '10',
+            descrizione: 'Retribuzione ordinaria',
+            tag: 'GIORNI',
+            quantita: 20.0,
+            importo: 1000.0,
+            colonna: ColonnaVoceCoordinate.competenze,
+            flagN: true,
+          ),
+        ],
+        totali: TotaliCoordinate(
+          totaleCompetenze: 1000.0,
+          totaleTrattenute: 0.0,
+          nettoInBusta: 1000.0,
+        ),
+      );
+
+      final risultato = parser.parse(_testoSintetico, null, voci);
+
+      expect(
+        risultato.warnings.any((w) =>
+            w.contains('TRATTENUTE') &&
+            w.contains('COMPETENZE') &&
+            w.contains('sia in colonna')),
+        isFalse,
+      );
+    });
+  });
 }

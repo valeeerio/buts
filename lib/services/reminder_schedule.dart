@@ -1,4 +1,6 @@
 import 'package:buts/models/busta_paga.dart';
+import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
 
 /// Giorni del mese in cui viene mostrato un promemoria "importa la busta
 /// paga", tutti allo stesso orario ([oraPromemoria]). Tre occasioni per
@@ -6,8 +8,39 @@ import 'package:buts/models/busta_paga.dart';
 /// prime notifiche senza perdere del tutto il promemoria di quel ciclo.
 const List<int> giorniPromemoria = [1, 8, 15];
 
-/// Ora (24h, locale) in cui viene mostrato ogni promemoria.
+/// Ora (24h, orario di **Europe/Rome**, non del device) in cui viene
+/// mostrato ogni promemoria — vedi [_timeZoneName] per il perché.
 const int oraPromemoria = 9;
+
+/// Nome IANA fisso del fuso orario di scheduling, duplicato deliberatamente
+/// da `LocalNotificationsScheduler._timeZoneName`
+/// (`lib/services/reminder_notifications.dart`): quel fuso è quello con cui
+/// [ReminderScheduler] interpreta davvero i numeri di ogni candidata al
+/// momento di schedularla per sistema. Il filtro "già passato" qui sotto
+/// deve ragionare nello stesso fuso, altrimenti una candidata può essere
+/// scartata/inclusa sulla base dell'ora sbagliata quando il device è in un
+/// fuso diverso da quello italiano (bug corretto in questa funzione).
+const String _timeZoneName = 'Europe/Rome';
+
+/// `true` dopo la prima inizializzazione del database dei fusi orari in
+/// questo isolate: [tz_data.initializeTimeZones] è economica ma non ha
+/// bisogno di essere ripetuta ad ogni chiamata di
+/// [promemoriaDaSchedulare]. La UI del promemoria vero (bootstrap in
+/// `main.dart`, tramite `LocalNotificationsScheduler.init()`) inizializza lo
+/// stesso database separatamente: richiamarla di nuovo qui è comunque
+/// innocuo (idempotente), serve solo a rendere questa funzione pura
+/// utilizzabile anche nei test, che non passano mai da quel bootstrap.
+bool _tzInitialized = false;
+
+/// Location Europe/Rome, inizializzando il database dei fusi orari alla
+/// prima chiamata se necessario.
+tz.Location _romeLocation() {
+  if (!_tzInitialized) {
+    tz_data.initializeTimeZones();
+    _tzInitialized = true;
+  }
+  return tz.getLocation(_timeZoneName);
+}
 
 /// Numero di cicli mensili "utili" per cui si generano in anticipo le
 /// notifiche — non un numero fisso di mesi di calendario a partire da
@@ -94,8 +127,21 @@ List<DateTime> promemoriaDaSchedulare({
 }) {
   final risultato = <DateTime>[];
 
-  var anno = ora.year;
-  var mese = ora.month;
+  // `ora` rappresenta un istante assoluto (`DateTime.now()` nel caso reale,
+  // vedi `PayslipReminderService`), ma i suoi componenti wall-clock sono
+  // quelli del fuso del *device*. Lo scheduling reale
+  // (`LocalNotificationsScheduler.schedule`) interpreta invece i componenti
+  // di ogni candidata come orario di *Europe/Rome*: per decidere in modo
+  // coerente se una candidata è già passata bisogna quindi confrontare
+  // entrambe le date nello stesso fuso. `roma` è lo stesso istante di `ora`,
+  // riespresso come wall-clock italiana — a differenza delle candidate qui
+  // sotto (costruite direttamente come wall-clock italiana, senza
+  // conversione, esattamente come farà poi lo scheduler reale).
+  final romeLocation = _romeLocation();
+  final roma = tz.TZDateTime.from(ora, romeLocation);
+
+  var anno = roma.year;
+  var mese = roma.month;
 
   var cicliUtili = 0;
   var iterazioni = 0;
@@ -118,8 +164,22 @@ List<DateTime> promemoriaDaSchedulare({
     } else {
       final dateDelCiclo = <DateTime>[];
       for (final giorno in giorniPromemoria) {
+        // La candidata restituita resta un `DateTime` "naive" (non un
+        // `TZDateTime`): è quello che i chiamanti esistenti (test,
+        // `PayslipReminderService`, `LocalNotificationsScheduler.schedule`)
+        // si aspettano — quest'ultimo, in particolare, legge solo i
+        // componenti wall-clock e li reinterpreta come Europe/Rome (vedi
+        // `reminder_notifications.dart`), quindi un `DateTime` naive coi
+        // componenti giusti è sufficiente e preserva l'uguaglianza con le
+        // istanze `DateTime` naive usate dai chiamanti (`TZDateTime` non è
+        // mai `==` a un `DateTime` semplice, anche a parità di istante).
         final dataPromemoria = DateTime(anno, mese, giorno, oraPromemoria);
-        if (dataPromemoria.isAfter(ora)) {
+        // Il confronto "già passato", invece, va fatto nel fuso in cui
+        // quella stessa candidata verrà interpretata al momento dello
+        // scheduling reale (Europe/Rome) — vedi dartdoc della funzione.
+        final dataPromemoriaRoma =
+            tz.TZDateTime(romeLocation, anno, mese, giorno, oraPromemoria);
+        if (dataPromemoriaRoma.isAfter(roma)) {
           dateDelCiclo.add(dataPromemoria);
         }
       }

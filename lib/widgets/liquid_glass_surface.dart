@@ -47,9 +47,7 @@ class LiquidGlassSurface extends StatelessWidget {
   /// `LiquidGlassButton`). Lasciare `null` per il vetro neutro standard.
   final Color? tint;
 
-  /// Spessore del bordo speculare. Default: `1.1`, coerente con ogni altra
-  /// card dell'app — solo popup/superfici piccole e centrate possono avere
-  /// bisogno di un bordo più marcato per restare riconoscibili.
+  /// Spessore del bordo speculare. Default: `1.1`.
   final double borderWidth;
 
   const LiquidGlassSurface({
@@ -172,7 +170,26 @@ class _SpecularBorderPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = clipper.getClip(size);
+    // Il `CustomPaint` di questo bordo è annidato dentro lo stesso `ClipPath`
+    // (stesso `clipper`, stessa `size`) che avvolge l'intero `Stack` in
+    // `LiquidGlassSurface.build` — vincolo necessario per Impeller, vedi
+    // commento lì. Uno stroke disegnato esattamente su `clipper.getClip
+    // (size)` verrebbe quindi centrato sul path di clip e tagliato a metà
+    // spessore dal clip stesso. Per evitarlo, lo stroke va tracciato su un
+    // path "inset" di metà `strokeWidth`: centrato su quel path più piccolo,
+    // lo stroke intero (dentro + fuori) ricade sempre entro il perimetro
+    // originale, quindi non viene più ritagliato.
+    final inset = strokeWidth / 2;
+    final insetSize = Size(
+      math.max(size.width - strokeWidth, 0.0),
+      math.max(size.height - strokeWidth, 0.0),
+    );
+    final insetRadius = math.max(clipper.radius - inset, 0.0);
+    final path = SquirclePath.build(
+      insetSize,
+      insetRadius,
+      smoothing: clipper.smoothing,
+    ).shift(Offset(inset, inset));
 
     const rad = _lightAngleDeg * math.pi / 180;
     final dir = Offset(math.cos(rad), math.sin(rad));

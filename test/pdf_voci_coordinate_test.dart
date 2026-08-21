@@ -253,6 +253,38 @@ void main() {
     });
   });
 
+  group(
+      'tabella voci — riga con valori in ENTRAMBE le colonne TRATTENUTE e '
+      'COMPETENZE (caso anomalo)', () {
+    test(
+        'colonna/importo seguono COMPETENZE, entrambeColonneValorizzate '
+        'segnala il valore TRATTENUTE scartato', () {
+      final risultato = classificaVociDaCoordinate([
+        parola('999', top: 340.0, left: xCodiceSinistro, right: xCodiceDestro),
+        parola('Voce', top: 340.0, left: 50.0, right: 90.0),
+        parola('anomala', top: 340.0, left: 91.5, right: 130.0),
+        parola('5,00', top: 340.0, left: 450.0, right: xTrattenuteDestro),
+        parola('12,00', top: 340.0, left: 480.0, right: xCompetenzeDestro),
+      ]);
+
+      expect(risultato.righe, hasLength(1));
+      final riga = risultato.righe.single;
+      expect(riga.importo, closeTo(12.00, 0.001));
+      expect(riga.colonna, ColonnaVoceCoordinate.competenze);
+      expect(riga.entrambeColonneValorizzate, isTrue);
+    });
+
+    test('solo COMPETENZE valorizzata → entrambeColonneValorizzate false', () {
+      final risultato = classificaVociDaCoordinate([
+        parola('10', top: 300.0, left: xCodiceSinistro, right: xCodiceDestro),
+        parola('Retribuzione', top: 300.0, left: 50.0, right: 110.0),
+        parola('1.532,48', top: 300.0, left: 480.0, right: xCompetenzeDestro),
+      ]);
+
+      expect(risultato.righe.single.entrambeColonneValorizzate, isFalse);
+    });
+  });
+
   group('tabella voci — riga in colonna TRATTENUTE con flag N', () {
     test('828 Rata Addizionale Regionale: colonna trattenute, flagN true', () {
       final risultato = classificaVociDaCoordinate([

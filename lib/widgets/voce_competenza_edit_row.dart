@@ -20,6 +20,28 @@ class VoceCompetenzaEditRow {
   final TextEditingController quantita;
   final TextEditingController importo;
 
+  /// `true` se il valore ORIGINALE dell'importo di questa voce (al momento
+  /// della costruzione della riga) era negativo — uno storno a debito del
+  /// cedolino (vedi `_rigaVoceCompetenza` in
+  /// `busta_paga_regex_parser.dart`), MAI digitato direttamente dall'utente.
+  /// Il controller [importo] mostra e fa digitare SEMPRE e SOLO il valore
+  /// ASSOLUTO — esattamente come la vista di sola lettura
+  /// (`formatEuroConSegno`, che applica `.abs()` dentro `formatEuro`) —
+  /// mentre il segno resta tracciato QUI, separato dal testo, e va
+  /// riapplicato leggendo [importoValue]. Stesso pattern di
+  /// `TrattenutaEditRow.negativo`/`valoreConSegno`, ma rilevato dal segno
+  /// "-" iniziale della stringa già formattata passata al costruttore
+  /// (`importo` resta un parametro `String`, non `double`, per compatibilità
+  /// con gli altri chiamanti di questa classe che precompilano la riga con
+  /// lo stesso pattern) invece che da un parametro `double` separato: prima
+  /// di questo fix il controller veniva precompilato col valore CON segno
+  /// (es. "-14,50") e il widget anteponeva comunque un prefisso "€ " fisso,
+  /// producendo un doppio segno in editing ("€ -14,50") che la sola lettura
+  /// non mostra mai (mostra invece "− € 14,50") — bug reale corretto qui,
+  /// non un'ipotesi. Catturato una sola volta alla costruzione della riga,
+  /// mai ricalcolato dal testo digitato in [importo].
+  final bool negativo;
+
   VoceCompetenzaEditRow({
     String descrizione = '',
     String quantita = '',
@@ -27,7 +49,12 @@ class VoceCompetenzaEditRow {
   })  : id = _nextId++,
         descrizione = TextEditingController(text: descrizione),
         quantita = TextEditingController(text: quantita),
-        importo = TextEditingController(text: importo);
+        negativo = importo.trim().startsWith('-'),
+        importo = TextEditingController(
+          text: importo.trim().startsWith('-')
+              ? importo.trim().substring(1)
+              : importo,
+        );
 
   /// `null` quando il campo è vuoto — stessa convenzione della vista di sola
   /// lettura: la riga del PDF non riportava alcuna quantità (nessun tag
@@ -39,7 +66,16 @@ class VoceCompetenzaEditRow {
   double? get quantitaValue =>
       quantita.text.trim().isEmpty ? null : parseItalianNumber(quantita.text);
 
-  double get importoValue => parseItalianNumber(importo.text);
+  /// Valore "vero" dell'importo, col segno di [negativo] riapplicato al
+  /// valore assoluto attualmente digitato in [importo] — unico punto da cui
+  /// leggere il valore per salvataggio/calcoli live, stesso pattern di
+  /// `TrattenutaEditRow.valoreConSegno`. `.abs()` sul testo digitato è una
+  /// rete di sicurezza: il campo non impedisce comunque di incollare/digitare
+  /// un "-" (nessun `inputFormatters` dedicato).
+  double get importoValue {
+    final assoluto = parseItalianNumber(importo.text).abs();
+    return negativo ? -assoluto : assoluto;
+  }
 
   void dispose() {
     descrizione.dispose();
@@ -92,7 +128,17 @@ Widget voceCompetenzaEditRow(
               Expanded(
                 flex: 2,
                 child: Center(
-                  child: inlineNumberField(row.importo, prefix: '€ '),
+                  // Prefisso dinamico "€ "/"− € ", non fisso: stessa
+                  // convenzione della vista di sola lettura
+                  // (`formatEuroConSegno`, che ANTEPONE il segno al simbolo
+                  // valuta per un valore negativo — a differenza delle
+                  // trattenute, il segno mostrato corrisponde 1:1 al segno
+                  // del valore, non è invertito) — vedi doc di
+                  // `VoceCompetenzaEditRow.negativo`.
+                  child: inlineNumberField(
+                    row.importo,
+                    prefix: row.negativo ? '− € ' : '€ ',
+                  ),
                 ),
               ),
             ],

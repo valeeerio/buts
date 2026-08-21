@@ -197,6 +197,78 @@ void main() {
       expect(risultato, contains(DateTime(2026, 8, 15, 9)));
     });
 
+    group(
+        'confronto "già passato" coerente con Europe/Rome '
+        '(regressione bug mismatch di fuso orario)', () {
+      // `ora` è costruito con `DateTime.utc(...)` invece del costruttore
+      // "locale" usato dal resto dei test in questo file: rappresenta così
+      // sempre lo stesso istante assoluto indipendentemente dal fuso del
+      // device/macchina che esegue i test — esattamente lo scenario del bug
+      // (device in un fuso diverso da quello, fisso, usato per lo
+      // scheduling reale). Le candidate restano invece quelle "locali" già
+      // usate altrove nel file: sono equivalenti a `Europe/Rome` perché
+      // l'ambiente di sviluppo di questo progetto ha il fuso di sistema
+      // impostato su `Europe/Rome` (stessa assunzione implicita degli altri
+      // test di questo file).
+      test(
+          'in orario legale (CEST, UTC+2): un istante UTC corrispondente '
+          'alle 8:59 italiane include ancora la candidata delle 9:00', () {
+        final ora = DateTime.utc(2026, 8, 1, 6, 59);
+
+        final risultato = promemoriaDaSchedulare(
+          ora: ora,
+          periodiImportati: const {},
+        );
+
+        expect(risultato, contains(DateTime(2026, 8, 1, 9)));
+      });
+
+      test(
+          'in orario legale (CEST, UTC+2): un istante UTC corrispondente '
+          'alle 9:01 italiane esclude la candidata delle 9:00, non le '
+          'successive', () {
+        final ora = DateTime.utc(2026, 8, 1, 7, 1);
+
+        final risultato = promemoriaDaSchedulare(
+          ora: ora,
+          periodiImportati: const {},
+        );
+
+        expect(risultato, isNot(contains(DateTime(2026, 8, 1, 9))));
+        expect(risultato, contains(DateTime(2026, 8, 8, 9)));
+        expect(risultato, contains(DateTime(2026, 8, 15, 9)));
+      });
+
+      test(
+          'in orario solare (CET, UTC+1): un istante UTC corrispondente '
+          'alle 8:59 italiane include ancora la candidata delle 9:00', () {
+        final ora = DateTime.utc(2026, 1, 1, 7, 59);
+
+        final risultato = promemoriaDaSchedulare(
+          ora: ora,
+          periodiImportati: const {},
+        );
+
+        expect(risultato, contains(DateTime(2026, 1, 1, 9)));
+      });
+
+      test(
+          'in orario solare (CET, UTC+1): un istante UTC corrispondente '
+          'alle 9:01 italiane esclude la candidata delle 9:00, non le '
+          'successive', () {
+        final ora = DateTime.utc(2026, 1, 1, 8, 1);
+
+        final risultato = promemoriaDaSchedulare(
+          ora: ora,
+          periodiImportati: const {},
+        );
+
+        expect(risultato, isNot(contains(DateTime(2026, 1, 1, 9))));
+        expect(risultato, contains(DateTime(2026, 1, 8, 9)));
+        expect(risultato, contains(DateTime(2026, 1, 15, 9)));
+      });
+    });
+
     test(
         'un ciclo esaurito per il tempo e un ciclo saltato per import già '
         'presente si distinguono: solo il secondo conta come utile, il '

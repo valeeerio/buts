@@ -46,6 +46,14 @@ class _CupertinoRangeSliderState extends State<CupertinoRangeSlider>
   static const _thumbVisualSize = 14.0;
   static const _thumbActiveScale = 1.3;
   static const _trackHeight = 4.0;
+  // Capsula piena (non un token `AppRadius`, pensati per superfici/card in
+  // vetro) esplicitamente derivata da `_trackHeight`: uno slider a doppio
+  // pollice ha tipicamente un track a capsula, è il comportamento visivo
+  // corretto per questo controllo funzionale — non una superficie/card
+  // soggetta alla regola "mai pill/capsule stondate al massimo" di
+  // `CLAUDE.md`. Espressa come costante derivata invece che ripetuta
+  // inline nei due punti in cui il track viene disegnato.
+  static const _trackRadius = _trackHeight / 2;
   static const _minGapMonths = 1;
 
   // Stessa fisica "a molla" di `SpringButton` (ingrandimento rapido
@@ -89,6 +97,31 @@ class _CupertinoRangeSliderState extends State<CupertinoRangeSlider>
         oldWidget.maxDate != widget.maxDate) {
       _endFraction = _fractionFor(widget.endValue);
     }
+    // Le fraction appena ricalcolate da props esterne devono rispettare lo
+    // stesso gap minimo imposto durante il drag (`_applyFraction`):
+    // altrimenti un `_startFraction` > `_endFraction - _minGapFraction`
+    // romperebbe l'invariante che protegge `clamp(lower, upper)` in
+    // `_applyFraction` dal successivo drag, con `lower > upper` ->
+    // `ArgumentError` a runtime.
+    final clamped = _enforceMinGap(_startFraction, _endFraction);
+    _startFraction = clamped.start;
+    _endFraction = clamped.end;
+  }
+
+  /// Corregge una coppia di fraction (start, end) perché rispetti sempre
+  /// `end - start >= _minGapFraction`, la stessa soglia usata da
+  /// [_applyFraction] durante il drag. Spinge prima [end] in avanti; se
+  /// [end] è già al limite superiore (1.0) e il gap resta insufficiente,
+  /// tira indietro [start] per compensare.
+  ({double start, double end}) _enforceMinGap(double start, double end) {
+    final gap = _minGapFraction;
+    if (end - start >= gap) return (start: start, end: end);
+    var newEnd = (start + gap).clamp(0.0, 1.0);
+    var newStart = start;
+    if (newEnd - newStart < gap) {
+      newStart = (newEnd - gap).clamp(0.0, 1.0);
+    }
+    return (start: newStart, end: newEnd);
   }
 
   // Unità del range in mesi interi (non millisecondi): i periodi delle
@@ -265,7 +298,7 @@ class _CupertinoRangeSliderState extends State<CupertinoRangeSlider>
                         height: _trackHeight,
                         decoration: BoxDecoration(
                           color: trackColor,
-                          borderRadius: BorderRadius.circular(_trackHeight / 2),
+                          borderRadius: BorderRadius.circular(_trackRadius),
                         ),
                       ),
                     ),
@@ -277,7 +310,7 @@ class _CupertinoRangeSliderState extends State<CupertinoRangeSlider>
                         height: _trackHeight,
                         decoration: BoxDecoration(
                           color: accent,
-                          borderRadius: BorderRadius.circular(_trackHeight / 2),
+                          borderRadius: BorderRadius.circular(_trackRadius),
                         ),
                       ),
                     ),
