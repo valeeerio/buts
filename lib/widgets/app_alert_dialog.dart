@@ -126,11 +126,6 @@ class AppAlertDialog extends StatelessWidget {
 /// strutturale, non approssimata — il barrier è disegnato a mano qui invece
 /// di affidarsi a quello di sistema, che usa `Curves.ease` fisso non
 /// configurabile e non sincronizzabile con la curva del contenuto).
-const _barrierColor = CupertinoDynamicColor.withBrightness(
-  color: Color(0x66000000),
-  darkColor: Color(0x99000000),
-);
-
 Future<T?> showAppAlertDialog<T>({
   required BuildContext context,
   required String title,
@@ -147,24 +142,54 @@ Future<T?> showAppAlertDialog<T>({
       return AppAlertDialog(title: title, message: message, actions: actions);
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
-      final fade = CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOut,
-        reverseCurve: Curves.easeIn,
-      );
-      final resolvedBarrierColor =
-          CupertinoDynamicColor.resolve(_barrierColor, context);
-      return Stack(
-        children: [
-          Positioned.fill(
-            child: FadeTransition(
-              opacity: fade,
-              child: ColoredBox(color: resolvedBarrierColor),
-            ),
-          ),
-          FadeTransition(opacity: fade, child: child),
-        ],
-      );
+      return _AlertTransition(animation: animation, child: child);
     },
   );
+}
+
+/// Isola la costruzione della `CurvedAnimation` di fade dal `transitionBuilder`
+/// di `showGeneralDialog`, che viene richiamato ad ogni frame della
+/// transizione (~200ms): come `StatefulWidget`, `_AlertTransitionState`
+/// viene creato una sola volta (stesso `Element` riusato finché tipo/
+/// posizione nell'albero restano gli stessi) e la `late final` qui sotto
+/// costruisce la curva una sola volta invece che ad ogni frame.
+class _AlertTransition extends StatefulWidget {
+  final Animation<double> animation;
+  final Widget child;
+
+  const _AlertTransition({required this.animation, required this.child});
+
+  @override
+  State<_AlertTransition> createState() => _AlertTransitionState();
+}
+
+class _AlertTransitionState extends State<_AlertTransition> {
+  late final CurvedAnimation _fade = CurvedAnimation(
+    parent: widget.animation,
+    curve: Curves.easeOut,
+    reverseCurve: Curves.easeIn,
+  );
+
+  @override
+  void dispose() {
+    _fade.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final resolvedBarrierColor =
+        CupertinoDynamicColor.resolve(AppColors.alertBarrier, context);
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: FadeTransition(
+            opacity: _fade,
+            child: ColoredBox(color: resolvedBarrierColor),
+          ),
+        ),
+        FadeTransition(opacity: _fade, child: widget.child),
+      ],
+    );
+  }
 }

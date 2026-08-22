@@ -231,6 +231,14 @@ class RigaVoceCoordinate {
   final ColonnaVoceCoordinate colonna;
   final bool flagN;
 
+  /// `true` quando la riga aveva un valore letto SIA in colonna TRATTENUTE
+  /// SIA in colonna COMPETENZE (caso anomalo/inatteso, mai osservato sui PDF
+  /// di riferimento): in quel caso [colonna]/[importo] riflettono solo la
+  /// colonna COMPETENZE (data la precedenza), l'altro valore è scartato —
+  /// vedi il warning aggiunto da [BustaPagaRegexParser.parse] quando questo
+  /// flag è `true`, così l'ambiguità non passa inosservata.
+  final bool entrambeColonneValorizzate;
+
   const RigaVoceCoordinate({
     required this.codice,
     required this.descrizione,
@@ -239,6 +247,7 @@ class RigaVoceCoordinate {
     required this.importo,
     required this.colonna,
     required this.flagN,
+    this.entrambeColonneValorizzate = false,
   });
 }
 
@@ -864,6 +873,15 @@ class BustaPagaRegexParser {
 
     final List<VoceCompetenza> competenze;
     if (usaVociCoordinate) {
+      for (final riga in voci.righe) {
+        if (riga.entrambeColonneValorizzate) {
+          warnings.add(
+            'riga "${riga.descrizione}": valori letti sia in colonna '
+            'TRATTENUTE sia in colonna COMPETENZE dalle coordinate del PDF, '
+            'usato solo il valore COMPETENZE — verifica manualmente',
+          );
+        }
+      }
       competenze = _competenzeDaCoordinate(voci);
     } else {
       final testuali = <VoceCompetenza>[];

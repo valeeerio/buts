@@ -76,6 +76,21 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
   /// default, quindi tutte chiuse all'apertura dell'Archivio.
   final Set<int> _extraEspansi = {};
 
+  /// Traccia, per ogni anno, se l'ultima build aveva la sotto-sezione
+  /// "Extra" forzata-espansa (nessuna mensile in questa vista, vedi
+  /// [_espansaExtra]). Serve a rilevare la transizione "solo extra" → "extra
+  /// + mensili": in quel momento l'anno va aggiunto a [_extraEspansi] così
+  /// il nuovo wrapper animato monta già espanso invece di collassare di
+  /// scatto (vedi [_espansaExtra]).
+  final Map<int, bool> _extraForzataEspansa = {};
+
+  /// Durata/curva condivise dall'apertura/chiusura della sotto-sezione
+  /// "Extra" (vedi [_extraSliver]) e dalla rotazione della freccetta (vedi
+  /// [_extraToggle]): stesso valore per entrambe così i due effetti si
+  /// percepiscono come un unico gesto, non due animazioni scollegate.
+  static const _extraAnimationDuration = Duration(milliseconds: 260);
+  static const _extraAnimationCurve = Curves.easeOutCubic;
+
   final _scrollController = ScrollController();
 
   // true finché non si è scrollato fino in fondo alla lista — nasconde la
@@ -196,9 +211,29 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
     return _removeBustaPaga(context, ref, bustaPaga.id);
   }
 
-  /// Righe di un gruppo di buste paga (swipe-to-delete + tap per il
-  /// dettaglio), fattorizzato perché sia la sotto-sezione "Extra" sia le
-  /// mensilità normali di un anno usano esattamente questo pattern.
+  /// Singola riga busta paga (swipe-to-delete + tap per il dettaglio),
+  /// fattorizzata perché sia [_bustePagaSliverList] (mensilità) sia
+  /// [_extraSliver] (sotto-sezione "Extra") disegnano esattamente questa
+  /// riga — stessa `ValueKey`, stesso `Dismissible`/conferma di eliminazione
+  /// in entrambi i casi.
+  Widget _bustaPagaRow(
+      BuildContext context, WidgetRef ref, BustaPaga bustaPaga) {
+    return Dismissible(
+      key: ValueKey('row-${bustaPaga.id}'),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) => _confermaEElimina(context, ref, bustaPaga),
+      background: const SwipeDeleteBackground(radius: AppRadius.glassSmall),
+      child: BustaPagaListItem(
+        bustaPaga: bustaPaga,
+        onTap: () => widget.onOpenDetail(bustaPaga),
+      ),
+    );
+  }
+
+  /// Elenco (sliver) di un gruppo di buste paga: usato per le mensilità
+  /// normali di un anno, che non hanno bisogno di apertura/chiusura
+  /// animata (a differenza della sotto-sezione "Extra", vedi
+  /// [_extraSliver]).
   Widget _bustePagaSliverList(WidgetRef ref, List<BustaPaga> buste) {
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(
@@ -210,44 +245,141 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
       sliver: SliverList.separated(
         itemCount: buste.length,
         separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
-        itemBuilder: (context, index) {
-          final bustaPaga = buste[index];
-          return Dismissible(
-            key: ValueKey('row-${bustaPaga.id}'),
-            direction: DismissDirection.endToStart,
-            confirmDismiss: (_) => _confermaEElimina(context, ref, bustaPaga),
-            background:
-                const SwipeDeleteBackground(radius: AppRadius.glassSmall),
-            child: BustaPagaListItem(
-              bustaPaga: bustaPaga,
-              onTap: () => widget.onOpenDetail(bustaPaga),
-            ),
-          );
-        },
+        itemBuilder: (context, index) =>
+            _bustaPagaRow(context, ref, buste[index]),
       ),
     );
+  }
+
+  /// Sotto-sezione "Extra" come singolo sliver, con apertura/chiusura
+  /// animata: crescita di altezza dall'alto (`AnimatedAlign` con
+  /// `heightFactor`, clippata da `ClipRect` per nascondere l'overflow oltre
+  /// l'altezza corrente) + fade-in/out (`AnimatedOpacity`) + un leggero
+  /// slide verticale d'ingresso (`AnimatedSlide`) — stessa
+  /// `_extraAnimationDuration`/`_extraAnimationCurve` della freccetta in
+  /// [_extraToggle], per un unico gesto percepito. Le righe restano sempre
+  /// montate nell'albero (nessuno swap di widget tra aperto/chiuso): è
+  /// questo che permette al contenuto di dissolversi visibilmente invece di
+  /// sparire di scatto mentre la sezione collassa.
+  ///
+  /// Se `animato` è `false` (nessuna mensile in questa vista, la sezione è
+  /// **sempre** espansa, vedi [_yearSliver]) la lista è mostrata
+  /// direttamente senza alcun wrapper animato: niente flash di apertura
+  /// quando non c'è nulla da collassare, e lo spacer verso le mensilità
+  /// (`AppSpacing.md`) viene omesso perché non ci sono mensilità da cui
+  /// separarsi.
+  Widget _extraSliver(
+    BuildContext context,
+    WidgetRef ref,
+    List<BustaPaga> extra, {
+    required bool espansa,
+    required bool animato,
+  }) {
+    final content = Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.screenHorizontal,
+        AppSpacing.xs,
+        AppSpacing.screenHorizontal,
+        0,
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < extra.length; i++) ...[
+            if (i > 0) const SizedBox(height: AppSpacing.sm),
+            _bustaPagaRow(context, ref, extra[i]),
+          ],
+        ],
+      ),
+    );
+
+    if (!animato) {
+      return SliverToBoxAdapter(child: content);
+    }
+
+    // Lo spacer verso le mensilità resta sempre presente (fuori dal blocco
+    // che collassa in altezza): a differenza delle righe sopra, non deve
+    // sparire con l'animazione di chiusura, altrimenti il gap tra il toggle
+    // "Extra" nell'header e la prima riga mensile si riduce quando la
+    // sezione è collassata.
+    return SliverToBoxAdapter(
+      child: Column(
+        children: [
+          ClipRect(
+            child: AnimatedAlign(
+              alignment: Alignment.topCenter,
+              heightFactor: espansa ? 1.0 : 0.0,
+              duration: _extraAnimationDuration,
+              curve: _extraAnimationCurve,
+              child: AnimatedSlide(
+                offset: espansa ? Offset.zero : const Offset(0, -0.06),
+                duration: _extraAnimationDuration,
+                curve: _extraAnimationCurve,
+                child: AnimatedOpacity(
+                  opacity: espansa ? 1.0 : 0.0,
+                  duration: _extraAnimationDuration,
+                  curve: _extraAnimationCurve,
+                  child: content,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+        ],
+      ),
+    );
+  }
+
+  /// `true` se `buste` contiene almeno una mensile (a differenza di
+  /// 13esima/14esima, che sono "Extra") — determina se la sotto-sezione
+  /// "Extra" ha un toggle animato o è forzata sempre espansa, vedi
+  /// [_espansaExtra].
+  bool _animato(List<BustaPaga> buste) =>
+      buste.any((b) => b.tipo == TipoBustaPaga.mensile);
+
+  /// Calcola se la sotto-sezione "Extra" dell'anno `anno` deve risultare
+  /// espansa in questa build, gestendo la transizione "solo extra" (nessuna
+  /// mensile in questa vista, forzata sempre espansa senza toggle) → "extra
+  /// + mensili" (toggle animato, stato tracciato da `_extraEspansi`).
+  ///
+  /// Se `animato` è `false` l'anno viene marcato in
+  /// [_extraForzataEspansa]. Alla prima build successiva in cui `animato`
+  /// torna `true` (una mensile è stata importata per lo stesso anno), la
+  /// marcatura viene rimossa e l'anno viene aggiunto a `_extraEspansi`
+  /// **prima** di calcolare `espansa` — così il nuovo wrapper animato monta
+  /// già espanso invece di collassare di scatto (bug reale corretto qui,
+  /// non un'ipotesi, vedi CLAUDE.md/istruzioni task).
+  ///
+  /// Va chiamato una sola volta per anno per build, centralizzato in
+  /// [_yearSection] **prima** di costruire sia [_extraToggle] sia
+  /// [_yearSliver]: se venisse chiamato dentro [_yearSliver] (che è passato
+  /// come argomento nominato `sliver:`, valutato dopo `header:` nell'ordine
+  /// testuale del sorgente), [_extraToggle] leggerebbe lo stato di
+  /// `_extraEspansi` prima della mutazione, causando un disallineamento tra
+  /// la freccetta e il contenuto nel frame della transizione.
+  bool _espansaExtra(int anno, bool animato) {
+    if (!animato) {
+      _extraForzataEspansa[anno] = true;
+    } else if (_extraForzataEspansa.remove(anno) == true) {
+      _extraEspansi.add(anno);
+    }
+    return !animato || _extraEspansi.contains(anno);
   }
 
   /// Contenuto (`sliver:`) di un `SliverStickyHeader` anno: le mensilità
   /// normali, poi in fondo la sotto-sezione "Extra" (13esima/14esima) se
   /// presente — header tappabile con freccetta che espande/collassa
-  /// `_bustePagaSliverList(extra)`, chiusa di default (`anno` non in
-  /// `_extraEspansi`). Niente sticky header annidato (non supportato da
+  /// `_extraSliver(extra)` con una transizione animata (vedi
+  /// [_extraSliver]), chiusa di default (`anno` non in `_extraEspansi`).
+  /// Niente sticky header annidato (non supportato da
   /// `flutter_sticky_header`), tutto sotto lo stesso header "$anno".
   ///
   /// `buste` è già la lista **per questo anno nella vista corrente** (dopo
   /// un eventuale filtro di ricerca, vedi [_filtered]/`build`), non il
-  /// totale assoluto dell'anno: se in questa vista non c'è nessuna mensile
-  /// (`normali` vuoto) la sotto-sezione "Extra" resta sempre espansa
-  /// indipendentemente da `_extraEspansi`, altrimenti — con `_extraEspansi`
-  /// chiuso di default — `SliverMainAxisGroup` riceverebbe zero sliver e
-  /// l'intero anno apparirebbe vuoto sotto il suo header: capita sia quando
-  /// un anno ha solo 13esima/14esima in archivio, sia quando una ricerca
-  /// filtra via tutte le mensili di un anno lasciando solo un risultato
-  /// dentro gli Extra — bug reale corretto qui, non un'ipotesi (vedi
-  /// CLAUDE.md/istruzioni task).
-  Widget _yearSliver(
-      BuildContext context, WidgetRef ref, int anno, List<BustaPaga> buste) {
+  /// totale assoluto dell'anno. `espansa` è calcolato esternamente da
+  /// [_yearSection] (via [_espansaExtra]) e passato qui come parametro:
+  /// questo metodo non muta più alcuno stato, solo disegna.
+  Widget _yearSliver(BuildContext context, WidgetRef ref, int anno,
+      List<BustaPaga> buste, bool espansa) {
     // Ordine fisso per tipo (13esima sempre prima della 14esima), non
     // cronologico per mese come le mensilità: il mese registrato su
     // ciascuna può variare da un anno all'altro, l'ordine per tipo resta
@@ -256,26 +388,75 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
       ..sort((a, b) => a.tipo.index.compareTo(b.tipo.index));
     final normali =
         buste.where((b) => b.tipo == TipoBustaPaga.mensile).toList();
-    final espansa = normali.isEmpty || _extraEspansi.contains(anno);
+    final animato = _animato(buste);
 
     return SliverMainAxisGroup(
       slivers: [
-        if (extra.isNotEmpty) ...[
-          if (espansa) _bustePagaSliverList(ref, extra),
-          if (normali.isNotEmpty)
-            const SliverToBoxAdapter(
-              child: SizedBox(height: AppSpacing.md),
-            ),
-        ],
+        if (extra.isNotEmpty)
+          _extraSliver(context, ref, extra, espansa: espansa, animato: animato),
         if (normali.isNotEmpty) _bustePagaSliverList(ref, normali),
       ],
     );
   }
 
-  /// Toggle "Extra ⌄" (testo + `AnimatedRotation` chevron), ora disegnato
-  /// sulla stessa riga dell'header sticky dell'anno invece che come riga a
-  /// parte sopra l'elenco — stesso comportamento/stato (`_extraEspansi`) di
-  /// prima, solo posizione diversa.
+  /// Unico punto di ingresso per la sezione di un anno: calcola `animato`
+  /// ed `espansa` **prima** di costruire `SliverStickyHeader`, poi passa
+  /// `espansa` esplicitamente sia a [_extraToggle] (nell'header) sia a
+  /// [_yearSliver] (nel contenuto) — evita il disallineamento tra freccetta
+  /// e contenuto descritto in [_espansaExtra].
+  Widget _yearSection(
+      BuildContext context, WidgetRef ref, int anno, List<BustaPaga> buste) {
+    final animato = _animato(buste);
+    final espansa = _espansaExtra(anno, animato);
+    final haExtra = buste.any((b) => b.tipo != TipoBustaPaga.mensile);
+
+    return SliverStickyHeader(
+      header: _pinnedBackground(
+        context,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.screenHorizontal,
+            AppSpacing.xs,
+            AppSpacing.screenHorizontal,
+            AppSpacing.sm + 2,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '$anno',
+                  style: AppTextStyles.subtitle.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: CupertinoDynamicColor.resolve(
+                        AppColors.labelPrimary, context),
+                  ),
+                ),
+              ),
+              // Toggle mostrato solo se l'anno ha ENTRAMBI mensili ed Extra
+              // nella vista corrente: altrimenti (solo Extra, vedi
+              // `_espansaExtra`) la sotto-sezione resta sempre espansa e non
+              // c'è nulla da collassare — un toggle interattivo lì potrebbe
+              // far ricomparire la sezione vuota che questo fix corregge.
+              if (haExtra && animato) _extraToggle(context, anno, espansa),
+            ],
+          ),
+        ),
+      ),
+      sliver: _yearSliver(context, ref, anno, buste, espansa),
+    );
+  }
+
+  /// Toggle "Extra ⌄" (testo + `AnimatedRotation` chevron), disegnato sulla
+  /// stessa riga dell'header sticky dell'anno invece che come riga a parte
+  /// sopra l'elenco. `espansa` è calcolato da [_yearSection] (via
+  /// [_espansaExtra]) e passato esplicitamente, così è sempre coerente col
+  /// contenuto disegnato da [_yearSliver] nello stesso frame — vedi
+  /// [_espansaExtra] per il perché questo calcolo non può più avvenire
+  /// localmente qui o dentro [_yearSliver]. La rotazione della freccetta
+  /// usa la stessa durata/curva (`_extraAnimationDuration`/
+  /// `_extraAnimationCurve`) della crescita/fade della lista in
+  /// [_extraSliver], così i due effetti si percepiscono come un unico
+  /// gesto.
   Widget _extraToggle(BuildContext context, int anno, bool espansa) {
     final labelSecondary =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
@@ -300,7 +481,8 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
           const SizedBox(width: AppSpacing.xs),
           AnimatedRotation(
             turns: espansa ? 0.25 : 0,
-            duration: const Duration(milliseconds: 200),
+            duration: _extraAnimationDuration,
+            curve: _extraAnimationCurve,
             child: Icon(
               CupertinoIcons.chevron_right,
               size: 14,
@@ -401,47 +583,7 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
                   )
                 else
                   for (final anno in anni) ...[
-                    SliverStickyHeader(
-                      header: _pinnedBackground(
-                        context,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.screenHorizontal,
-                            AppSpacing.xs,
-                            AppSpacing.screenHorizontal,
-                            AppSpacing.sm + 2,
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  '$anno',
-                                  style: AppTextStyles.subtitle.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: CupertinoDynamicColor.resolve(
-                                        AppColors.labelPrimary, context),
-                                  ),
-                                ),
-                              ),
-                              // Toggle mostrato solo se l'anno ha ENTRAMBI
-                              // mensili ed Extra nella vista corrente:
-                              // altrimenti (solo Extra, vedi `_yearSliver`)
-                              // la sotto-sezione resta sempre espansa e non
-                              // c'è nulla da collassare — un toggle
-                              // interattivo lì potrebbe far ricomparire la
-                              // sezione vuota che questo fix corregge.
-                              if (byYear[anno]!.any(
-                                      (b) => b.tipo != TipoBustaPaga.mensile) &&
-                                  byYear[anno]!.any(
-                                      (b) => b.tipo == TipoBustaPaga.mensile))
-                                _extraToggle(context, anno,
-                                    _extraEspansi.contains(anno)),
-                            ],
-                          ),
-                        ),
-                      ),
-                      sliver: _yearSliver(context, ref, anno, byYear[anno]!),
-                    ),
+                    _yearSection(context, ref, anno, byYear[anno]!),
                     if (anno != anni.last)
                       const SliverToBoxAdapter(
                         child: SizedBox(height: AppSpacing.lg),

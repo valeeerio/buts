@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -71,8 +72,7 @@ class BustePagaNotifier extends StateNotifier<List<BustaPaga>> {
   ///    indipendentemente dall'ordine esatto in cui le due operazioni
   ///    asincrone vengono effettivamente eseguite dal database.
   Future<void> _initialize() async {
-    final righe = await _db.select(_db.bustePagaTable).get();
-    final daDb = righe.map((r) => r.toDomain()).toList();
+    final daDb = await _leggiRigheResilienti();
     final idGiaInStato = state.map((b) => b.id).toSet();
     final mancantiDaDb = daDb.where(
       (b) => !idGiaInStato.contains(b.id) && !_idsRimossi.contains(b.id),
@@ -84,6 +84,45 @@ class BustePagaNotifier extends StateNotifier<List<BustaPaga>> {
     // non deve mai ritardare né bloccare l'inizializzazione dell'archivio
     // (vedi doc di [_sweepPdfOrfani]).
     _sweepPdfOrfani();
+  }
+
+  /// Legge dal DB tutte le buste paga, riga per riga, in modo resiliente a
+  /// righe singolarmente corrotte.
+  ///
+  /// `_db.select(_db.bustePagaTable).get()` non basta: i converter JSON
+  /// (`TrattenuteConverter`/`VoceCompetenzaListConverter` in
+  /// `lib/data/database.dart`) vengono invocati da Drift internamente,
+  /// dentro la stessa `.map().toList()` sincrona che costruisce l'intera
+  /// lista di righe — se anche una sola riga ha JSON malformato in
+  /// `trattenute`/`competenze`, l'intera `Future` di `.get()` fallisce prima
+  /// di restituire qualunque riga, non solo quella incriminata. Per isolare
+  /// il fallimento riga per riga si legge prima il solo elenco di id (colonna
+  /// di solo testo, non passa per nessun converter JSON, non può fallire per
+  /// questo motivo), poi si rilegge — e converte in `BustaPaga` — ogni riga
+  /// singolarmente, scartando con un log solo quelle che falliscono: un
+  /// singolo record corrotto non deve mai rendere invisibile tutto il resto
+  /// dell'archivio.
+  Future<List<BustaPaga>> _leggiRigheResilienti() async {
+    final idRows = await (_db.selectOnly(_db.bustePagaTable)
+          ..addColumns([_db.bustePagaTable.id]))
+        .get();
+    final ids = idRows.map((r) => r.read(_db.bustePagaTable.id)!).toList();
+
+    final daDb = <BustaPaga>[];
+    for (final id in ids) {
+      try {
+        final riga = await (_db.select(_db.bustePagaTable)
+              ..where((t) => t.id.equals(id)))
+            .getSingle();
+        daDb.add(riga.toDomain());
+      } catch (e) {
+        // Riga corrotta (es. JSON malformato in `trattenute`/`competenze`):
+        // scartata singolarmente, non deve far fallire il caricamento
+        // dell'intero archivio.
+        debugPrint('Busta paga (id=$id) scartata perché corrotta: $e');
+      }
+    }
+    return daDb;
   }
 
   /// Elimina dalla cartella `buste_paga_pdf/` i PDF non referenziati da
@@ -160,7 +199,13 @@ class BustePagaNotifier extends StateNotifier<List<BustaPaga>> {
 
   Future<void> add(BustaPaga busta) async {
     final precedente = state;
-    state = [...state, busta];
+    final giaPresente = state.any((b) => b.id == busta.id);
+    state = giaPresente
+        ? [
+            for (final b in state)
+              if (b.id == busta.id) busta else b,
+          ]
+        : [...state, busta];
     try {
       await _db
           .into(_db.bustePagaTable)

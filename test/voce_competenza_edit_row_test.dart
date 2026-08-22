@@ -35,6 +35,68 @@ void main() {
     });
   });
 
+  group('VoceCompetenzaEditRow — importo negativo, nessun doppio segno', () {
+    // Regressione: prima del fix il controller veniva precompilato con
+    // `formatEuro(importo)` (che antepone già un "-" per i negativi, es.
+    // "-14,50") e il widget aggiungeva comunque un prefisso "€ " fisso,
+    // producendo "€ -14,50" in editing contro "− € 14,50" mostrato in sola
+    // lettura da `formatEuroConSegno` — vedi CLAUDE.md, requisito "modifica
+    // inline" non negoziabile.
+    test(
+        'costruita con stringa negativa: negativo=true, campo mostra solo '
+        'il valore assoluto', () {
+      final row =
+          VoceCompetenzaEditRow(descrizione: 'Storno', importo: '-14,50');
+      addTearDown(row.dispose);
+
+      expect(row.negativo, isTrue);
+      expect(row.importo.text, '14,50');
+      expect(row.importoValue, closeTo(-14.5, 0.001));
+    });
+
+    test(
+        'costruita con stringa positiva: negativo=false, nessun segno nel '
+        'campo', () {
+      final row =
+          VoceCompetenzaEditRow(descrizione: 'Ordinaria', importo: '1.500,00');
+      addTearDown(row.dispose);
+
+      expect(row.negativo, isFalse);
+      expect(row.importo.text, '1.500,00');
+      expect(row.importoValue, closeTo(1500.0, 0.001));
+    });
+
+    testWidgets(
+        'riga negativa mostra il prefisso "− € ", mai un "€ -" col segno '
+        'duplicato', (tester) async {
+      final row =
+          VoceCompetenzaEditRow(descrizione: 'Storno', importo: '-14,50');
+      addTearDown(row.dispose);
+
+      await tester.pumpWidget(
+        CupertinoApp(
+          home: CupertinoPageScaffold(
+            child: Center(
+              child: SizedBox(
+                width: 600,
+                child: voceCompetenzaEditRow(row, onDismissed: () {}),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('− € '), findsOneWidget);
+      expect(find.text('€ '), findsNothing);
+
+      final campoImporto = tester
+          .widgetList<CupertinoTextField>(find.byType(CupertinoTextField))
+          .firstWhere((w) => w.controller == row.importo);
+      expect(campoImporto.controller!.text, '14,50');
+    });
+  });
+
   group('BustaPagaCompetenzeSection — sola lettura, quantità assente', () {
     testWidgets(
         'quantità null mostra un trattino "—", non "0" (fuorviante come '

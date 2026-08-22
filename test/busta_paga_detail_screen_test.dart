@@ -117,4 +117,86 @@ void main() {
           reason: 'doppio segno "€ -" nel diff: $diff');
     });
   });
+
+  group('valoriDerivatiEditing - fallback competenze vuote', () {
+    const voce = VoceCompetenza(
+      descrizione: 'Straordinario diurno (30%)',
+      quantita: 10,
+      importo: 150.0,
+    );
+
+    test(
+        'partenza vuota, resta vuota: fallback al vecchio lordo/straordinari/netto',
+        () {
+      final corrente = _busta().copyWith(lordo: 0, straordinari: 0, netto: 0);
+
+      final valori = valoriDerivatiEditing(
+        corrente: corrente,
+        competenze: const [],
+        trattenute: const {},
+        competenzeVuoteInPartenza: true,
+      );
+
+      expect(valori.lordo, 0);
+      expect(valori.straordinari, 0);
+      expect(valori.netto, 0);
+    });
+
+    test('partenza non vuota, svuotata dall\'utente: deriva da competenze []',
+        () {
+      final corrente = _busta(competenze: const [voce])
+          .copyWith(lordo: 150, straordinari: 10, netto: 150);
+
+      final valori = valoriDerivatiEditing(
+        corrente: corrente,
+        competenze: const [],
+        trattenute: const {},
+        competenzeVuoteInPartenza: false,
+      );
+
+      expect(valori.lordo, 0);
+      expect(valori.straordinari, 0);
+      expect(valori.netto, 0);
+    });
+
+    test(
+        'partenza non vuota, modificata non svuotata: deriva da competenze correnti',
+        () {
+      const voceModificata = VoceCompetenza(
+        descrizione: 'Straordinario diurno (30%)',
+        quantita: 5,
+        importo: 75.0,
+      );
+      final corrente = _busta(competenze: const [voce])
+          .copyWith(lordo: 150, straordinari: 10, netto: 150);
+
+      final valori = valoriDerivatiEditing(
+        corrente: corrente,
+        competenze: const [voceModificata],
+        trattenute: const {},
+        competenzeVuoteInPartenza: false,
+      );
+
+      expect(valori.lordo, 75.0);
+      expect(valori.straordinari, 5.0);
+      expect(valori.netto, 75.0);
+    });
+
+    test(
+        'partenza vuota, righe aggiunte: deriva da competenze correnti (bug corretto)',
+        () {
+      final corrente = _busta().copyWith(lordo: 0, straordinari: 0, netto: 0);
+
+      final valori = valoriDerivatiEditing(
+        corrente: corrente,
+        competenze: const [voce],
+        trattenute: const {},
+        competenzeVuoteInPartenza: true,
+      );
+
+      expect(valori.lordo, 150.0);
+      expect(valori.straordinari, 10.0);
+      expect(valori.netto, 150.0);
+    });
+  });
 }

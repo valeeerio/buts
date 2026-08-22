@@ -599,7 +599,10 @@ double _bottomTitleInterval({
 /// anche dopo il diradamento di `_bottomTitleInterval`.
 const _yearlyLabelsThreshold = 14;
 
-/// Oltre questo numero di buste paga, `_StraordinarioChart` passa da barre
+/// Oltre questo numero di *slot mensili* nella griglia continua
+/// (`_grigliaMensile`, l'ampiezza temporale coperta dal filtro — non il
+/// numero di buste paga confermate, che può restare basso pur coprendo un
+/// arco di molti anni se mancano mesi), `_StraordinarioChart` passa da barre
 /// mensili a barre trimestrali (somma ore per trimestre): con 2+ anni di
 /// dati mensili le barre diventano troppo sottili per essere lette anche con
 /// lo scroll orizzontale, e 30 barre singole sono meno leggibili di un
@@ -1281,7 +1284,6 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
     final tooltip = _tooltipColors(context);
 
-    final aggregato = buste.length > _quarterlyAggregationThreshold;
     // Griglia continua (mensile o trimestrale a seconda dell'aggregazione),
     // stesso meccanismo di `_NettoLordoChart`/`_FerieRolPermessiChart` (vedi
     // doc di libreria su `_grigliaMensile`/`_grigliaTrimestrale`): un
@@ -1289,10 +1291,19 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
     // disegnata per quello slot) invece di sparire silenziosamente
     // avvicinando le barre dei mesi/trimestri adiacenti come se fossero
     // consecutivi.
+    final grigliaMensile = _grigliaMensile(buste);
+    // Decisione basata sull'ampiezza temporale reale coperta dalla griglia
+    // (numero di slot mensili, buchi inclusi), non sul numero di buste paga
+    // confermate: un archivio con molti mesi mancanti/non confermati ma che
+    // copre un arco di molti anni renderizzerebbe altrimenti una griglia
+    // mensile non aggregata su molti slot, con uno scroll orizzontale molto
+    // lungo — in contrasto con l'intento della soglia (vedi doc su
+    // `_quarterlyAggregationThreshold`).
+    final aggregato = grigliaMensile.length > _quarterlyAggregationThreshold;
     final punti = aggregato
         ? _grigliaTrimestrale(buste)
         : [
-            for (final g in _grigliaMensile(buste))
+            for (final g in grigliaMensile)
               (periodo: g.periodo, totale: g.busta?.straordinari),
           ];
     final shortLabelBuilder = aggregato ? _trimestreLabel : meseAxisLabel;
