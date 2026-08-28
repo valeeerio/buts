@@ -239,7 +239,13 @@ sul pilota Archivio Buste Paga ed estesa a tutta l'app.
   riservato ad accenti puntuali (badge di stato, CTA primaria via il parametro
   `tint` di `LiquidGlassSurface`/`LiquidGlassButton`), mai come riempimento pieno
   della superficie. Light e dark mode entrambi previsti fin da subito tramite
-  `CupertinoDynamicColor`.
+  `CupertinoDynamicColor`. **2026-08-26**: nuovo accento primario "brand"
+  `AppColors.brandAccent` (corallo/arancio caldo, `#DF6020` light / `#FF8850`
+  dark) sostituisce `systemBlue` come colore d'accento principale nei punti
+  "riscaldati" dello stile (CTA primarie, icone di rilievo, illustrazioni
+  custom, vedi paragrafo "Icone" sotto) — migrazione fatta schermata per
+  schermata, lavoro in corso: non tutte le occorrenze di `systemBlue` sono
+  ancora state sostituite.
 - **Forme**: corner radius "squircle" continui (superellisse, non il doppio arco di
   `BorderRadius.circular`) via `lib/widgets/squircle_clipper.dart`, applicati da
   `LiquidGlassSurface`/`LiquidGlassButton`. Raggi in `lib/theme/app_spacing.dart` →
@@ -254,8 +260,16 @@ sul pilota Archivio Buste Paga ed estesa a tutta l'app.
   (sotto-navigazione, barra Conferma/Modifica).
 - **Tipografia**: system font (SF Pro su iOS via Cupertino di default). Gerarchia
   in `lib/theme/app_text_styles.dart`.
-- **Icone**: sempre `CupertinoIcons` (SF Symbols-style). Mai emoji nei componenti
-  di produzione — se ne trovi in mockup precedenti (HTML) sono placeholder da
+- **Icone**: standard `CupertinoIcons` (SF Symbols-style) in tutta l'app.
+  **2026-08-26**: permesso un piccolo set di illustrazioni/icone custom (non
+  SF Symbols) per momenti chiave — stati vuoti, onboarding, momenti che
+  richiedono attenzione — vedi `lib/widgets/custom_illustration.dart`
+  (`CustomIllustration`). Vanno sempre costruite come widget
+  `CustomPainter`/geometria vettoriale Dart (mai asset raster, mai SVG
+  importato), stile line-art a tratto singolo colorato con
+  `AppColors.brandAccent`. `CupertinoIcons` resta lo standard per ogni altro
+  punto dell'app (barre, chip, pulsanti, badge). Mai emoji nei componenti di
+  produzione — se ne trovi in mockup precedenti (HTML) sono placeholder da
   sostituire.
 
 **Scroll e dissolvenza in fondo alla lista**: nell'Archivio (`buste_paga_

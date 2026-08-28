@@ -17,6 +17,7 @@ import '../../theme/app_text_styles.dart';
 import '../../utils/busta_paga_formatting.dart';
 import '../../widgets/app_alert_dialog.dart';
 import '../../widgets/cupertino_range_slider.dart';
+import '../../widgets/custom_illustration.dart';
 import '../../widgets/flat_chip_button.dart';
 import '../../widgets/spring_button.dart';
 import '../../widgets/squircle_clipper.dart';
@@ -165,7 +166,8 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
     await service.schedulaNotificaDiProvaPerDebug();
     if (!mounted) return;
 
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     await showAppAlertDialog<void>(
       context: context,
       title: 'Notifica di prova',
@@ -193,12 +195,17 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
     if (service == null || !service.onboardingDaMostrare) return;
     if (!mounted) return;
 
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     final secondary =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
 
     await showAppAlertDialog<void>(
       context: context,
+      illustration: const CustomIllustration(
+        variant: CustomIllustrationVariant.onboardingNotifiche,
+        size: 72,
+      ),
       title: 'Promemoria busta paga',
       message: 'Il 1° di ogni mese Buts può ricordarti di importare la '
           'busta paga del mese appena concluso, con altri due solleciti '
@@ -237,7 +244,8 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
   /// seconda volta, va spiegato che si riattiva da Impostazioni.
   void _showPermessoNotificheNegatoAlert() {
     if (!mounted) return;
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     showAppAlertDialog<void>(
       context: context,
       title: 'Notifiche disattivate',
@@ -418,7 +426,8 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
   /// lente come prefix (tappabile per chiudere), campo borderless, tasto
   /// "Annulla" per chiudere in alternativa.
   Widget _buildSearchField(Color labelPrimary, Color labelSecondary) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     return Row(
       children: [
         Semantics(
@@ -494,7 +503,8 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
   }
 
   void _showImportError(String title, String message) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     showAppAlertDialog<void>(
       context: context,
       title: title,
@@ -573,10 +583,10 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
                     // pieni della sidecar (`FlatChipButton`).
                     colors: [
                       CupertinoDynamicColor.resolve(
-                              AppColors.systemBlue, context)
+                              AppColors.brandAccent, context)
                           .withValues(alpha: 0.55),
                       CupertinoDynamicColor.resolve(
-                              AppColors.systemBlue, context)
+                              AppColors.brandAccent, context)
                           .withValues(alpha: 0),
                     ],
                   ),
@@ -682,7 +692,7 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
                                           CupertinoIcons.search,
                                           size: 22,
                                           color: CupertinoDynamicColor.resolve(
-                                              AppColors.systemBlue, context),
+                                              AppColors.brandAccent, context),
                                         ),
                                       ),
                                     ),
@@ -768,7 +778,7 @@ class _BustePagaSidecar extends StatelessWidget {
     // Stesso colore della fascia di benvenuto in alto, usato per il "+" e
     // per il tab attivo.
     final plusAccent =
-        CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     final labelSecondary =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
 

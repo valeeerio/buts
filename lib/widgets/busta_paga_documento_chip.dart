@@ -46,7 +46,8 @@ class BustaPagaDocumentoChip extends StatelessWidget {
   }
 
   void _mostraErroreApertura(BuildContext context, String messaggio) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     showAppAlertDialog<void>(
       context: context,
       title: 'Impossibile aprire il documento',
@@ -64,7 +65,8 @@ class BustaPagaDocumentoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     final labelPrimary =
         CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
 

@@ -472,7 +472,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       context: context,
       builder: (context) {
         final accent =
-            CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+            CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
         return Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.screenHorizontal,
@@ -548,7 +548,8 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   }
 
   void _showAlert(String title, String message) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     showAppAlertDialog<void>(
       context: context,
       title: title,
@@ -643,7 +644,8 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       return;
     }
 
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     final labelSecondary =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
     showAppAlertDialog<void>(
@@ -908,7 +910,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                           icon: CupertinoIcons.checkmark_alt,
                           label: 'OK',
                           color: CupertinoDynamicColor.resolve(
-                              AppColors.systemBlue, context),
+                              AppColors.brandAccent, context),
                           onPressed: () => Navigator.of(context).pop(),
                         ),
                       ],
@@ -927,7 +929,8 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   }
 
   Widget _aggiungiVoceButton(BuildContext context) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: SpringButton(
@@ -1009,7 +1012,8 @@ class _ActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     final greenAccent =
         CupertinoDynamicColor.resolve(AppColors.systemGreen, context);
     final secondaryAccent =

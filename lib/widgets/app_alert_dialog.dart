@@ -40,11 +40,18 @@ class AppAlertDialog extends StatelessWidget {
   final String? message;
   final List<AppAlertAction> actions;
 
+  /// Illustrazione opzionale (`CustomIllustration`) mostrata sopra il
+  /// titolo, es. per l'onboarding dei promemoria. Additivo: se `null` (il
+  /// caso di ogni chiamata esistente), l'aspetto del popup resta identico a
+  /// prima.
+  final Widget? illustration;
+
   const AppAlertDialog({
     super.key,
     required this.title,
     this.message,
     required this.actions,
+    this.illustration,
   });
 
   @override
@@ -78,6 +85,10 @@ class AppAlertDialog extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                if (illustration != null) ...[
+                  illustration!,
+                  const SizedBox(height: AppSpacing.sm),
+                ],
                 Text(
                   title,
                   textAlign: TextAlign.center,
@@ -131,6 +142,7 @@ Future<T?> showAppAlertDialog<T>({
   required String title,
   String? message,
   required List<AppAlertAction> actions,
+  Widget? illustration,
 }) {
   return showGeneralDialog<T>(
     context: context,
@@ -139,7 +151,12 @@ Future<T?> showAppAlertDialog<T>({
     barrierColor: const Color(0x00000000),
     transitionDuration: const Duration(milliseconds: 200),
     pageBuilder: (context, animation, secondaryAnimation) {
-      return AppAlertDialog(title: title, message: message, actions: actions);
+      return AppAlertDialog(
+        title: title,
+        message: message,
+        actions: actions,
+        illustration: illustration,
+      );
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       return _AlertTransition(animation: animation, child: child);

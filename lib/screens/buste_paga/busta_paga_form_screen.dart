@@ -309,7 +309,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
       context: context,
       builder: (context) {
         final accent =
-            CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+            CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
         return Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.screenHorizontal,
@@ -433,7 +433,8 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
       .toList();
 
   void _showAlert(String title, String message) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     showAppAlertDialog<void>(
       context: context,
       title: title,
@@ -547,7 +548,8 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     final secondaryAccent =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
 

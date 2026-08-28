@@ -65,6 +65,15 @@ class AppColors {
     darkColor: Color(0x80EBEBF5),
   );
 
+  /// Accento brand dell'app, corallo/arancio caldo: sostituisce systemBlue
+  /// nei punti "riscaldati" (CTA primarie, icone di rilievo, illustrazioni
+  /// custom). Valori scelti per adeguata distanza di tonalità HSL da
+  /// systemRed/systemOrange e contrasto sufficiente su sfondo bianco.
+  static const brandAccent = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFFDF6020),
+    darkColor: Color(0xFFFF8850),
+  );
+
   // --- Liquid Glass ---
   // Palette volutamente sobria/neutra: il materiale vetro è la fonte di
   // profondità, il colore resta riservato ad accenti puntuali (badge di

@@ -29,7 +29,17 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
   static const _fadeHeight = 90.0;
 
   static const _nettoColor = AppColors.systemGreen;
-  static const _lordoColor = AppColors.systemBlue;
+  // Riscaldata a `brandAccent` (era systemBlue): nel grafico Netto/Lordo è
+  // l'unica altra serie oltre a Netto (systemGreen), nessun rischio di
+  // confusione con systemOrange/systemRed che non compaiono in questo
+  // grafico.
+  static const _lordoColor = AppColors.brandAccent;
+  // Resta systemBlue (non riscaldata): nel grafico Ferie e permessi
+  // convive con systemOrange (permessi orario goduti) — troppo vicino in
+  // tonalità a `brandAccent` (coral/arancio) per restare distinguibile in
+  // un grafico a 4 serie, vedi CLAUDE.md sulla distanza HSL verificata solo
+  // rispetto a systemRed/systemOrange in isolamento, non nel contesto di un
+  // grafico che li affianca entrambi.
   static const _ferieColor = AppColors.systemBlue;
   static const _rolColor = AppColors.systemPurple;
   static const _permessiColor = AppColors.systemOrange;

@@ -144,19 +144,9 @@ class BustaPagaHeroCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sm,
-                  vertical: AppSpacing.xs,
-                ),
-                decoration: BoxDecoration(
-                  color: badgeColor.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(AppRadius.small),
-                ),
-                child: Text(
-                  isConfermato ? 'Confermato' : 'Da confermare',
-                  style: AppTextStyles.changeBadge.copyWith(color: badgeColor),
-                ),
+              _StatoBadge(
+                isConfermato: isConfermato,
+                badgeColor: badgeColor,
               ),
             ],
           ),
@@ -220,6 +210,86 @@ class BustaPagaHeroCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Badge di stato (Confermato/Da confermare): sola visualizzazione, colori e
+/// aspetto sempre guidati dal chiamante (`isConfermato`/`badgeColor`, a loro
+/// volta derivati dallo stato letto dal provider, mai da variabili locali di
+/// editing). Aggiunge solo un piccolo "pop" a molla sulla scala quando
+/// [isConfermato] cambia rispetto al build precedente — mai al primo mount.
+class _StatoBadge extends StatefulWidget {
+  final bool isConfermato;
+  final Color badgeColor;
+
+  const _StatoBadge({
+    required this.isConfermato,
+    required this.badgeColor,
+  });
+
+  @override
+  State<_StatoBadge> createState() => _StatoBadgeState();
+}
+
+class _StatoBadgeState extends State<_StatoBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+    _scale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 1.0, end: 1.15)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 40,
+      ),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.15, end: 1.0)
+            .chain(CurveTween(curve: Curves.elasticOut)),
+        weight: 60,
+      ),
+    ]).animate(_controller);
+  }
+
+  @override
+  void didUpdateWidget(_StatoBadge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isConfermato != widget.isConfermato) {
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScaleTransition(
+      scale: _scale,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: widget.badgeColor.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(AppRadius.small),
+        ),
+        child: Text(
+          widget.isConfermato ? 'Confermato' : 'Da confermare',
+          style: AppTextStyles.changeBadge.copyWith(color: widget.badgeColor),
+        ),
       ),
     );
   }

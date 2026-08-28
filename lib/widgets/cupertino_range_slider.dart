@@ -243,7 +243,8 @@ class _CupertinoRangeSliderState extends State<CupertinoRangeSlider>
   Widget build(BuildContext context) {
     final trackColor =
         CupertinoDynamicColor.resolve(AppColors.separator, context);
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     final labelColor =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
 
@@ -379,7 +380,8 @@ class _RangeThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     // `CupertinoColors.white` letterale invece di un token `AppColors`: il
     // thumb va risolto esplicitamente comunque tramite
     // `CupertinoDynamicColor.resolve` (convenzione di progetto per ogni

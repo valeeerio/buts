@@ -35,7 +35,8 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final labelSecondary =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
 
     return GlassFormSection(
       children: [

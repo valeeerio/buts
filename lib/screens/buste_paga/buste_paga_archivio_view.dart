@@ -13,9 +13,11 @@ import '../../utils/busta_paga_formatting.dart';
 import '../../widgets/app_alert_dialog.dart';
 import '../../widgets/busta_paga_list_item.dart';
 import '../../widgets/busta_paga_summary_hero.dart';
+import '../../widgets/custom_illustration.dart';
 import '../../widgets/liquid_glass_button.dart';
 import '../../widgets/liquid_glass_surface.dart';
 import '../../widgets/spring_button.dart';
+import '../../widgets/staggered_fade_slide_in.dart';
 import '../../widgets/swipe_delete_background.dart';
 
 /// Filtra le buste paga per periodo (nome mese, anno e/o etichetta di tipo,
@@ -101,6 +103,39 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
   // anche quando non c'era nient'altro da rivelare scorrendo oltre.
   bool _showBottomFade = true;
 
+  /// Indice globale/continuo (non locale ad ogni sotto-sezione) di ogni
+  /// busta paga nell'ordine in cui compare dall'alto verso il basso in
+  /// tutta la colonna scrollabile (Extra e mensili di tutti gli anni
+  /// visibili) — usato da [StaggeredFadeSlideIn] per lo scaglionamento
+  /// dell'animazione d'ingresso. Ricalcolata ad ogni `build` in
+  /// [_computeGlobalRowIndex] **prima** di costruire gli sliver, così resta
+  /// coerente anche se `SliverList.separated`/`itemBuilder` costruiscono le
+  /// righe in modo lazy/non sequenziale (l'ordine viene deciso qui, non
+  /// dedotto dall'ordine di chiamata dei builder).
+  Map<String, int> _globalRowIndex = const {};
+
+  /// Calcola [_globalRowIndex] per la build corrente: stesso ordine con cui
+  /// [_yearSliver] disegna le righe (per ogni anno decrescente, prima
+  /// "Extra" ordinata per tipo poi le mensili in ordine cronologico
+  /// decrescente già garantito da `sorted`).
+  void _computeGlobalRowIndex(
+      List<int> anni, Map<int, List<BustaPaga>> byYear) {
+    final index = <String, int>{};
+    var i = 0;
+    for (final anno in anni) {
+      final buste = byYear[anno]!;
+      final extra = buste.where((b) => b.tipo != TipoBustaPaga.mensile).toList()
+        ..sort((a, b) => a.tipo.index.compareTo(b.tipo.index));
+      final normali =
+          buste.where((b) => b.tipo == TipoBustaPaga.mensile).toList();
+      for (final bustaPaga in [...extra, ...normali]) {
+        index[bustaPaga.id] = i;
+        i++;
+      }
+    }
+    _globalRowIndex = index;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -178,7 +213,7 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
     } catch (_) {
       if (!context.mounted) return false;
       final accent =
-          CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+          CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
       showAppAlertDialog<void>(
         context: context,
         title: 'Eliminazione non riuscita',
@@ -218,14 +253,19 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
   /// in entrambi i casi.
   Widget _bustaPagaRow(
       BuildContext context, WidgetRef ref, BustaPaga bustaPaga) {
-    return Dismissible(
-      key: ValueKey('row-${bustaPaga.id}'),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (_) => _confermaEElimina(context, ref, bustaPaga),
-      background: const SwipeDeleteBackground(radius: AppRadius.glassSmall),
-      child: BustaPagaListItem(
-        bustaPaga: bustaPaga,
-        onTap: () => widget.onOpenDetail(bustaPaga),
+    final globalIndex = _globalRowIndex[bustaPaga.id] ?? 0;
+    return StaggeredFadeSlideIn(
+      key: ValueKey('stagger-${bustaPaga.id}'),
+      index: globalIndex,
+      child: Dismissible(
+        key: ValueKey('row-${bustaPaga.id}'),
+        direction: DismissDirection.endToStart,
+        confirmDismiss: (_) => _confermaEElimina(context, ref, bustaPaga),
+        background: const SwipeDeleteBackground(radius: AppRadius.glassSmall),
+        child: BustaPagaListItem(
+          bustaPaga: bustaPaga,
+          onTap: () => widget.onOpenDetail(bustaPaga),
+        ),
       ),
     );
   }
@@ -507,6 +547,7 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
         widget.query.trim().isNotEmpty &&
         filtered.isEmpty;
     final mostraHero = !widget.searchActive && ultima != null;
+    _computeGlobalRowIndex(anni, byYear);
 
     // Ricontrolla dopo ogni layout (non solo sullo scroll dell'utente): il
     // contenuto della lista cambia (import/eliminazione, ricerca) e con
@@ -633,11 +674,9 @@ class _NessunRisultato extends StatelessWidget {
         width: double.infinity,
         child: Column(
           children: [
-            Icon(
-              CupertinoIcons.search,
-              size: 28,
-              color: CupertinoDynamicColor.resolve(
-                  AppColors.labelSecondary, context),
+            const CustomIllustration(
+              variant: CustomIllustrationVariant.nessunRisultato,
+              size: 72,
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
@@ -663,7 +702,8 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
     return LiquidGlassSurface(
       radius: AppRadius.glass,
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -671,11 +711,9 @@ class _EmptyState extends StatelessWidget {
         width: double.infinity,
         child: Column(
           children: [
-            Icon(
-              CupertinoIcons.doc_text_search,
-              size: 32,
-              color: CupertinoDynamicColor.resolve(
-                  AppColors.labelSecondary, context),
+            const CustomIllustration(
+              variant: CustomIllustrationVariant.archivioVuoto,
+              size: 132,
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
