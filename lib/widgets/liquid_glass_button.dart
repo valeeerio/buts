@@ -23,7 +23,7 @@ class LiquidGlassButton extends StatelessWidget {
     this.radius = AppRadius.glassSmall,
     this.padding = const EdgeInsets.symmetric(
       horizontal: AppSpacing.lg,
-      vertical: AppSpacing.sm + 4,
+      vertical: AppSpacing.mdMinus,
     ),
     this.tint,
   });

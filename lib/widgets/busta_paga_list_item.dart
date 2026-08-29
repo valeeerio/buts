@@ -41,14 +41,14 @@ class BustaPagaListItem extends StatelessWidget {
       onTap: onTap,
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm + 4,
+        vertical: AppSpacing.mdMinus,
       ),
       child: Row(
         children: [
           Container(
             width: 8,
             height: 8,
-            margin: const EdgeInsets.only(right: AppSpacing.sm + 2),
+            margin: const EdgeInsets.only(right: AppSpacing.smPlus),
             decoration: BoxDecoration(
               color: statoColor,
               shape: BoxShape.circle,

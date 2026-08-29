@@ -104,7 +104,7 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
       color: textPrimary,
     );
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.smPlus),
       child: Row(
         children: [
           Expanded(
@@ -148,7 +148,7 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
     final textSecondary =
         CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.smPlus),
       child: Text(
         message,
         style: AppTextStyles.pulseBody.copyWith(color: textSecondary),

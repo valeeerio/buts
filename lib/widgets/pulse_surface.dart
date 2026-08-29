@@ -22,6 +22,16 @@ class PulseSurface extends StatefulWidget {
   /// neutro `AppColors.pulseSurface`. In questo caso niente ombra.
   final bool filled;
 
+  /// Override opzionale del gradiente di `filled`: se fornito (richiede
+  /// almeno 2 colori), sostituisce il gradiente diagonale ciano di default
+  /// con un gradiente diagonale custom fra questi colori — usato da
+  /// `BustaPagaSummaryHero` per il gradiente viola→ciano del blocco netto
+  /// (mesh gradient, vedi CLAUDE.md/piano sessione). Ignorato se `filled` è
+  /// `false`. Nessun effetto sugli altri usi esistenti di
+  /// `PulseSurface(filled: true)`, che continuano a mostrare il gradiente
+  /// ciano invariato.
+  final List<Color>? filledGradientColors;
+
   final VoidCallback? onTap;
 
   const PulseSurface({
@@ -30,6 +40,7 @@ class PulseSurface extends StatefulWidget {
     this.padding,
     this.borderRadius = AppRadius.pulse,
     this.filled = false,
+    this.filledGradientColors,
     this.onTap,
   });
 
@@ -51,20 +62,27 @@ class _PulseSurfaceState extends State<PulseSurface> {
 
     Decoration decoration;
     if (widget.filled) {
-      final accent = CupertinoDynamicColor.resolve(
-        AppColors.pulseAccent,
-        context,
-      );
-      final accentDark = Color.alphaBlend(
-        CupertinoColors.black.withValues(alpha: 0.22),
-        accent,
-      );
+      List<Color> gradientColors;
+      if (widget.filledGradientColors != null &&
+          widget.filledGradientColors!.length >= 2) {
+        gradientColors = widget.filledGradientColors!;
+      } else {
+        final accent = CupertinoDynamicColor.resolve(
+          AppColors.pulseAccent,
+          context,
+        );
+        final accentDark = Color.alphaBlend(
+          CupertinoColors.black.withValues(alpha: 0.22),
+          accent,
+        );
+        gradientColors = [accent, accentDark];
+      }
       decoration = BoxDecoration(
         borderRadius: radius,
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [accent, accentDark],
+          colors: gradientColors,
         ),
       );
     } else {
@@ -72,16 +90,12 @@ class _PulseSurfaceState extends State<PulseSurface> {
         AppColors.pulseSurface,
         context,
       );
-      final isDark =
-          MediaQuery.platformBrightnessOf(context) == Brightness.dark;
       decoration = BoxDecoration(
         color: surface,
         borderRadius: radius,
         boxShadow: [
           BoxShadow(
-            color: CupertinoColors.black.withValues(
-              alpha: isDark ? 0.28 : 0.08,
-            ),
+            color: CupertinoColors.black.withValues(alpha: 0.28),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),

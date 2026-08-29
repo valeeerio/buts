@@ -61,68 +61,69 @@ class AppAlertDialog extends StatelessWidget {
         CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
     final surface =
         CupertinoDynamicColor.resolve(AppColors.pulseSurface, context);
-    final isDark = MediaQuery.platformBrightnessOf(context) == Brightness.dark;
 
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(AppRadius.pulse),
-            boxShadow: [
-              BoxShadow(
-                color: CupertinoColors.black
-                    .withValues(alpha: isDark ? 0.5 : 0.18),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                if (illustration != null) ...[
-                  illustration!,
-                  const SizedBox(height: AppSpacing.sm),
-                ],
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.pulseBodyEmphasis.copyWith(
-                    color: textPrimary,
-                  ),
-                ),
-                if (message != null) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    message!,
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.pulseBody.copyWith(
-                      color: textSecondary,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: AppSpacing.lg),
-                Row(
-                  children: [
-                    for (var i = 0; i < actions.length; i++) ...[
-                      if (i > 0) const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: FlatChipButton(
-                          icon: actions[i].icon,
-                          label: actions[i].label,
-                          color: actions[i].color,
-                          onPressed: actions[i].onPressed,
-                        ),
-                      ),
-                    ],
-                  ],
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(AppRadius.pulse),
+              boxShadow: [
+                BoxShadow(
+                  color: CupertinoColors.black.withValues(alpha: 0.5),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
                 ),
               ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (illustration != null) ...[
+                    illustration!,
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.pulseBodyEmphasis.copyWith(
+                      color: textPrimary,
+                    ),
+                  ),
+                  if (message != null) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      message!,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.pulseBody.copyWith(
+                        color: textSecondary,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.lg),
+                  Row(
+                    children: [
+                      for (var i = 0; i < actions.length; i++) ...[
+                        if (i > 0) const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: FlatChipButton(
+                            icon: actions[i].icon,
+                            label: actions[i].label,
+                            color: actions[i].color,
+                            onPressed: actions[i].onPressed,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),

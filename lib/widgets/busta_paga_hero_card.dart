@@ -148,66 +148,150 @@ class BustaPagaHeroCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Lordo',
-                        textAlign: TextAlign.center,
-                        style: labelStyle,
-                      ),
-                      const SizedBox(height: 2),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          lordoDisplay,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          style: amountValueStyle,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  width: 0.5,
-                  margin: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                  color: separator,
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Netto',
-                        textAlign: TextAlign.center,
-                        style: labelStyle,
-                      ),
-                      const SizedBox(height: 2),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          nettoDisplay,
-                          textAlign: TextAlign.center,
-                          maxLines: 1,
-                          style: amountValueStyle,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          _AmountsRow(
+            lordoDisplay: lordoDisplay,
+            nettoDisplay: nettoDisplay,
+            labelStyle: labelStyle,
+            valueStyle: amountValueStyle,
+            separatorColor: separator,
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Riga Lordo/Netto della hero card: calcola UN SOLO fattore di scala
+/// condiviso tra i due valori (invece di due `FittedBox` indipendenti, uno
+/// per Lordo e uno per Netto), così i due restano sempre alla stessa
+/// dimensione di font — requisito non negoziabile del widget (vedi doc sopra
+/// su `BustaPagaHeroCard`). Con due `FittedBox` separati, stringhe di
+/// lunghezza diversa (es. un Netto negativo col prefisso "− €" più lungo del
+/// Lordo) venivano scalate ciascuna col proprio fattore, risultando in due
+/// dimensioni di font diverse tra Lordo e Netto — bug reale corretto qui, non
+/// un'ipotesi.
+///
+/// Il fattore è calcolato misurando la larghezza naturale di entrambe le
+/// stringhe con `TextPainter` (stesso `valueStyle`, stesso `textScaler` di
+/// sistema per rispettare l'accessibilità) e confrontandola con la larghezza
+/// disponibile per singola colonna (metà della larghezza totale, al netto del
+/// divisore centrale): si usa la stringa PIÙ LARGA delle due per calcolare lo
+/// scala, applicato poi a ENTRAMBE — mai un fattore per stringa. Nel caso
+/// comune (entrambi i valori di lunghezza normale, scala 1.0) il layout
+/// risultante è identico a prima del fix: il fix è correttivo solo nel caso
+/// limite in cui uno dei due valori non entrerebbe nella propria metà a
+/// dimensione naturale.
+class _AmountsRow extends StatelessWidget {
+  final String lordoDisplay;
+  final String nettoDisplay;
+  final TextStyle labelStyle;
+  final TextStyle valueStyle;
+  final Color separatorColor;
+
+  const _AmountsRow({
+    required this.lordoDisplay,
+    required this.nettoDisplay,
+    required this.labelStyle,
+    required this.valueStyle,
+    required this.separatorColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const separatorSpace = 0.5 + AppSpacing.sm * 2;
+        final columnWidth = ((constraints.maxWidth - separatorSpace) / 2).clamp(
+          0.0,
+          double.infinity,
+        );
+        final scale = _sharedScale(context, columnWidth);
+        final scaledValueStyle = valueStyle.copyWith(
+          fontSize: (valueStyle.fontSize ?? 20) * scale,
+        );
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _AmountColumn(
+                  label: 'Lordo',
+                  value: lordoDisplay,
+                  labelStyle: labelStyle,
+                  valueStyle: scaledValueStyle,
+                ),
+              ),
+              Container(
+                width: 0.5,
+                margin: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                color: separatorColor,
+              ),
+              Expanded(
+                child: _AmountColumn(
+                  label: 'Netto',
+                  value: nettoDisplay,
+                  labelStyle: labelStyle,
+                  valueStyle: scaledValueStyle,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  double _sharedScale(BuildContext context, double columnWidth) {
+    final textScaler = MediaQuery.textScalerOf(context);
+    double naturalWidth(String text) {
+      final painter = TextPainter(
+        text: TextSpan(text: text, style: valueStyle),
+        textDirection: Directionality.of(context),
+        textScaler: textScaler,
+        maxLines: 1,
+      )..layout();
+      return painter.width;
+    }
+
+    final widest = [
+      naturalWidth(lordoDisplay),
+      naturalWidth(nettoDisplay),
+    ].reduce((a, b) => a > b ? a : b);
+    if (widest <= 0 || columnWidth <= 0) return 1.0;
+    return (columnWidth / widest).clamp(0.0, 1.0);
+  }
+}
+
+/// Singola colonna etichetta+valore (Lordo o Netto), stile condiviso tramite
+/// [valueStyle] già scalato da [_AmountsRow].
+class _AmountColumn extends StatelessWidget {
+  final String label;
+  final String value;
+  final TextStyle labelStyle;
+  final TextStyle valueStyle;
+
+  const _AmountColumn({
+    required this.label,
+    required this.value,
+    required this.labelStyle,
+    required this.valueStyle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(label, textAlign: TextAlign.center, style: labelStyle),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          style: valueStyle,
+        ),
+      ],
     );
   }
 }

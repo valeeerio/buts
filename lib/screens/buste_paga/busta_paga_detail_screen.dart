@@ -17,9 +17,11 @@ import '../../widgets/busta_paga_maturazioni_section.dart';
 import '../../widgets/busta_paga_stat_row.dart';
 import '../../widgets/flat_chip_button.dart';
 import '../../widgets/pulse_icon.dart';
+import '../../widgets/pulse_mesh_background.dart';
 import '../../widgets/pulse_section_card.dart';
 import '../../widgets/pulse_surface.dart';
 import '../../widgets/spring_button.dart';
+import '../../widgets/stationary_push_bar.dart';
 import '../../widgets/trattenuta_edit_row.dart';
 import '../../widgets/voce_competenza_edit_row.dart';
 
@@ -717,229 +719,276 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
         ? periodoDisplayFor(periodo: _periodoEdit, tipo: _tipoEdit)
         : bustaPagaPeriodoDisplay(corrente);
 
-    return CupertinoPageScaffold(
-      backgroundColor:
-          CupertinoDynamicColor.resolve(AppColors.pulseBackground, context),
-      navigationBar: const CupertinoNavigationBar(),
-      child: Stack(
-        children: [
-          SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.screenHorizontal,
-                    AppSpacing.sm,
-                    AppSpacing.screenHorizontal,
-                    0,
+    // La macchia decorativa viola di `PulseMeshBackground` ha il suo punto
+    // di massima opacità proprio nell'angolo in alto a sinistra, dove
+    // `CupertinoNavigationBar` disegna il back-chevron: un fill leggermente
+    // opaco (stesso token `pulseBackground` del "chrome" della barra
+    // flottante in basso, vedi `_floatingBarBackground`) ammorbidisce la
+    // macchia sotto la nav bar senza nasconderla nel resto della schermata.
+    final navBarBackground =
+        CupertinoDynamicColor.resolve(AppColors.pulseBackground, context)
+            .withValues(alpha: 0.55);
+
+    return PulseMeshBackground(
+      child: CupertinoPageScaffold(
+        backgroundColor: CupertinoColors.transparent,
+        navigationBar: CupertinoNavigationBar(
+          backgroundColor: navBarBackground,
+          border: null,
+        ),
+        child: Stack(
+          children: [
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.screenHorizontal,
+                      AppSpacing.sm,
+                      AppSpacing.screenHorizontal,
+                      0,
+                    ),
+                    child: BustaPagaHeroCard(
+                      isConfermato: corrente.statoVerifica ==
+                          StatoVerificaBustaPaga.confermato,
+                      periodoLabel: periodoLabelVista,
+                      lordoDisplay: formatEuroConSegno(_isEditing
+                          ? _valoriDerivatiEditing(corrente).lordo
+                          : corrente.lordo),
+                      nettoDisplay: formatEuroConSegno(_isEditing
+                          ? _valoriDerivatiEditing(corrente).netto
+                          : corrente.netto),
+                      onTapPeriodo: _isEditing ? _pickPeriodo : null,
+                      onTapTipo: _isEditing ? _pickTipo : null,
+                    ),
                   ),
-                  child: BustaPagaHeroCard(
-                    isConfermato: corrente.statoVerifica ==
-                        StatoVerificaBustaPaga.confermato,
-                    periodoLabel: periodoLabelVista,
-                    lordoDisplay: formatEuroConSegno(_isEditing
-                        ? _valoriDerivatiEditing(corrente).lordo
-                        : corrente.lordo),
-                    nettoDisplay: formatEuroConSegno(_isEditing
-                        ? _valoriDerivatiEditing(corrente).netto
-                        : corrente.netto),
-                    onTapPeriodo: _isEditing ? _pickPeriodo : null,
-                    onTapTipo: _isEditing ? _pickTipo : null,
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding:
-                        const EdgeInsets.only(bottom: _actionBarReservedHeight),
-                    child: ShaderMask(
-                      blendMode: BlendMode.dstIn,
-                      shaderCallback: (rect) {
-                        const fadeHeight = 32.0;
-                        var topStop =
-                            (fadeHeight / rect.height).clamp(0.0, 1.0);
-                        final bottomStop =
-                            1 - (fadeHeight / rect.height).clamp(0.0, 1.0);
-                        topStop = topStop.clamp(0.0, bottomStop);
-                        return LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: const [
-                            CupertinoColors.transparent,
-                            CupertinoColors.white,
-                            CupertinoColors.white,
-                            CupertinoColors.transparent,
-                          ],
-                          stops: [0.0, topStop, bottomStop, 1.0],
-                        ).createShader(rect);
-                      },
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.screenHorizontal,
-                          AppSpacing.lg,
-                          AppSpacing.screenHorizontal,
-                          AppSpacing.xl,
-                        ),
-                        children: [
-                          if (corrente.fileOrigine != null) ...[
-                            BustaPagaDocumentoChip(
-                              filePath: corrente.fileOrigine!,
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(
+                          bottom: _actionBarReservedHeight),
+                      child: ShaderMask(
+                        blendMode: BlendMode.dstIn,
+                        shaderCallback: (rect) {
+                          const fadeHeight = 32.0;
+                          var topStop =
+                              (fadeHeight / rect.height).clamp(0.0, 1.0);
+                          final bottomStop =
+                              1 - (fadeHeight / rect.height).clamp(0.0, 1.0);
+                          topStop = topStop.clamp(0.0, bottomStop);
+                          return LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: const [
+                              CupertinoColors.transparent,
+                              CupertinoColors.white,
+                              CupertinoColors.white,
+                              CupertinoColors.transparent,
+                            ],
+                            stops: [0.0, topStop, bottomStop, 1.0],
+                          ).createShader(rect);
+                        },
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.screenHorizontal,
+                            AppSpacing.lg,
+                            AppSpacing.screenHorizontal,
+                            AppSpacing.xl,
+                          ),
+                          children: [
+                            if (corrente.fileOrigine != null) ...[
+                              BustaPagaDocumentoChip(
+                                filePath: corrente.fileOrigine!,
+                                periodo: corrente.periodo,
+                                tipo: corrente.tipo,
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                            ],
+                            BustaPagaMaturazioniSection(
+                              isEditing: _isEditing,
+                              ferieMaturate:
+                                  formatNumber(corrente.ferieMaturate),
+                              ferieGodute: formatNumber(corrente.ferieGodute),
+                              ferieResidue: formatNumber(corrente.ferieResidue),
+                              rolMaturati: formatNumber(corrente.rolMaturati),
+                              rolGoduti: formatNumber(corrente.rolGoduti),
+                              rolResidui: formatNumber(corrente.rolResidui),
+                              exFestivitaMaturate:
+                                  formatNumber(corrente.exFestivitaMaturate),
+                              exFestivitaGodute:
+                                  formatNumber(corrente.exFestivitaGodute),
+                              exFestivitaResidue:
+                                  formatNumber(corrente.exFestivitaResidue),
+                              ferieMaturateCtrl:
+                                  _isEditing ? _ferieMaturateCtrl : null,
+                              ferieGoduteCtrl:
+                                  _isEditing ? _ferieGoduteCtrl : null,
+                              ferieResidueCtrl:
+                                  _isEditing ? _ferieResidueCtrl : null,
+                              rolMaturatiCtrl:
+                                  _isEditing ? _rolMaturatiCtrl : null,
+                              rolGodutiCtrl: _isEditing ? _rolGodutiCtrl : null,
+                              rolResiduiCtrl:
+                                  _isEditing ? _rolResiduiCtrl : null,
+                              exFestivitaMaturateCtrl:
+                                  _isEditing ? _exFestivitaMaturateCtrl : null,
+                              exFestivitaGoduteCtrl:
+                                  _isEditing ? _exFestivitaGoduteCtrl : null,
+                              exFestivitaResidueCtrl:
+                                  _isEditing ? _exFestivitaResidueCtrl : null,
+                            ),
+                            BustaPagaStatRow(items: [
+                              (
+                                'Ore lavorate',
+                                _isEditing
+                                    ? inlineNumberField(
+                                        _oreLavorateCtrl,
+                                        style: AppTextStyles.pulseDisplaySmall,
+                                      )
+                                    : Text(formatNumber(corrente.oreLavorate),
+                                        textAlign: TextAlign.center),
+                              ),
+                              (
+                                'Straordinari',
+                                Text(
+                                  '${formatNumber(_isEditing ? _valoriDerivatiEditing(corrente).straordinari : corrente.straordinari)} h',
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ]),
+                            const SizedBox(height: AppSpacing.lg),
+                            BustaPagaCompetenzeSection(
+                              isEditing: _isEditing,
+                              competenze: corrente.competenze,
+                              righeEdit: _isEditing ? _competenzeEdit : null,
+                              onAggiungi: _isEditing ? _addCompetenza : null,
+                              onRimuovi: _isEditing ? _removeCompetenza : null,
                             ),
                             const SizedBox(height: AppSpacing.lg),
+                            _trattenuteSection(
+                              context,
+                              footer: _isEditing
+                                  ? 'Aggiungi le voci di trattenuta indicate in busta '
+                                      'paga (es. INPS, IRPEF).'
+                                  : null,
+                              rows: _isEditing
+                                  ? [
+                                      for (var i = 0;
+                                          i < _trattenuteEdit.length;
+                                          i++)
+                                        trattenutaEditRow(
+                                          _trattenuteEdit[i],
+                                          onDismissed: () =>
+                                              _removeTrattenuta(i),
+                                        ),
+                                      _aggiungiVoceButton(context),
+                                    ]
+                                  : corrente.trattenute.isEmpty
+                                      ? [
+                                          _trattenutaRow(
+                                              'Nessuna trattenuta', '—')
+                                        ]
+                                      : corrente.trattenute.entries
+                                          .map((e) => _trattenutaRow(
+                                              e.key, formatTrattenuta(e.value)))
+                                          .toList(),
+                            ),
                           ],
-                          BustaPagaMaturazioniSection(
-                            isEditing: _isEditing,
-                            ferieMaturate: formatNumber(corrente.ferieMaturate),
-                            ferieGodute: formatNumber(corrente.ferieGodute),
-                            ferieResidue: formatNumber(corrente.ferieResidue),
-                            rolMaturati: formatNumber(corrente.rolMaturati),
-                            rolGoduti: formatNumber(corrente.rolGoduti),
-                            rolResidui: formatNumber(corrente.rolResidui),
-                            exFestivitaMaturate:
-                                formatNumber(corrente.exFestivitaMaturate),
-                            exFestivitaGodute:
-                                formatNumber(corrente.exFestivitaGodute),
-                            exFestivitaResidue:
-                                formatNumber(corrente.exFestivitaResidue),
-                            ferieMaturateCtrl:
-                                _isEditing ? _ferieMaturateCtrl : null,
-                            ferieGoduteCtrl:
-                                _isEditing ? _ferieGoduteCtrl : null,
-                            ferieResidueCtrl:
-                                _isEditing ? _ferieResidueCtrl : null,
-                            rolMaturatiCtrl:
-                                _isEditing ? _rolMaturatiCtrl : null,
-                            rolGodutiCtrl: _isEditing ? _rolGodutiCtrl : null,
-                            rolResiduiCtrl: _isEditing ? _rolResiduiCtrl : null,
-                            exFestivitaMaturateCtrl:
-                                _isEditing ? _exFestivitaMaturateCtrl : null,
-                            exFestivitaGoduteCtrl:
-                                _isEditing ? _exFestivitaGoduteCtrl : null,
-                            exFestivitaResidueCtrl:
-                                _isEditing ? _exFestivitaResidueCtrl : null,
-                          ),
-                          BustaPagaStatRow(items: [
-                            (
-                              'Ore lavorate',
-                              _isEditing
-                                  ? inlineNumberField(
-                                      _oreLavorateCtrl,
-                                      style: AppTextStyles.pulseDisplaySmall,
-                                    )
-                                  : Text(formatNumber(corrente.oreLavorate),
-                                      textAlign: TextAlign.center),
-                            ),
-                            (
-                              'Straordinari',
-                              Text(
-                                '${formatNumber(_isEditing ? _valoriDerivatiEditing(corrente).straordinari : corrente.straordinari)} h',
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ]),
-                          const SizedBox(height: AppSpacing.lg),
-                          BustaPagaCompetenzeSection(
-                            isEditing: _isEditing,
-                            competenze: corrente.competenze,
-                            righeEdit: _isEditing ? _competenzeEdit : null,
-                            onAggiungi: _isEditing ? _addCompetenza : null,
-                            onRimuovi: _isEditing ? _removeCompetenza : null,
-                          ),
-                          _trattenuteSection(
-                            context,
-                            footer: _isEditing
-                                ? 'Aggiungi le voci di trattenuta indicate in busta '
-                                    'paga (es. INPS, IRPEF).'
-                                : null,
-                            rows: _isEditing
-                                ? [
-                                    for (var i = 0;
-                                        i < _trattenuteEdit.length;
-                                        i++)
-                                      trattenutaEditRow(
-                                        _trattenuteEdit[i],
-                                        onDismissed: () => _removeTrattenuta(i),
-                                      ),
-                                    _aggiungiVoceButton(context),
-                                  ]
-                                : corrente.trattenute.isEmpty
-                                    ? [
-                                        _trattenutaRow(
-                                            'Nessuna trattenuta', '—')
-                                      ]
-                                    : corrente.trattenute.entries
-                                        .map((e) => _trattenutaRow(
-                                            e.key, formatTrattenuta(e.value)))
-                                        .toList(),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Positioned(
-            left: AppSpacing.screenHorizontal,
-            right: AppSpacing.screenHorizontal,
-            bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: _ActionBar(
-                  bustaPaga: corrente,
-                  isEditing: _isEditing,
-                  onConferma: () async {
-                    try {
-                      await ref.read(busteRepositoryProvider.notifier).update(
-                            corrente.copyWith(
-                              statoVerifica: StatoVerificaBustaPaga.confermato,
-                            ),
+            Positioned(
+              left: AppSpacing.screenHorizontal,
+              right: AppSpacing.screenHorizontal,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: StationaryPushBar(
+                    child: _ActionBar(
+                      bustaPaga: corrente,
+                      isEditing: _isEditing,
+                      onConferma: () async {
+                        try {
+                          await ref
+                              .read(busteRepositoryProvider.notifier)
+                              .update(
+                                corrente.copyWith(
+                                  statoVerifica:
+                                      StatoVerificaBustaPaga.confermato,
+                                ),
+                              );
+                        } catch (_) {
+                          if (!context.mounted) return;
+                          _showAlert(
+                            'Salvataggio non riuscito',
+                            'Impossibile confermare i dati, riprova.',
                           );
-                    } catch (_) {
-                      if (!context.mounted) return;
-                      _showAlert(
-                        'Salvataggio non riuscito',
-                        'Impossibile confermare i dati, riprova.',
-                      );
-                      return;
-                    }
-                    if (!context.mounted) return;
-                    showAppAlertDialog<void>(
-                      context: context,
-                      title: 'Dati confermati',
-                      actions: [
-                        AppAlertAction(
-                          icon: CupertinoIcons.checkmark_alt,
-                          label: 'OK',
-                          color: CupertinoDynamicColor.resolve(
-                              AppColors.pulseAccent, context),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                      ],
-                    );
-                  },
-                  onModifica: () => _enterEditing(corrente),
-                  onSalva: () => _save(corrente),
-                  onAnnulla: _cancelEditing,
+                          return;
+                        }
+                        if (!context.mounted) return;
+                        showAppAlertDialog<void>(
+                          context: context,
+                          title: 'Dati confermati',
+                          actions: [
+                            AppAlertAction(
+                              icon: CupertinoIcons.checkmark_alt,
+                              label: 'OK',
+                              color: CupertinoDynamicColor.resolve(
+                                  AppColors.pulseAccent, context),
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                          ],
+                        );
+                      },
+                      onModifica: () => _enterEditing(corrente),
+                      onSalva: () => _save(corrente),
+                      onAnnulla: _cancelEditing,
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  /// Sezione "Trattenute": card `PulseSectionCard` condivisa (stesso
-  /// impianto di `BustaPagaCompetenzeSection`/`BustaPagaMaturazioniSection`).
+  /// Sezione "Trattenute": header testuale + card `PulseSectionCard`
+  /// condivisa (stesso impianto di
+  /// `BustaPagaCompetenzeSection`/`BustaPagaMaturazioniSection`). L'header
+  /// segue lo stesso pattern di `_WarningsSection` in
+  /// `busta_paga_form_screen.dart` ("Da verificare"): senza un'intestazione
+  /// propria la card risultava visivamente ambigua, come se continuasse la
+  /// card Competenze sopra invece di essere una sezione distinta.
   Widget _trattenuteSection(
     BuildContext context, {
     required List<Widget> rows,
     String? footer,
   }) {
-    return PulseSectionCard(rows: rows, footer: footer);
+    final textSecondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(
+            left: AppSpacing.md,
+            bottom: AppSpacing.xs,
+          ),
+          child: Text(
+            'Trattenute',
+            style: AppTextStyles.pulseLabel.copyWith(color: textSecondary),
+          ),
+        ),
+        PulseSectionCard(rows: rows, footer: footer),
+      ],
+    );
   }
 
   Widget _aggiungiVoceButton(BuildContext context) {
@@ -968,7 +1017,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
         final textPrimary =
             CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.smPlus),
           child: Row(
             children: [
               Expanded(

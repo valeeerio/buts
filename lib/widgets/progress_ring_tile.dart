@@ -11,6 +11,16 @@ import 'pulse_surface.dart';
 /// `PulseSurface` non filled con un anello di progresso e un valore
 /// formattato al centro — sostituisce le vecchie righe testuali del
 /// dettaglio busta paga con una rappresentazione visiva bold/dark-first.
+/// Diametro dell'anello — leggermente più grande dei 52 originali per
+/// lasciare più respiro al valore centrale senza assottigliare troppo lo
+/// stroke (vedi [_ringInnerContentSize]).
+const double _ringSize = 56;
+
+/// Spazio libero (quadrato inscritto) lasciato al testo dentro l'anello,
+/// al netto dello stroke colorato — vincola esplicitamente il `FittedBox`
+/// del valore così non scala mai fino a toccare l'arco.
+const double _ringInnerContentSize = 34;
+
 class ProgressRingTile extends StatelessWidget {
   final String label;
   final String value;
@@ -48,22 +58,38 @@ class ProgressRingTile extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           SizedBox(
-            width: 52,
-            height: 52,
+            width: _ringSize,
+            height: _ringSize,
             child: CustomPaint(
               painter: _ProgressRingPainter(
                 progress: clampedProgress,
                 accent: accent,
               ),
               child: Center(
-                child: Text(
-                  value,
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.pulseDisplaySmall.copyWith(
-                    fontSize: 12,
-                    color: CupertinoDynamicColor.resolve(
-                      AppColors.pulseTextPrimary,
-                      context,
+                // Vincola esplicitamente lo spazio disponibile al testo
+                // all'area libera dentro l'anello (non all'intero
+                // `_ringSize`, come prima): senza questo `FittedBox` con
+                // `BoxFit.scaleDown` scalava il testo fino a riempire
+                // l'intero quadrato della `SizedBox`, ignorando lo stroke
+                // colorato e finendo quasi a contatto con l'arco (bug
+                // visivo reale, non un'ipotesi).
+                child: SizedBox(
+                  width: _ringInnerContentSize,
+                  height: _ringInnerContentSize,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      value,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.pulseDisplaySmall.copyWith(
+                        fontSize: 12,
+                        color: CupertinoDynamicColor.resolve(
+                          AppColors.pulseTextPrimary,
+                          context,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -94,7 +120,7 @@ class _ProgressRingPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
     final radius = size.shortestSide / 2;
-    final strokeWidth = size.shortestSide * 0.14;
+    final strokeWidth = size.shortestSide * 0.12;
     final rect = Rect.fromCircle(
       center: center,
       radius: radius - strokeWidth / 2,

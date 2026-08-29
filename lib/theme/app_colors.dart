@@ -59,21 +59,6 @@ class AppColors {
     darkColor: Color(0x99545458),
   );
 
-  /// Colore neutro di accento per la sezione Buste Paga (icone, CTA).
-  static const bustePaga = CupertinoDynamicColor.withBrightness(
-    color: Color(0x803C3C43),
-    darkColor: Color(0x80EBEBF5),
-  );
-
-  /// Accento brand dell'app, corallo/arancio caldo: sostituisce systemBlue
-  /// nei punti "riscaldati" (CTA primarie, icone di rilievo, illustrazioni
-  /// custom). Valori scelti per adeguata distanza di tonalità HSL da
-  /// systemRed/systemOrange e contrasto sufficiente su sfondo bianco.
-  static const brandAccent = CupertinoDynamicColor.withBrightness(
-    color: Color(0xFFDF6020),
-    darkColor: Color(0xFFFF8850),
-  );
-
   // --- Liquid Glass ---
   // Palette volutamente sobria/neutra: il materiale vetro è la fonte di
   // profondità, il colore resta riservato ad accenti puntuali (badge di
@@ -167,6 +152,17 @@ class AppColors {
   static const pulseTextSecondary = CupertinoDynamicColor.withBrightness(
     color: Color(0xFF5B6472),
     darkColor: Color(0xFF97A3B3),
+  );
+
+  /// Viola elettrico per macchie/gradienti di sfondo (mesh gradient viola↔
+  /// ciano, direzione "futuristica" derivata dal mockup B — vedi
+  /// CLAUDE.md/piano sessione). Uso ESCLUSIVAMENTE decorativo: sfondi
+  /// (`PulseMeshBackground`), gradiente del blocco netto in
+  /// `BustaPagaSummaryHero`. MAI come colore funzionale di icone/testo/CTA —
+  /// quel ruolo resta interamente a `pulseAccent` (ciano), che non cambia.
+  static const pulseSecondaryGlow = CupertinoDynamicColor.withBrightness(
+    color: Color(0xFF6A3FD1),
+    darkColor: Color(0xFF7C5CFF),
   );
 
   /// Variazione favorevole/stato positivo (es. "Confermato") sopra

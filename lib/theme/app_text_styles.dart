@@ -27,17 +27,6 @@ class AppTextStyles {
     letterSpacing: 0.2,
   );
 
-  static const cardAmountLarge = TextStyle(
-    fontSize: 18,
-    fontWeight: FontWeight.w700,
-  );
-
-  /// Cifra netta in evidenza massima nella hero card del dettaglio busta paga.
-  static const heroAmount = TextStyle(
-    fontSize: 34,
-    fontWeight: FontWeight.w700,
-  );
-
   static const cardAmount = TextStyle(
     fontSize: 16,
     fontWeight: FontWeight.w700,
@@ -46,17 +35,6 @@ class AppTextStyles {
   static const cardLabel = TextStyle(
     fontSize: 12,
     fontWeight: FontWeight.w400,
-  );
-
-  static const changeBadge = TextStyle(
-    fontSize: 12,
-    fontWeight: FontWeight.w600,
-  );
-
-  static const insightText = TextStyle(
-    fontSize: 13,
-    fontWeight: FontWeight.w500,
-    height: 1.3,
   );
 
   // --- Pulse ---

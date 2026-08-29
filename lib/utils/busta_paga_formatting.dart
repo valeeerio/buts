@@ -179,6 +179,42 @@ String formatEuroConSegno(double value) {
       : '€ ${formatEuro(value)}';
 }
 
+/// Versione COMPATTA di [formatEuroConSegno], per etichette con spazio
+/// ristretto (asse Y del grafico Netto/Lordo in Statistiche, vedi
+/// `_valueLeftAxisTitles` in `buste_paga_statistiche_screen.dart`) — NON per
+/// importi normali (tooltip, tabella riepilogativa), che restano su
+/// [formatEuroConSegno] con i due decimali esatti. Arrotonda all'euro (zero
+/// decimali) e, per i valori con modulo ≥ 1000, passa a notazione "k" con al
+/// più una cifra decimale (es. "1,5k", oppure "2k" se il migliaio è esatto) —
+/// una stringa come "− € 3.245,67" (12 caratteri) forzava lo scale-down di
+/// `FittedBox` ben sotto la soglia di leggibilità (~9-11px) nello spazio
+/// riservato all'asse; la versione compatta ("− € 3,2k", 8 caratteri) ci sta
+/// alla dimensione naturale del font. Stessa convenzione di segno/simbolo di
+/// [formatEuroConSegno]: "−" prima di "€" per i negativi.
+String formatEuroConSegnoCompatto(double value) {
+  final negative = value < 0;
+  final abs = value.abs();
+  // La decisione tra notazione "k" e numero secco va presa sul valore GIÀ
+  // arrotondato all'euro (stesso arrotondamento poi effettivamente
+  // mostrato nel ramo secco) — non su `abs` non arrotondato. Altrimenti un
+  // valore come 999.6 (sotto soglia, ma che arrotonda a 1000) finiva nel
+  // ramo secco producendo "€ 1000" invece di "€ 1k" (bug corretto qui). Il
+  // ramo "k" riparte a sua volta da questo intero già arrotondato, così non
+  // ci sono due arrotondamenti indipendenti che possano disallinearsi tra
+  // soglia e cifra mostrata.
+  final roundedAbs = abs.round();
+  final String numberPart;
+  if (roundedAbs >= 1000) {
+    final kRounded = (roundedAbs / 100).round() / 10;
+    numberPart = kRounded == kRounded.roundToDouble()
+        ? '${kRounded.toStringAsFixed(0)}k'
+        : '${kRounded.toStringAsFixed(1).replaceAll('.', ',')}k';
+  } else {
+    numberPart = roundedAbs.toString();
+  }
+  return negative ? '− € $numberPart' : '€ $numberPart';
+}
+
 /// Converte un numero in formato italiano digitato dall'utente (punto come
 /// separatore delle migliaia, virgola come separatore decimale — es.
 /// "1.234,56" o "1234,56") in un `double`, tornando `0` se il testo è vuoto o

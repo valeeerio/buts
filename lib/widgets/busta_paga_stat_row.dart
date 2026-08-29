@@ -31,7 +31,7 @@ class BustaPagaStatRow extends StatelessWidget {
       borderRadius: AppRadius.pulse,
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
-        vertical: AppSpacing.sm + 4,
+        vertical: AppSpacing.mdMinus,
       ),
       child: IntrinsicHeight(
         child: Row(

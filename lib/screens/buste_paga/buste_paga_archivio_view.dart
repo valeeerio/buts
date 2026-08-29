@@ -457,7 +457,7 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
             AppSpacing.screenHorizontal,
             AppSpacing.xs,
             AppSpacing.screenHorizontal,
-            AppSpacing.sm + 2,
+            AppSpacing.smPlus,
           ),
           child: Row(
             children: [
@@ -744,7 +744,7 @@ class _EmptyState extends StatelessWidget {
               onTap: onAdd,
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.lg,
-                vertical: AppSpacing.sm + 2,
+                vertical: AppSpacing.smPlus,
               ),
               child: Text(
                 'Aggiungi busta paga',

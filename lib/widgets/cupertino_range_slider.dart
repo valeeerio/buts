@@ -242,11 +242,12 @@ class _CupertinoRangeSliderState extends State<CupertinoRangeSlider>
   @override
   Widget build(BuildContext context) {
     final trackColor =
-        CupertinoDynamicColor.resolve(AppColors.separator, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context)
+            .withValues(alpha: 0.3);
     final accent =
         CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
     final labelColor =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -256,14 +257,14 @@ class _CupertinoRangeSliderState extends State<CupertinoRangeSlider>
           children: [
             Text(
               periodoAxisLabel(_dateFor(_startFraction)),
-              style: AppTextStyles.cardLabel.copyWith(
+              style: AppTextStyles.pulseLabel.copyWith(
                 color: labelColor,
                 fontWeight: FontWeight.w600,
               ),
             ),
             Text(
               periodoAxisLabel(_dateFor(_endFraction)),
-              style: AppTextStyles.cardLabel.copyWith(
+              style: AppTextStyles.pulseLabel.copyWith(
                 color: labelColor,
                 fontWeight: FontWeight.w600,
               ),

@@ -8,6 +8,16 @@ class AppSpacing {
 
   static const double xs = 4;
   static const double sm = 8;
+
+  /// Gradino intermedio tra `sm` (8) e `md` (14): copre gli spazi
+  /// leggermente più larghi di `sm` (es. gap tra icona e testo, padding
+  /// verticale compatto) prima diffusi come espressione derivata
+  /// `AppSpacing.sm + 2`.
+  static const double smPlus = 10;
+
+  /// Gradino intermedio tra `smPlus` (10) e `md` (14): copre gli spazi
+  /// prima diffusi come espressione derivata `AppSpacing.sm + 4`.
+  static const double mdMinus = 12;
   static const double md = 14;
   static const double lg = 20;
   static const double xl = 28;
@@ -20,10 +30,7 @@ class AppRadius {
   AppRadius._();
 
   static const double small = 8;
-  static const double medium = 10;
   static const double large = 12;
-  static const double card =
-      16; // usato per card più grandi (es. donut summary)
 
   // --- Liquid Glass ---
   // Curve più generose e "continue" (vedi `lib/widgets/squircle_clipper.dart`)

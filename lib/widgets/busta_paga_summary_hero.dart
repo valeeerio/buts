@@ -28,8 +28,10 @@ class BustaPagaSummaryHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final onAccent =
         CupertinoDynamicColor.resolve(AppColors.pulseOnAccent, context);
-    final isDarkMode =
-        MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+    final secondaryGlow =
+        CupertinoDynamicColor.resolve(AppColors.pulseSecondaryGlow, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
     final isConfermato =
         bustaPaga.statoVerifica == StatoVerificaBustaPaga.confermato;
     final badgeFill = CupertinoDynamicColor.resolve(
@@ -43,6 +45,16 @@ class BustaPagaSummaryHero extends StatelessWidget {
 
     return PulseSurface(
       filled: true,
+      // Gradiente diagonale viola→ciano ("mesh gradient", mockup B — vedi
+      // CLAUDE.md/piano sessione): il viola resta puramente decorativo qui.
+      // `pulseOnAccent` sopra regge benissimo (~10:1) contro l'estremo
+      // `pulseAccent` (ciano chiaro), ma contro `pulseSecondaryGlow` (viola,
+      // più scuro) scende a ~3.79:1 — sotto la soglia 4.5:1 per testo
+      // normale. La label "NETTO · ..." (`_NettoLabel`), che siede proprio
+      // nell'angolo in alto a sinistra dominato dal viola, ha quindi uno
+      // scrim chiaro dedicato per riportare quel punto sopra soglia — vedi
+      // commento su `_NettoLabel`.
+      filledGradientColors: [secondaryGlow, accent],
       borderRadius: AppRadius.pulse,
       padding: const EdgeInsets.all(AppSpacing.lg),
       onTap: onTap,
@@ -57,7 +69,6 @@ class BustaPagaSummaryHero extends StatelessWidget {
                   text:
                       'NETTO · ${bustaPagaPeriodoDisplay(bustaPaga).toUpperCase()}',
                   color: onAccent,
-                  showScrim: !isDarkMode,
                 ),
               ),
               Container(
@@ -89,32 +100,36 @@ class BustaPagaSummaryHero extends StatelessWidget {
   }
 }
 
-/// Label "NETTO · MESE ANNO" con uno scrim scuro discreto dietro al solo
-/// testo, in light mode: `pulseOnAccent` (bianco) su `pulseAccent` light dà
-/// solo 3.72:1, insufficiente per il rapporto di contrasto normale 4.5:1
-/// richiesto (a 14px logici il testo non raggiunge davvero la soglia WCAG di
-/// "testo grande bold", che corrisponde a ~18.7px logici, non 14px). Uno
-/// scrim nero al 18% di opacità dietro la sola label — non l'intero blocco
-/// Netto — scurisce il colore di sfondo effettivo sotto il testo bianco a
-/// sufficienza da superare 4.5:1 (~5.22:1 con questo valore, ricalcolato
-/// componendo `Colors.black` al 18% sopra `pulseAccent` light) restando
-/// visivamente sottile. In dark mode `pulseOnAccent` su `pulseAccent` dark è
-/// già ampiamente sopra soglia (~10:1+), nessuno scrim necessario lì.
+/// Label "NETTO · MESE ANNO", nell'angolo in alto a sinistra del blocco
+/// Netto (vedi `BustaPagaSummaryHero`), dove il gradiente diagonale è al suo
+/// estremo `pulseSecondaryGlow` (viola). `pulseOnAccent` (testo quasi-nero,
+/// pensato per un fondo chiaro come `pulseAccent`) contro quel viola dà solo
+/// ~3.79:1, sotto la soglia 4.5:1 per testo normale — il viola, pur scuro,
+/// non è abbastanza scuro da reggere un testo quasi-nero sopra. Uno scrim
+/// **chiaro** (bianco al 16% di opacità, sempre attivo — l'app forza sempre
+/// `Brightness.dark`, vedi `main.dart`, quindi non condizionato al tema)
+/// dietro la sola label schiarisce localmente il fondo sotto il testo scuro,
+/// portando il contrasto a ~4.9:1 (ricalcolato componendo il bianco al 16%
+/// sopra `pulseSecondaryGlow` e la luminanza risultante contro
+/// `pulseOnAccent`). Contro l'altro estremo del gradiente (`pulseAccent`,
+/// già chiaro) lo stesso scrim schiarisce ulteriormente il fondo, quindi non
+/// può che aumentare un contrasto già ampiamente sopra soglia (~10:1) — nessun
+/// rischio di regressione su quel lato.
 class _NettoLabel extends StatelessWidget {
   final String text;
   final Color color;
-  final bool showScrim;
 
   const _NettoLabel({
     required this.text,
     required this.color,
-    required this.showScrim,
   });
 
   @override
   Widget build(BuildContext context) {
     final label = Text(
       text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
       style: AppTextStyles.pulseLabel.copyWith(
         color: color,
         fontSize: 14,
@@ -122,23 +137,17 @@ class _NettoLabel extends StatelessWidget {
       ),
     );
 
-    if (!showScrim) {
-      return Align(alignment: Alignment.centerLeft, child: label);
-    }
-
     return Align(
       alignment: Alignment.centerLeft,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: CupertinoColors.black.withValues(alpha: 0.18),
+          color: CupertinoColors.white.withValues(alpha: 0.16),
           borderRadius: BorderRadius.circular(AppRadius.pulseSmall / 2),
         ),
         child: Padding(
-          padding: const EdgeInsets.only(
-            left: 0,
-            right: 4,
-            top: 2,
-            bottom: 2,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 4,
+            vertical: 2,
           ),
           child: label,
         ),

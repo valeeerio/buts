@@ -103,14 +103,26 @@ Widget voceCompetenzaEditRow(
         final textPrimary =
             CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.smPlus),
           child: Row(
             children: [
               Expanded(
                 flex: 3,
+                // `maxLines: null` (nessun limite, cresce verticalmente)
+                // invece del default di `CupertinoTextField` (1 riga, che
+                // TRONCA orizzontalmente il testo che eccede la larghezza) —
+                // la vista di sola lettura (`BustaPagaCompetenzeSection`,
+                // `maxLines: 2, overflow: TextOverflow.ellipsis`) va invece
+                // su due righe per le descrizioni lunghe: senza questo,
+                // entrare in modifica cambiava l'altezza della riga e
+                // tagliava silenziosamente il testo visibile — violava il
+                // requisito "modifica inline" non negoziabile (vedi
+                // CLAUDE.md), stesso bug reale già corretto per le
+                // Trattenute (`TrattenutaEditRow`, vedi la sua doc).
                 child: CupertinoTextField(
                   controller: row.descrizione,
                   placeholder: 'Voce',
+                  maxLines: null,
                   decoration: const BoxDecoration(),
                   padding: EdgeInsets.zero,
                   style: AppTextStyles.pulseBodyEmphasis.copyWith(

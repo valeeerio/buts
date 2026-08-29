@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -210,8 +212,8 @@ class _NoDataMessage extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             busteNonConfermate > 0
-                ? Icon(
-                    CupertinoIcons.checkmark_seal,
+                ? PulseIcon(
+                    glyph: PulseIconGlyph.checkmark,
                     size: 28,
                     color: secondary,
                   )
@@ -255,36 +257,61 @@ class _ChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PulseSurface(
-      borderRadius: AppRadius.pulse,
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: SizedBox(
-        width: double.infinity,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: AppTextStyles.pulseBodyEmphasis.copyWith(
-                color: CupertinoDynamicColor.resolve(
-                    AppColors.pulseTextPrimary, context),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Wrap(
-              spacing: AppSpacing.md,
-              runSpacing: AppSpacing.xs,
-              children: [
-                for (final entry in legend) _LegendChip(entry: entry),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            SizedBox(height: 180, child: chart),
-            if (stats != null && stats!.righe.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.md),
-              _StatsTable(data: stats!),
-            ],
+    // Bordo sottile a gradiente viola→ciano (direzione "gradient mesh", vedi
+    // CLAUDE.md): non tocca `PulseSurface` in sé (widget condiviso da tutta
+    // l'app, fuori scope qui) — un `Container` esterno con un `BoxDecoration`
+    // a gradiente e 1px di `padding` disegna il bordo "attorno" alla
+    // superficie piatta, così i tre grafici non sembrano isolati dal resto
+    // dell'app ora più riccamente colorata, senza introdurre una seconda
+    // superficie/ombra sovrapposta.
+    final violet =
+        CupertinoDynamicColor.resolve(AppColors.pulseSecondaryGlow, context);
+    final cyan = CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(AppRadius.pulse),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            violet.withValues(alpha: 0.35),
+            cyan.withValues(alpha: 0.35),
           ],
+        ),
+      ),
+      padding: const EdgeInsets.all(1),
+      child: PulseSurface(
+        borderRadius: AppRadius.pulse,
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: SizedBox(
+          width: double.infinity,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: AppTextStyles.pulseBodyEmphasis.copyWith(
+                  color: CupertinoDynamicColor.resolve(
+                      AppColors.pulseTextPrimary, context),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Wrap(
+                spacing: AppSpacing.md,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  for (final entry in legend) _LegendChip(entry: entry),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              SizedBox(height: 180, child: chart),
+              if (stats != null && stats!.righe.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.md),
+                _StatsTable(data: stats!),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -334,14 +361,24 @@ class _StatsTable extends StatelessWidget {
     // Il testo non deve mai andare a capo (anche con celle lunghe tipo
     // "€ 1563.99 (mag '26)" in colonne strette): FittedBox lo restringe
     // fino a stare su una riga sola invece di lasciarlo wrappare — garanzia
-    // strutturale indipendente dal numero di colonne del grafico.
+    // strutturale indipendente dal numero di colonne del grafico. Il
+    // `Padding` orizzontale attorno al `FittedBox` è necessario oltre al
+    // `columnDivider` (0.5px, quasi invisibile): senza margine esplicito, il
+    // testo di due celle scalate a piena larghezza (es. "9,00 (gen '26)" e
+    // "17,80 (gen '26)" nella riga Minimo) arriva a ridosso del divisore su
+    // entrambi i lati e appare come un'unica stringa attaccata — bug reale
+    // corretto qui, non un'ipotesi.
     Widget cell(String text, TextStyle style,
         {TextAlign align = TextAlign.center}) {
-      return FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment:
-            align == TextAlign.center ? Alignment.center : Alignment.centerLeft,
-        child: Text(text, style: style, maxLines: 1, softWrap: false),
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: align == TextAlign.center
+              ? Alignment.center
+              : Alignment.centerLeft,
+          child: Text(text, style: style, maxLines: 1, softWrap: false),
+        ),
       );
     }
 
@@ -490,7 +527,13 @@ _StatsTableData? _ferieRolPermessiStats(List<BustaPaga> buste) {
   final minExFestivita = _bustaConMinimo(buste, (b) => b.exFestivitaResidue);
   final maxExFestivita = _bustaConMassimo(buste, (b) => b.exFestivitaResidue);
   return (
-    colonne: const ['Ferie', 'Permessi', 'Permessi orario', 'Ex festività'],
+    // "Perm. orario" (non "Permessi orario"): l'etichetta completa era
+    // l'unica delle 4 intestazioni troppo larga per la colonna, forzando lo
+    // scale-down di `FittedBox` a una dimensione visibilmente più piccola
+    // delle altre 3 — bug reale corretto qui, non un'ipotesi. Accorciare
+    // l'etichetta invece di affidarsi allo scale-down mantiene tutte le
+    // intestazioni alla stessa dimensione di font.
+    colonne: const ['Ferie', 'Permessi', 'Perm. orario', 'Ex festività'],
     righe: [
       (
         'Media',
@@ -863,19 +906,49 @@ AxisTitles _periodoBottomAxisTitles({
 /// asse solo se le grandezze combinate risultassero poco leggibili.
 AxisTitles _valueLeftAxisTitles({
   required Color labelColor,
+  required double interval,
   String Function(double value) formatValue = formatNumber,
+  // 40 di default (etichette corte tipo "12,5"/"20,0h" di `formatNumber`,
+  // usate da Ferie/Permessi e Straordinario). Il grafico Netto/Lordo passa
+  // esplicitamente `_euroCompactAxisReservedSize` (52): margine extra per il
+  // caso peggiore plausibile del suo formato compatto ("− € 12,3k", vedi
+  // `formatEuroConSegnoCompatto`) alla dimensione naturale del font (fontSize
+  // 10), senza affidarsi allo scale-down di `FittedBox` sotto la soglia di
+  // leggibilità.
+  double reservedSize = 40,
 }) {
   return AxisTitles(
     sideTitles: SideTitles(
       showTitles: true,
-      reservedSize: 40,
+      reservedSize: reservedSize,
+      // Interval SEMPRE esplicito (mai lasciato calcolare da fl_chart): senza
+      // questo, con un range di dati stretto (es. un solo mese), fl_chart
+      // sceglie da solo uno step piccolo (es. €20-30) che, una volta passato
+      // a [formatValue] con la sua risoluzione di arrotondamento (es. "k" a
+      // un decimale, cioè €100, di `formatEuroConSegnoCompatto`), produce
+      // etichette duplicate su tick adiacenti — bug reale corretto qui, non
+      // un'ipotesi. [interval] arriva già calcolato da [_niceStep] con una
+      // soglia minima legata alla risoluzione del formato usato su
+      // quell'asse, e dagli stessi bound "nice" allineati allo stesso step
+      // (vedi `_niceAxisBounds`), così i tick coincidono sempre con min/max.
+      interval: interval,
       getTitlesWidget: (value, meta) {
         return Padding(
           padding: const EdgeInsets.only(right: 6),
-          child: Text(
-            formatValue(value),
-            style: AppTextStyles.pulseLabel
-                .copyWith(color: labelColor, fontSize: 10),
+          child: SizedBox(
+            // -6 per il padding a destra sopra, così la larghezza reale
+            // dell'etichetta resta sempre coerente con [reservedSize] invece
+            // di un valore fisso indipendente che potrebbe disallinearsi.
+            width: reservedSize - 6,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerRight,
+              child: Text(
+                formatValue(value),
+                style: AppTextStyles.pulseLabel
+                    .copyWith(color: labelColor, fontSize: 10),
+              ),
+            ),
           ),
         );
       },
@@ -889,6 +962,44 @@ AxisTitles _valueLeftAxisTitles({
 /// spesso un bordo non allineato ai tick automatici (es. 105.60 quando i
 /// tick sono 0/50/100): fl_chart aggiunge comunque un'etichetta forzata al
 /// bordo, che finisce per sovrapporsi al tick "pulito" più vicino.
+/// Calcola uno step "nice" (1, 2 o 5 × una potenza di 10) per i tick di un
+/// asse valori, mirando a circa [targetTicks] tick sul [range] di dati, ma
+/// mai sotto [minStep] — la risoluzione minima della formattazione usata su
+/// quell'asse (es. €100 per `formatEuroConSegnoCompatto` in notazione "k",
+/// dove un decimale corrisponde a un decimo di migliaio). Con un range
+/// stretto (es. un solo mese di dati) lo step "naturale" (range/targetTicks)
+/// scenderebbe spesso sotto quella risoluzione, producendo tick adiacenti che
+/// si formattano nella stessa stringa (bug reale corretto qui, non
+/// un'ipotesi — vedi `_valueLeftAxisTitles`). Con un range ampio lo step
+/// "nice" naturale è già più grande di [minStep], quindi il clamp non ha
+/// alcun effetto e il numero di tick resta vicino a [targetTicks] invece di
+/// esplodere: la stessa funzione copre così sia il caso "pochi
+/// dati/range stretto" sia "molti dati/range ampio" senza introdurre
+/// l'estremo opposto (assi con 1-2 soli tick).
+double _niceStep(
+  double range, {
+  double targetTicks = 5,
+  required double minStep,
+}) {
+  if (range <= 0) return minStep;
+  final rawStep = range / targetTicks;
+  final magnitude =
+      math.pow(10, (math.log(rawStep) / math.ln10).floor()).toDouble();
+  final residual = rawStep / magnitude;
+  final double niceResidual;
+  if (residual <= 1) {
+    niceResidual = 1;
+  } else if (residual <= 2) {
+    niceResidual = 2;
+  } else if (residual <= 5) {
+    niceResidual = 5;
+  } else {
+    niceResidual = 10;
+  }
+  final step = niceResidual * magnitude;
+  return step < minStep ? minStep : step;
+}
+
 ({double min, double max}) _niceAxisBounds(
   double dataMin,
   double dataMax, {
@@ -899,6 +1010,13 @@ AxisTitles _valueLeftAxisTitles({
   if (max <= min) max += step;
   return (min: min, max: max);
 }
+
+/// `reservedSize` di [_valueLeftAxisTitles] per il grafico Netto/Lordo,
+/// l'unico che usa il formato euro compatto (`formatEuroConSegnoCompatto`,
+/// caso peggiore "− € 12,3k") — costante condivisa per evitare che il fix del
+/// disallineamento 40 vs 52 (vedi `_StraordinarioChartState._leftAxisWidth`)
+/// si ripresenti in futuro se il valore viene cambiato in un solo punto.
+const _euroCompactAxisReservedSize = 52.0;
 
 /// Colori condivisi per lo sfondo/testo dei tooltip al tocco, usati da tutti
 /// e tre i grafici — estratti per non avere tre calcoli divergenti.
@@ -952,10 +1070,18 @@ class _NettoLordoChart extends StatelessWidget {
     final datiMin = valori.reduce((a, b) => a < b ? a : b);
     final datiMax = valori.reduce((a, b) => a > b ? a : b);
     final margine = (datiMax - datiMin) * 0.08;
+    // Step minimo di €100: coincide con la risoluzione di arrotondamento di
+    // `formatEuroConSegnoCompatto` in notazione "k" (un decimale = un decimo
+    // di migliaio) — vedi doc di [_niceStep], evita etichette duplicate
+    // sull'asse con un range di dati stretto.
+    final step = _niceStep(
+      (datiMax + margine) - (datiMin - margine),
+      minStep: 100,
+    );
     final bounds = _niceAxisBounds(
       datiMin - margine,
       datiMax + margine,
-      step: 100,
+      step: step,
     );
 
     return LayoutBuilder(
@@ -979,7 +1105,13 @@ class _NettoLordoChart extends StatelessWidget {
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               leftTitles: _valueLeftAxisTitles(
                 labelColor: labelColor,
-                formatValue: formatEuroConSegno,
+                interval: step,
+                // Formato compatto SOLO per l'etichetta dell'asse (spazio
+                // ristretto): `formatEuroConSegno` resta usato per tooltip e
+                // tabella riepilogativa sopra, dove serve precisione a 2
+                // decimali — vedi doc di `formatEuroConSegnoCompatto`.
+                formatValue: formatEuroConSegnoCompatto,
+                reservedSize: _euroCompactAxisReservedSize,
               ),
               bottomTitles: _periodoBottomAxisTitles(
                 periodi: [for (final g in griglia) g.periodo],
@@ -1118,10 +1250,12 @@ class _FerieRolPermessiChart extends StatelessWidget {
     ];
     final valoriMax = valori.reduce((a, b) => a > b ? a : b);
     final valoriMin = valori.reduce((a, b) => a < b ? a : b);
+    final ferieBoundsMin = valoriMin < 0 ? valoriMin : 0.0;
+    final step = _niceStep(valoriMax - ferieBoundsMin, minStep: 1);
     final bounds = _niceAxisBounds(
-      valoriMin < 0 ? valoriMin : 0,
+      ferieBoundsMin,
       valoriMax,
-      step: 20,
+      step: step,
     );
 
     return LayoutBuilder(
@@ -1142,7 +1276,10 @@ class _FerieRolPermessiChart extends StatelessWidget {
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               rightTitles:
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              leftTitles: _valueLeftAxisTitles(labelColor: labelColor),
+              leftTitles: _valueLeftAxisTitles(
+                labelColor: labelColor,
+                interval: step,
+              ),
               bottomTitles: _periodoBottomAxisTitles(
                 periodi: [for (final g in griglia) g.periodo],
                 availableWidth: constraints.maxWidth,
@@ -1259,6 +1396,13 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
   static const _barWidth = 16.0;
   static const _groupsSpace = 20.0;
   static const _minGroupSlotWidth = _barWidth + _groupsSpace;
+  // Larghezza della colonna fissa dell'asse Y in `buildAxisOnly()` (modalità
+  // scroll orizzontale): deve corrispondere esattamente al `reservedSize`
+  // passato a `_valueLeftAxisTitles` in ENTRAMBI i percorsi di rendering
+  // (`buildPlot`/`buildAxisOnly`) di questo grafico — bug reale corretto qui
+  // (40 vs 52, vedi CLAUDE.md), non un'ipotesi: se in futuro serve un valore
+  // diverso dal default di `_valueLeftAxisTitles`, va cambiato qui e passato
+  // esplicitamente a entrambe le chiamate sotto, mai lasciato disallineato.
   static const _leftAxisWidth = 40.0;
   static const _rightFadeWidth = 28.0;
 
@@ -1335,8 +1479,9 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
         0, (max, p) => (p.totale ?? 0) > max ? p.totale! : max);
     final maxIndex =
         punti.indexWhere((p) => p.totale != null && p.totale == maxValue);
-    final bounds =
-        _niceAxisBounds(0, maxValue <= 0 ? 1 : maxValue * 1.2, step: 20);
+    final straordinarioAxisMax = maxValue <= 0 ? 1.0 : maxValue * 1.2;
+    final step = _niceStep(straordinarioAxisMax, minStep: 1);
+    final bounds = _niceAxisBounds(0, straordinarioAxisMax, step: step);
 
     Widget buildPlot({required double width, required bool showLeftAxis}) {
       return SizedBox(
@@ -1359,7 +1504,11 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
               rightTitles:
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               leftTitles: showLeftAxis
-                  ? _valueLeftAxisTitles(labelColor: labelColor)
+                  ? _valueLeftAxisTitles(
+                      labelColor: labelColor,
+                      interval: step,
+                      reservedSize: _leftAxisWidth,
+                    )
                   : const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               bottomTitles: _periodoBottomAxisTitles(
                 periodi: [for (final p in punti) p.periodo],
@@ -1427,7 +1576,11 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
                   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
               bottomTitles: const AxisTitles(
                   sideTitles: SideTitles(showTitles: false, reservedSize: 22)),
-              leftTitles: _valueLeftAxisTitles(labelColor: labelColor),
+              leftTitles: _valueLeftAxisTitles(
+                labelColor: labelColor,
+                interval: step,
+                reservedSize: _leftAxisWidth,
+              ),
             ),
           ),
         ),

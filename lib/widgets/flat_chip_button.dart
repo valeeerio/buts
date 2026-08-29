@@ -41,7 +41,7 @@ class FlatChipButton extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 4),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.mdMinus),
         decoration: BoxDecoration(
           color: filled ? color.withValues(alpha: 0.16) : null,
           borderRadius: BorderRadius.circular(AppRadius.glassSmall),

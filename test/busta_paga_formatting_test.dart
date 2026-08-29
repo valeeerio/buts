@@ -252,4 +252,53 @@ void main() {
       expect(trattenutaPrefix(parseItalianNumber('-3')), '+ € ');
     });
   });
+
+  group('formatEuroConSegnoCompatto', () {
+    // Regressione: la soglia `abs >= 1000` per scegliere tra notazione "k" e
+    // numero secco era verificata sul valore NON arrotondato, ma il ramo
+    // "secco" arrotondava comunque con `.round()`. Per valori come 999.6 la
+    // soglia risultava falsa (ramo secco) ma l'arrotondamento produceva 1000,
+    // quindi l'output era "€ 1000" invece di "€ 1k". Il fix decide il ramo
+    // sul valore già arrotondato all'euro.
+    test('valori normali sotto soglia (nessuna notazione "k")', () {
+      expect(formatEuroConSegnoCompatto(0), '€ 0');
+      expect(formatEuroConSegnoCompatto(1), '€ 1');
+      expect(formatEuroConSegnoCompatto(42.3), '€ 42');
+      expect(formatEuroConSegnoCompatto(999.0), '€ 999');
+    });
+
+    test('valori normali sopra soglia (notazione "k")', () {
+      expect(formatEuroConSegnoCompatto(1500.0), '€ 1,5k');
+      expect(formatEuroConSegnoCompatto(2000.0), '€ 2k');
+      expect(formatEuroConSegnoCompatto(3245.67), '€ 3,2k');
+    });
+
+    test(
+        'boundary 999.5-1000.4: la scelta tra "k" e numero secco è sempre '
+        'coerente con l\'arrotondamento effettivamente mostrato', () {
+      expect(formatEuroConSegnoCompatto(999.5), '€ 1k');
+      expect(formatEuroConSegnoCompatto(999.6), '€ 1k');
+      expect(formatEuroConSegnoCompatto(999.9), '€ 1k');
+      expect(formatEuroConSegnoCompatto(1000.0), '€ 1k');
+      expect(formatEuroConSegnoCompatto(1000.4), '€ 1k');
+    });
+
+    test('valore appena sotto il boundary resta un numero secco', () {
+      expect(formatEuroConSegnoCompatto(999.4), '€ 999');
+    });
+
+    test('zero', () {
+      expect(formatEuroConSegnoCompatto(0.0), '€ 0');
+    });
+
+    test('valori negativi: prefisso "− €" prima del simbolo', () {
+      expect(formatEuroConSegnoCompatto(-42.3), '− € 42');
+      expect(formatEuroConSegnoCompatto(-999.6), '− € 1k');
+      expect(formatEuroConSegnoCompatto(-1500.0), '− € 1,5k');
+    });
+
+    test('valore molto grande', () {
+      expect(formatEuroConSegnoCompatto(-99999.0), '− € 100k');
+    });
+  });
 }

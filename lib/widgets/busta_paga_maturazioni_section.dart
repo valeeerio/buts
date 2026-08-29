@@ -172,7 +172,7 @@ class BustaPagaMaturazioniSection extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.smPlus),
       child: Row(
         children: [
           Expanded(

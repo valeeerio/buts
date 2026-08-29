@@ -18,9 +18,11 @@ import '../../widgets/busta_paga_maturazioni_section.dart';
 import '../../widgets/busta_paga_stat_row.dart';
 import '../../widgets/flat_chip_button.dart';
 import '../../widgets/pulse_icon.dart';
+import '../../widgets/pulse_mesh_background.dart';
 import '../../widgets/pulse_section_card.dart';
 import '../../widgets/pulse_surface.dart';
 import '../../widgets/spring_button.dart';
+import '../../widgets/stationary_push_bar.dart';
 import '../../widgets/trattenuta_edit_row.dart';
 import '../../widgets/voce_competenza_edit_row.dart';
 
@@ -553,6 +555,16 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     final secondaryAccent =
         CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
 
+    // La macchia decorativa viola di `PulseMeshBackground` ha il suo punto
+    // di massima opacità proprio nell'angolo in alto a sinistra, dove
+    // `CupertinoNavigationBar` disegna il back-chevron: un fill leggermente
+    // opaco (stesso token `pulseBackground` del "chrome" della barra
+    // flottante in basso, vedi `_pinnedBackground`) ammorbidisce la macchia
+    // sotto la nav bar senza nasconderla nel resto della schermata.
+    final navBarBackground =
+        CupertinoDynamicColor.resolve(AppColors.pulseBackground, context)
+            .withValues(alpha: 0.55);
+
     // Ricontrolla dopo ogni layout (non solo sullo scroll dell'utente): il
     // contenuto del form può cambiare (aggiunta/rimozione trattenute) e con
     // esso può cambiare se c'è ancora altro da scorrere sotto — stesso
@@ -577,181 +589,137 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
           _pdfImportService.deleteFile(_fileOrigine);
         }
       },
-      child: CupertinoPageScaffold(
-        backgroundColor:
-            CupertinoDynamicColor.resolve(AppColors.pulseBackground, context),
-        navigationBar: const CupertinoNavigationBar(
-          middle: Text('Nuova busta paga'),
-        ),
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: _actionBarReservedHeight),
-              child: ShaderMask(
-                blendMode: BlendMode.dstIn,
-                shaderCallback: (rect) {
-                  final fadeHeight = _showBottomFade ? 120.0 : 0.0;
-                  final stop = 1 - (fadeHeight / rect.height).clamp(0.0, 1.0);
-                  return LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: const [
-                      CupertinoColors.white,
-                      CupertinoColors.white,
-                      CupertinoColors.transparent,
-                    ],
-                    stops: [0.0, stop, 1.0],
-                  ).createShader(rect);
-                },
-                child: SafeArea(
-                  child: ListView(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.screenHorizontal,
-                      AppSpacing.sm,
-                      AppSpacing.screenHorizontal,
-                      AppSpacing.sm,
-                    ),
-                    children: [
-                      if (_valoriDaConferma) ...[
-                        const _EstrazioneAutomaticaBanner(),
-                        const SizedBox(height: AppSpacing.lg),
+      child: PulseMeshBackground(
+        child: CupertinoPageScaffold(
+          backgroundColor: CupertinoColors.transparent,
+          navigationBar: CupertinoNavigationBar(
+            middle: const Text('Nuova busta paga'),
+            backgroundColor: navBarBackground,
+            border: null,
+          ),
+          child: Stack(
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.only(bottom: _actionBarReservedHeight),
+                child: ShaderMask(
+                  blendMode: BlendMode.dstIn,
+                  shaderCallback: (rect) {
+                    final fadeHeight = _showBottomFade ? 120.0 : 0.0;
+                    final stop = 1 - (fadeHeight / rect.height).clamp(0.0, 1.0);
+                    return LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: const [
+                        CupertinoColors.white,
+                        CupertinoColors.white,
+                        CupertinoColors.transparent,
                       ],
-                      BustaPagaHeroCard(
-                        isConfermato: false,
-                        periodoLabel: _periodoLabel,
-                        lordoDisplay: formatEuroConSegno(
-                            computeLordo(_competenzeCorrenti)),
-                        nettoDisplay: formatEuroConSegno(computeNetto(
-                          computeLordo(_competenzeCorrenti),
-                          _trattenuteCorrenti,
-                        )),
-                        onTapPeriodo: _pickPeriodo,
-                        onTapTipo: _pickTipo,
+                      stops: [0.0, stop, 1.0],
+                    ).createShader(rect);
+                  },
+                  child: SafeArea(
+                    child: ListView(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.screenHorizontal,
+                        AppSpacing.sm,
+                        AppSpacing.screenHorizontal,
+                        AppSpacing.sm,
                       ),
-                      if (_warnings.isNotEmpty) ...[
-                        const SizedBox(height: AppSpacing.lg),
-                        _WarningsSection(warnings: _warnings),
-                      ],
-                      const SizedBox(height: AppSpacing.lg),
-                      BustaPagaDocumentoChip(filePath: _fileOrigine),
-                      const SizedBox(height: AppSpacing.lg),
-                      BustaPagaMaturazioniSection(
-                        isEditing: true,
-                        ferieMaturate:
-                            formatNumber(_parse(_ferieMaturateController)),
-                        ferieGodute:
-                            formatNumber(_parse(_ferieGoduteController)),
-                        ferieResidue:
-                            formatNumber(_parse(_ferieResidueController)),
-                        rolMaturati:
-                            formatNumber(_parse(_rolMaturatiController)),
-                        rolGoduti: formatNumber(_parse(_rolGodutiController)),
-                        rolResidui: formatNumber(_parse(_rolResiduiController)),
-                        exFestivitaMaturate: formatNumber(
-                            _parse(_exFestivitaMaturateController)),
-                        exFestivitaGodute:
-                            formatNumber(_parse(_exFestivitaGoduteController)),
-                        exFestivitaResidue:
-                            formatNumber(_parse(_exFestivitaResidueController)),
-                        ferieMaturateCtrl: _ferieMaturateController,
-                        ferieGoduteCtrl: _ferieGoduteController,
-                        ferieResidueCtrl: _ferieResidueController,
-                        rolMaturatiCtrl: _rolMaturatiController,
-                        rolGodutiCtrl: _rolGodutiController,
-                        rolResiduiCtrl: _rolResiduiController,
-                        exFestivitaMaturateCtrl: _exFestivitaMaturateController,
-                        exFestivitaGoduteCtrl: _exFestivitaGoduteController,
-                        exFestivitaResidueCtrl: _exFestivitaResidueController,
-                      ),
-                      BustaPagaStatRow(items: [
-                        (
-                          'Ore lavorate',
-                          inlineNumberField(
-                            _oreLavorateController,
-                            style: AppTextStyles.pulseDisplaySmall,
-                          ),
-                        ),
-                        (
-                          'Straordinari',
-                          Text(
-                            '${formatNumber(computeStraordinari(_competenzeCorrenti))} h',
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ]),
-                      const SizedBox(height: AppSpacing.lg),
-                      BustaPagaCompetenzeSection(
-                        isEditing: true,
-                        competenze: const [],
-                        righeEdit: _competenze,
-                        onAggiungi: _addCompetenza,
-                        onRimuovi: _removeCompetenza,
-                      ),
-                      PulseSectionCard(
-                        footer:
-                            'Aggiungi le voci di trattenuta indicate in busta '
-                            'paga (es. INPS, IRPEF).',
-                        rows: [
-                          for (var i = 0; i < _trattenute.length; i++)
-                            trattenutaEditRow(
-                              _trattenute[i],
-                              onDismissed: () => _removeTrattenuta(i),
-                            ),
-                          _aggiungiVoceButton(accent),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              left: AppSpacing.screenHorizontal,
-              right: AppSpacing.screenHorizontal,
-              bottom: 0,
-              child: SafeArea(
-                top: false,
-                child: _StationaryPushBar(
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    // Blur di sfondo dietro l'intera fascia della barra (non
-                    // solo dietro ai singoli chip), stesso pattern di
-                    // `_pinnedBackground` nell'Archivio — vedi
-                    // `_floatingBarBackground` più sotto in questo file.
-                    child: Stack(
                       children: [
-                        Positioned.fill(child: _floatingBarBackground(context)),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FlatChipButton(
-                                icon: CupertinoIcons.checkmark_alt,
-                                label: 'Salva',
-                                color: accent,
-                                // No-op mentre `_saving` è vero: stesso guard di
-                                // rientranza di `_save()`, vedi la sua doc.
-                                onPressed: _saving ? () {} : _save,
-                              ),
+                        if (_valoriDaConferma) ...[
+                          const _EstrazioneAutomaticaBanner(),
+                          const SizedBox(height: AppSpacing.lg),
+                        ],
+                        BustaPagaHeroCard(
+                          isConfermato: false,
+                          periodoLabel: _periodoLabel,
+                          lordoDisplay: formatEuroConSegno(
+                              computeLordo(_competenzeCorrenti)),
+                          nettoDisplay: formatEuroConSegno(computeNetto(
+                            computeLordo(_competenzeCorrenti),
+                            _trattenuteCorrenti,
+                          )),
+                          onTapPeriodo: _pickPeriodo,
+                          onTapTipo: _pickTipo,
+                        ),
+                        if (_warnings.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.lg),
+                          _WarningsSection(warnings: _warnings),
+                        ],
+                        const SizedBox(height: AppSpacing.lg),
+                        BustaPagaDocumentoChip(
+                          filePath: _fileOrigine,
+                          periodo: _periodo,
+                          tipo: _tipo,
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        BustaPagaMaturazioniSection(
+                          isEditing: true,
+                          ferieMaturate:
+                              formatNumber(_parse(_ferieMaturateController)),
+                          ferieGodute:
+                              formatNumber(_parse(_ferieGoduteController)),
+                          ferieResidue:
+                              formatNumber(_parse(_ferieResidueController)),
+                          rolMaturati:
+                              formatNumber(_parse(_rolMaturatiController)),
+                          rolGoduti: formatNumber(_parse(_rolGodutiController)),
+                          rolResidui:
+                              formatNumber(_parse(_rolResiduiController)),
+                          exFestivitaMaturate: formatNumber(
+                              _parse(_exFestivitaMaturateController)),
+                          exFestivitaGodute: formatNumber(
+                              _parse(_exFestivitaGoduteController)),
+                          exFestivitaResidue: formatNumber(
+                              _parse(_exFestivitaResidueController)),
+                          ferieMaturateCtrl: _ferieMaturateController,
+                          ferieGoduteCtrl: _ferieGoduteController,
+                          ferieResidueCtrl: _ferieResidueController,
+                          rolMaturatiCtrl: _rolMaturatiController,
+                          rolGodutiCtrl: _rolGodutiController,
+                          rolResiduiCtrl: _rolResiduiController,
+                          exFestivitaMaturateCtrl:
+                              _exFestivitaMaturateController,
+                          exFestivitaGoduteCtrl: _exFestivitaGoduteController,
+                          exFestivitaResidueCtrl: _exFestivitaResidueController,
+                        ),
+                        BustaPagaStatRow(items: [
+                          (
+                            'Ore lavorate',
+                            inlineNumberField(
+                              _oreLavorateController,
+                              style: AppTextStyles.pulseDisplaySmall,
                             ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: FlatChipButton(
-                                icon: CupertinoIcons.xmark,
-                                label: 'Annulla',
-                                color: secondaryAccent,
-                                // Stesso guard: uscire mentre un salvataggio è
-                                // in corso, prima che `_saved` diventi vero,
-                                // farebbe cancellare dal `PopScope` sopra un
-                                // PDF ormai associato a un salvataggio riuscito
-                                // (l'insert Drift potrebbe già essere andata a
-                                // buon fine nella finestra tra il tap e questo
-                                // controllo).
-                                onPressed: _saving
-                                    ? () {}
-                                    : () => Navigator.of(context).pop(),
-                              ),
+                          ),
+                          (
+                            'Straordinari',
+                            Text(
+                              '${formatNumber(computeStraordinari(_competenzeCorrenti))} h',
+                              textAlign: TextAlign.center,
                             ),
+                          ),
+                        ]),
+                        const SizedBox(height: AppSpacing.lg),
+                        BustaPagaCompetenzeSection(
+                          isEditing: true,
+                          competenze: const [],
+                          righeEdit: _competenze,
+                          onAggiungi: _addCompetenza,
+                          onRimuovi: _removeCompetenza,
+                        ),
+                        PulseSectionCard(
+                          footer:
+                              'Aggiungi le voci di trattenuta indicate in busta '
+                              'paga (es. INPS, IRPEF).',
+                          rows: [
+                            for (var i = 0; i < _trattenute.length; i++)
+                              trattenutaEditRow(
+                                _trattenute[i],
+                                onDismissed: () => _removeTrattenuta(i),
+                              ),
+                            _aggiungiVoceButton(accent),
                           ],
                         ),
                       ],
@@ -759,8 +727,63 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                   ),
                 ),
               ),
-            ),
-          ],
+              Positioned(
+                left: AppSpacing.screenHorizontal,
+                right: AppSpacing.screenHorizontal,
+                bottom: 0,
+                child: SafeArea(
+                  top: false,
+                  child: StationaryPushBar(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      // Blur di sfondo dietro l'intera fascia della barra (non
+                      // solo dietro ai singoli chip), stesso pattern di
+                      // `_pinnedBackground` nell'Archivio — vedi
+                      // `_floatingBarBackground` più sotto in questo file.
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                              child: _floatingBarBackground(context)),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FlatChipButton(
+                                  icon: CupertinoIcons.checkmark_alt,
+                                  label: 'Salva',
+                                  color: accent,
+                                  // No-op mentre `_saving` è vero: stesso guard di
+                                  // rientranza di `_save()`, vedi la sua doc.
+                                  onPressed: _saving ? () {} : _save,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: FlatChipButton(
+                                  icon: CupertinoIcons.xmark,
+                                  label: 'Annulla',
+                                  color: secondaryAccent,
+                                  // Stesso guard: uscire mentre un salvataggio è
+                                  // in corso, prima che `_saved` diventi vero,
+                                  // farebbe cancellare dal `PopScope` sopra un
+                                  // PDF ormai associato a un salvataggio riuscito
+                                  // (l'insert Drift potrebbe già essere andata a
+                                  // buon fine nella finestra tra il tap e questo
+                                  // controllo).
+                                  onPressed: _saving
+                                      ? () {}
+                                      : () => Navigator.of(context).pop(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -802,62 +825,6 @@ Widget _floatingBarBackground(BuildContext context) {
       ),
     ),
   );
-}
-
-/// Contro-traslazione della barra "Salva/Annulla" durante le transizioni di
-/// push/pop di `CupertinoPageRoute`: la Row è già dentro un `Positioned`
-/// ancorato in basso, ma la route intera (compresa quella sotto, quando è
-/// una pop) viene traslata orizzontalmente dalla transizione standard iOS —
-/// senza questo wrapper la barra scorrerebbe via insieme al resto della
-/// pagina invece di restare visivamente ferma. La contro-traslazione va
-/// espressa in pixel assoluti (frazione della larghezza schermo), non
-/// frazionale rispetto alla larghezza della barra stessa, perché la barra è
-/// più stretta dello schermo intero (ha margini laterali via
-/// `AppSpacing.screenHorizontal`): usare `FractionalTranslation` o un
-/// offset relativo alla propria larghezza produrrebbe uno spostamento
-/// diverso da quello subito dal resto della pagina e la barra "scivolerebbe"
-/// comunque, solo a una velocità diversa. Durante lo swipe-to-pop interattivo
-/// (`popGestureInProgress`) il valore dell'animazione è già lineare rispetto
-/// al gesto e va usato direttamente; altrimenti si applica la stessa curva
-/// (`Curves.fastEaseInToSlowEaseOut`, quella usata da
-/// `CupertinoPageTransition` in Flutter 3.44) usata dalla transizione di
-/// sistema, così il movimento resta sincronizzato.
-class _StationaryPushBar extends StatelessWidget {
-  final Widget child;
-  const _StationaryPushBar({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final route = ModalRoute.of(context);
-    final routeAnimation = route?.animation;
-    if (route == null || routeAnimation == null) return child;
-
-    return AnimatedBuilder(
-      animation: routeAnimation,
-      builder: (context, builtChild) {
-        final linear = route.popGestureInProgress;
-        final double t;
-        if (linear) {
-          t = routeAnimation.value;
-        } else {
-          final curve = routeAnimation.status == AnimationStatus.reverse
-              ? Curves.fastEaseInToSlowEaseOut.flipped
-              : Curves.fastEaseInToSlowEaseOut;
-          t = curve.transform(routeAnimation.value.clamp(0.0, 1.0));
-        }
-        final dxFraction = (1.0 - t).clamp(0.0, 1.0);
-        final dxPixels = dxFraction * MediaQuery.sizeOf(context).width;
-        return Transform.translate(
-          offset: Offset(-dxPixels, 0),
-          child: Opacity(
-            opacity: (1.0 - dxFraction).clamp(0.0, 1.0),
-            child: builtChild,
-          ),
-        );
-      },
-      child: child,
-    );
-  }
 }
 
 /// Banner informativo fisso, sempre visibile mentre `_valoriDaConferma ==
