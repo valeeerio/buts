@@ -202,99 +202,53 @@ in `lib/providers/buste_paga_provider.dart`).
 
 ## Stile visivo — non negoziabile senza conferma esplicita dell'utente
 
-Direzione: **"Liquid Glass"**, approssimazione Flutter-only (nessun ponte nativo
-iOS/`UIGlassEffect`) del materiale in vetro liquido introdotto da Apple con iOS 26
-(HIG "Materials" / WWDC25 "Meet Liquid Glass"). Card, sezioni, righe di elenco e CTA
-sono superfici in vetro traslucido/sfocato che rifrangono ciò che hanno dietro,
-non più rettangoli piatti a tinta unita. Sostituisce la direzione precedente
-("struttura Revolut + estetica Apple, superfici piatte") — validata dall'utente
-sul pilota Archivio Buste Paga ed estesa a tutta l'app.
+Direzione: **"Pulse"**, sistema visivo bold/dark-first ispirato ai prodotti fintech moderni
+(riferimento esplicito dell'utente: Revolut). Sostituisce interamente "Liquid Glass" (vetro
+traslucido/blur, superfici squircle, palette Apple system) — validato dall'utente il
+2026-08-28 dopo un redesign totale tramite intervista approfondita e mockup visivi,
+motivato dal fatto che lo stile precedente "rispecchiava ancora le mie scelte originali" e
+non risultava sufficientemente distintivo/leggibile. La migrazione da Liquid Glass a Pulse
+avviene schermata per schermata (vedi fasi in corso), non tutte le occorrenze dei vecchi
+widget/token sono ancora state sostituite.
 
-- **Materiale**: ogni superficie/card usa `lib/widgets/liquid_glass_surface.dart`
-  (`LiquidGlassSurface`) — mai `Container`/`DecoratedBox` con colore pieno per una
-  card. Combina `BackdropFilter` (blur del contenuto sottostante), un riempimento
-  quasi neutro (`glassFill`), un bordo con gradiente di luce catturata
-  (`glassHighlight`/`glassShadowEdge`) e un'ombra a rilievo (`PhysicalShape`). I CTA
-  usano `lib/widgets/liquid_glass_button.dart` (`LiquidGlassButton`), che compone
-  `LiquidGlassSurface` con `lib/widgets/spring_button.dart` per la pressione a
-  molla. Vincoli implementativi da non violare se si tocca il widget: (1) il
-  `ClipPath` esplicito attorno al `BackdropFilter` (oltre al clip di
-  `PhysicalShape`) è necessario — su device reale con Impeller, un
-  `BackdropFilter` senza un clip layer diretto come antenato sbianca il resto
-  dello schermo; (2) il bordo decorativo interno (`_SpecularBorderPainter`)
-  deve avere `hitTest(Offset position) => false` esplicito, altrimenti
-  intercetta ogni tocco prima che raggiunga il contenuto sottostante; (3) il
-  riempimento a gradiente va calcolato in `CustomPaint` sulla `size` reale del
-  widget, mai sulle constraints di `LayoutBuilder` (illimitate dentro
-  `ListView`/`Row`). Inoltre: mai istanziare più `LiquidGlassSurface`
-  affiancate a poca distanza nello stesso `Row`/`Column` — più
-  `BackdropFilter` ravvicinati producono una "cucitura" di rendering visibile
-  tra le superfici. Per compartimenti multipli in riga (mini-statistiche, tab
-  della sotto-navigazione) usare **una sola** `LiquidGlassSurface` esterna con
-  scomparti piatti interni separati da un divisore sottile (`BustaPagaStatRow`),
-  oppure — per CTA/tab dove il vetro non è necessario — `FlatChipButton`.
-- **Colori**: colori semantici Apple — vedi `lib/theme/app_colors.dart`. systemRed
-  riservato ad alert e variazioni sfavorevoli. La palette del vetro (`glassFill`,
-  `glassHighlight`, `glassShadowEdge`) resta volutamente sobria/neutra: il colore è
-  riservato ad accenti puntuali (badge di stato, CTA primaria via il parametro
-  `tint` di `LiquidGlassSurface`/`LiquidGlassButton`), mai come riempimento pieno
-  della superficie. Light e dark mode entrambi previsti fin da subito tramite
-  `CupertinoDynamicColor`. **2026-08-26**: nuovo accento primario "brand"
-  `AppColors.brandAccent` (corallo/arancio caldo, `#DF6020` light / `#FF8850`
-  dark) sostituisce `systemBlue` come colore d'accento principale nei punti
-  "riscaldati" dello stile (CTA primarie, icone di rilievo, illustrazioni
-  custom, vedi paragrafo "Icone" sotto) — migrazione fatta schermata per
-  schermata, lavoro in corso: non tutte le occorrenze di `systemBlue` sono
-  ancora state sostituite.
-- **Forme**: corner radius "squircle" continui (superellisse, non il doppio arco di
-  `BorderRadius.circular`) via `lib/widgets/squircle_clipper.dart`, applicati da
-  `LiquidGlassSurface`/`LiquidGlassButton`. Raggi in `lib/theme/app_spacing.dart` →
-  `AppRadius.glass` (28, hero card/contenitori principali) e `AppRadius.glassSmall`
-  (18, righe elenco/chip/CTA compatte). I raggi piccoli precedenti
-  (`small`/`medium`/`large`/`card`) restano solo per dettagli minuti che non sono
-  superfici di vetro (badge, barre di grafici). Mai pill/capsule stondate al
-  massimo. Eccezione confermata esplicitamente dall'utente (2026-07-31):
-  `FlatChipButton` usa `AppRadius.glassSmall` su un bottone di altezza compatta,
-  quindi visivamente molto arrotondato — resta comunque un token, non un raggio
-  letterale enorme da vera capsula, e l'uso è limitato a quel componente
-  (sotto-navigazione, barra Conferma/Modifica).
-- **Tipografia**: system font (SF Pro su iOS via Cupertino di default). Gerarchia
-  in `lib/theme/app_text_styles.dart`.
-- **Icone**: standard `CupertinoIcons` (SF Symbols-style) in tutta l'app.
-  **2026-08-26**: permesso un piccolo set di illustrazioni/icone custom (non
-  SF Symbols) per momenti chiave — stati vuoti, onboarding, momenti che
-  richiedono attenzione — vedi `lib/widgets/custom_illustration.dart`
-  (`CustomIllustration`). Vanno sempre costruite come widget
-  `CustomPainter`/geometria vettoriale Dart (mai asset raster, mai SVG
-  importato), stile line-art a tratto singolo colorato con
-  `AppColors.brandAccent`. `CupertinoIcons` resta lo standard per ogni altro
-  punto dell'app (barre, chip, pulsanti, badge). Mai emoji nei componenti di
-  produzione — se ne trovi in mockup precedenti (HTML) sono placeholder da
-  sostituire.
-
-**Scroll e dissolvenza in fondo alla lista**: nell'Archivio (`buste_paga_
-archivio_view.dart`) la lista scrollabile è avvolta in uno `ShaderMask` con
-`fadeHeight` fisso in pixel (120.0), dentro un `Expanded` la cui altezza reale
-è ridotta da un `Padding(bottom: _sidecarReservedHeight)` esterno (non solo
-padding di contenuto) — è questo che riduce il viewport e fa coincidere la
-zona di dissolvenza con le ultime righe realmente visibili sopra la sidecar.
-Nel dettaglio busta paga (`busta_paga_detail_screen.dart`) è stato **abbandonato
-un approccio analogo con `ShaderMask` a piena altezza** (provato con più valori
-di `fadeHeight`, mai percepito come "uguale" all'Archivio a causa del viewport
-di altezza diversa — niente banner di benvenuto sopra la lista nel dettaglio):
-la schermata usa invece la hero card fissa fuori dallo scroll (vedi sopra) più
-scroll naturale sotto, con lo stesso pattern di `Padding` esterno che riduce il
-viewport (`_actionBarReservedHeight`) per il margine verso la barra flottante,
-e un `ShaderMask` con `fadeHeight` piccolo (poche decine di pixel, non l'intero
-margine) solo per ammorbidire lo stacco finale, non per "nascondere" più righe
-di contenuto come nell'Archivio. Lo stesso `ShaderMask` sfuma anche l'inizio
-della lista (gradiente `transparent→white→white→transparent` dall'alto verso
-il basso, stesso `fadeHeight` di partenza per entrambi gli estremi), così il
-primo item (chip documento) scompare in dissolvenza sotto la hero card fissa
-invece che con un taglio netto quando si scrolla verso l'alto. Se si ritocca
-uno dei due effetti, non assumere che debbano avere lo stesso valore assoluto
-di `fadeHeight`: il viewport sottostante è diverso in altezza tra le due
-schermate.
+- **Materiale**: nessun `BackdropFilter`/blur in nessuna superficie. Ogni card/sezione/riga è
+  una superficie piatta a colore pieno (`lib/widgets/pulse_surface.dart`, `PulseSurface`,
+  sostituisce `LiquidGlassSurface`/`LiquidGlassButton`) — riempimento `AppColors.pulseSurface`
+  per contenitori neutri, oppure riempimento pieno dell'accento (`AppColors.pulseAccent`, con
+  gradiente sottile) per i blocchi di rilievo (es. netto del mese). Ombre minime/assenti, mai
+  bagliori diffusi.
+- **Colori**: palette dark-first in `lib/theme/app_colors.dart` — `pulseBackground` (sfondo
+  pagina), `pulseSurface` (superficie tessera, un grado più chiara dello sfondo),
+  `pulseAccent` (ciano/cobalto elettrico, accento primario e riempimento pieno dei blocchi di
+  rilievo), `pulseTextPrimary`/`pulseTextSecondary`, `pulsePositive`/`pulseNegative` (stato
+  Confermato/Da confermare, alert). Light e dark mode restano **paritari**, stessa cura per
+  entrambi, sempre via `CupertinoDynamicColor`.
+- **Tipografia**: due font bundlati offline in `assets/fonts/` (mai `google_fonts` con fetch
+  di rete, l'app non ha connessione) — **Space Grotesk** (pesi 500/700/800) per titoli,
+  numeri, valori monetari/di maturazione: è l'elemento che rende l'identità "tipografia da
+  protagonista"; **Inter** (pesi 400/500/600) per corpo testo, label, UI. Ruoli tipografici in
+  `lib/theme/app_text_styles.dart`.
+- **Forme**: angoli arrotondati con `BorderRadius.circular` (non più squircle/superellisse) —
+  raggi in `AppRadius.pulse`/`AppRadius.pulseSmall`. `lib/widgets/squircle_clipper.dart` non è
+  più usato dalle superfici principali una volta migrate.
+- **Icone**: set custom ampio e coerente, non più `CupertinoIcons` come standard — ogni icona
+  di UI (ricerca, indietro, chiudi, modifica, elimina, tab di navigazione, documento, ecc.) è
+  disegnata con `CustomPainter`/geometria vettoriale nello stesso linguaggio grafico
+  bold/geometrico dell'app, tramite `lib/widgets/pulse_icon.dart` (`PulseIcon`, enum
+  `PulseIconGlyph`). Mai asset raster/SVG importati, mai emoji. Le illustrazioni più elaborate
+  per stati vuoti/onboarding (`lib/widgets/custom_illustration.dart`) restano e vengono
+  ridisegnate nella nuova palette man mano che le schermate migrano.
+- **Rappresentazione dati**: ferie/ROL/permessi/ex festività residue sono rappresentate con
+  anelli di progresso (`lib/widgets/progress_ring_tile.dart`, `ProgressRingTile`) dentro
+  tessere di griglia, non più righe di tabella testuale come unico mezzo.
+- **Navigazione**: la sidecar flottante Archivio/Statistiche/+ diventa una tab bar in basso a
+  icone con etichetta testuale (`PulseIcon`) con il bottone "+" come cerchio pieno nell'accento primario,
+  staccato visivamente dagli altri due segmenti. Struttura app a sezione singola invariata
+  (nessuna nuova sezione oltre Archivio/Statistiche).
+- **Impianto Archivio**: la schermata radice passa da "hero + elenco" a una struttura
+  "dashboard": blocco netto del mese in evidenza (riempimento pieno accento), tessere
+  Ferie/ROL/Permessi/Ex festività con anello di progresso, striscia "Storico" con le
+  mensilità precedenti scorrevole orizzontalmente invece di un elenco verticale continuo.
 
 ## Cosa manca (prossimi passi, in ordine di priorità suggerito)
 

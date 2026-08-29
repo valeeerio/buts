@@ -16,8 +16,9 @@ import '../../widgets/busta_paga_hero_card.dart';
 import '../../widgets/busta_paga_maturazioni_section.dart';
 import '../../widgets/busta_paga_stat_row.dart';
 import '../../widgets/flat_chip_button.dart';
-import '../../widgets/glass_form_section.dart';
-import '../../widgets/liquid_glass_surface.dart';
+import '../../widgets/pulse_icon.dart';
+import '../../widgets/pulse_section_card.dart';
+import '../../widgets/pulse_surface.dart';
 import '../../widgets/spring_button.dart';
 import '../../widgets/trattenuta_edit_row.dart';
 import '../../widgets/voce_competenza_edit_row.dart';
@@ -472,7 +473,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       context: context,
       builder: (context) {
         final accent =
-            CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
+            CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
         return Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.screenHorizontal,
@@ -484,8 +485,8 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
             top: false,
             child: SizedBox(
               height: 280,
-              child: LiquidGlassSurface(
-                radius: AppRadius.glass,
+              child: PulseSurface(
+                borderRadius: AppRadius.pulse,
                 child: Column(
                   children: [
                     Row(
@@ -500,9 +501,8 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                             padding: const EdgeInsets.all(AppSpacing.sm),
                             child: Text(
                               'Fatto',
-                              style: AppTextStyles.subtitle.copyWith(
+                              style: AppTextStyles.pulseBodyEmphasis.copyWith(
                                 color: accent,
-                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -549,7 +549,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
 
   void _showAlert(String title, String message) {
     final accent =
-        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
     showAppAlertDialog<void>(
       context: context,
       title: title,
@@ -645,9 +645,9 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     }
 
     final accent =
-        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
-    final labelSecondary =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
+    final textSecondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
     showAppAlertDialog<void>(
       context: context,
       title: 'Conferma modifiche',
@@ -657,7 +657,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
         AppAlertAction(
           icon: CupertinoIcons.xmark,
           label: 'Annulla',
-          color: labelSecondary,
+          color: textSecondary,
           onPressed: () => Navigator.of(context).pop(),
         ),
         AppAlertAction(
@@ -719,7 +719,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
 
     return CupertinoPageScaffold(
       backgroundColor:
-          CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
+          CupertinoDynamicColor.resolve(AppColors.pulseBackground, context),
       navigationBar: const CupertinoNavigationBar(),
       child: Stack(
         children: [
@@ -821,7 +821,10 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                             (
                               'Ore lavorate',
                               _isEditing
-                                  ? inlineNumberField(_oreLavorateCtrl)
+                                  ? inlineNumberField(
+                                      _oreLavorateCtrl,
+                                      style: AppTextStyles.pulseDisplaySmall,
+                                    )
                                   : Text(formatNumber(corrente.oreLavorate),
                                       textAlign: TextAlign.center),
                             ),
@@ -841,12 +844,13 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                             onAggiungi: _isEditing ? _addCompetenza : null,
                             onRimuovi: _isEditing ? _removeCompetenza : null,
                           ),
-                          GlassFormSection(
+                          _trattenuteSection(
+                            context,
                             footer: _isEditing
                                 ? 'Aggiungi le voci di trattenuta indicate in busta '
                                     'paga (es. INPS, IRPEF).'
                                 : null,
-                            children: _isEditing
+                            rows: _isEditing
                                 ? [
                                     for (var i = 0;
                                         i < _trattenuteEdit.length;
@@ -910,7 +914,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                           icon: CupertinoIcons.checkmark_alt,
                           label: 'OK',
                           color: CupertinoDynamicColor.resolve(
-                              AppColors.brandAccent, context),
+                              AppColors.pulseAccent, context),
                           onPressed: () => Navigator.of(context).pop(),
                         ),
                       ],
@@ -928,9 +932,19 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     );
   }
 
+  /// Sezione "Trattenute": card `PulseSectionCard` condivisa (stesso
+  /// impianto di `BustaPagaCompetenzeSection`/`BustaPagaMaturazioniSection`).
+  Widget _trattenuteSection(
+    BuildContext context, {
+    required List<Widget> rows,
+    String? footer,
+  }) {
+    return PulseSectionCard(rows: rows, footer: footer);
+  }
+
   Widget _aggiungiVoceButton(BuildContext context) {
     final accent =
-        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: SpringButton(
@@ -938,10 +952,10 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(CupertinoIcons.add_circled, color: accent, size: 18),
+            PulseIcon(glyph: PulseIconGlyph.add, color: accent, size: 18),
             const SizedBox(width: AppSpacing.xs),
             Text('Aggiungi voce',
-                style: AppTextStyles.subtitle.copyWith(color: accent)),
+                style: AppTextStyles.pulseBodyEmphasis.copyWith(color: accent)),
           ],
         ),
       ),
@@ -951,8 +965,8 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
   Widget _trattenutaRow(String label, String value) {
     return Builder(
       builder: (context) {
-        final labelPrimary =
-            CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
+        final textPrimary =
+            CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
           child: Row(
@@ -961,9 +975,8 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                 flex: 3,
                 child: Text(
                   label,
-                  style: AppTextStyles.subtitle.copyWith(
-                    color: labelPrimary,
-                    fontWeight: FontWeight.w700,
+                  style: AppTextStyles.pulseBodyEmphasis.copyWith(
+                    color: textPrimary,
                   ),
                 ),
               ),
@@ -972,9 +985,8 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                 child: Text(
                   value,
                   textAlign: TextAlign.center,
-                  style: AppTextStyles.cardAmount.copyWith(
-                    color: labelPrimary,
-                    fontWeight: FontWeight.w400,
+                  style: AppTextStyles.pulseDisplaySmall.copyWith(
+                    color: textPrimary,
                   ),
                 ),
               ),
@@ -1013,11 +1025,11 @@ class _ActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent =
-        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
     final greenAccent =
-        CupertinoDynamicColor.resolve(AppColors.systemGreen, context);
+        CupertinoDynamicColor.resolve(AppColors.pulsePositive, context);
     final secondaryAccent =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
 
     final Widget content;
     if (isEditing) {
@@ -1094,14 +1106,13 @@ class _ActionBar extends StatelessWidget {
 }
 
 /// Sfondo "chrome" traslucido/sfocato dietro la barra flottante
-/// "Conferma/Modifica"/"Salva/Annulla": stesso `BackdropFilter` di
-/// `_pinnedBackground` in `buste_paga_archivio_view.dart` (stesso raggio di
-/// blur, stesso fill di opacità, stesso `ClipRect` come antenato diretto del
+/// "Conferma/Modifica"/"Salva/Annulla": `BackdropFilter` con fill
+/// `pulseBackground` semi-trasparente, `ClipRect` come antenato diretto del
 /// `BackdropFilter` — vincolo critico per Impeller su device reale, vedi
-/// CLAUDE.md), copre l'intera fascia della barra.
+/// CLAUDE.md — copre l'intera fascia della barra.
 Widget _floatingBarBackground(BuildContext context) {
   final fill =
-      CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context);
+      CupertinoDynamicColor.resolve(AppColors.pulseBackground, context);
   return ClipRect(
     child: BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),

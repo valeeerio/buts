@@ -17,8 +17,9 @@ import '../../widgets/busta_paga_hero_card.dart';
 import '../../widgets/busta_paga_maturazioni_section.dart';
 import '../../widgets/busta_paga_stat_row.dart';
 import '../../widgets/flat_chip_button.dart';
-import '../../widgets/glass_form_section.dart';
-import '../../widgets/liquid_glass_surface.dart';
+import '../../widgets/pulse_icon.dart';
+import '../../widgets/pulse_section_card.dart';
+import '../../widgets/pulse_surface.dart';
 import '../../widgets/spring_button.dart';
 import '../../widgets/trattenuta_edit_row.dart';
 import '../../widgets/voce_competenza_edit_row.dart';
@@ -309,7 +310,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
       context: context,
       builder: (context) {
         final accent =
-            CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
+            CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
         return Padding(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.screenHorizontal,
@@ -321,8 +322,8 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
             top: false,
             child: SizedBox(
               height: 280,
-              child: LiquidGlassSurface(
-                radius: AppRadius.glass,
+              child: PulseSurface(
+                borderRadius: AppRadius.pulse,
                 child: Column(
                   children: [
                     Row(
@@ -337,9 +338,8 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                             padding: const EdgeInsets.all(AppSpacing.sm),
                             child: Text(
                               'Fatto',
-                              style: AppTextStyles.subtitle.copyWith(
+                              style: AppTextStyles.pulseBodyEmphasis.copyWith(
                                 color: accent,
-                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ),
@@ -434,7 +434,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
 
   void _showAlert(String title, String message) {
     final accent =
-        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
     showAppAlertDialog<void>(
       context: context,
       title: title,
@@ -549,9 +549,9 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   @override
   Widget build(BuildContext context) {
     final accent =
-        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
     final secondaryAccent =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
 
     // Ricontrolla dopo ogni layout (non solo sullo scroll dell'utente): il
     // contenuto del form può cambiare (aggiunta/rimozione trattenute) e con
@@ -579,7 +579,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
       },
       child: CupertinoPageScaffold(
         backgroundColor:
-            CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
+            CupertinoDynamicColor.resolve(AppColors.pulseBackground, context),
         navigationBar: const CupertinoNavigationBar(
           middle: Text('Nuova busta paga'),
         ),
@@ -667,7 +667,10 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                       BustaPagaStatRow(items: [
                         (
                           'Ore lavorate',
-                          inlineNumberField(_oreLavorateController),
+                          inlineNumberField(
+                            _oreLavorateController,
+                            style: AppTextStyles.pulseDisplaySmall,
+                          ),
                         ),
                         (
                           'Straordinari',
@@ -685,11 +688,11 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                         onAggiungi: _addCompetenza,
                         onRimuovi: _removeCompetenza,
                       ),
-                      GlassFormSection(
+                      PulseSectionCard(
                         footer:
                             'Aggiungi le voci di trattenuta indicate in busta '
                             'paga (es. INPS, IRPEF).',
-                        children: [
+                        rows: [
                           for (var i = 0; i < _trattenute.length; i++)
                             trattenutaEditRow(
                               _trattenute[i],
@@ -771,10 +774,10 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(CupertinoIcons.add_circled, color: accent, size: 18),
+            PulseIcon(glyph: PulseIconGlyph.add, color: accent, size: 18),
             const SizedBox(width: AppSpacing.xs),
             Text('Aggiungi voce',
-                style: AppTextStyles.subtitle.copyWith(color: accent)),
+                style: AppTextStyles.pulseBodyEmphasis.copyWith(color: accent)),
           ],
         ),
       ),
@@ -790,7 +793,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
 /// l'intera fascia della barra.
 Widget _floatingBarBackground(BuildContext context) {
   final fill =
-      CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context);
+      CupertinoDynamicColor.resolve(AppColors.pulseBackground, context);
   return ClipRect(
     child: BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
@@ -862,19 +865,20 @@ class _StationaryPushBar extends StatelessWidget {
 /// in `_WarningsSection` sotto): ricorda che i campi del form sono stati
 /// precompilati automaticamente dal parser regex e vanno verificati prima
 /// del salvataggio. Tono volutamente neutro/informativo (icona
-/// `info_circle`, colore secondario) per non essere confuso con gli warning
-/// puntuali (`systemOrange`) che restano più sotto.
+/// `info_circle` in `pulseAccent`, testo in `pulseTextSecondary`, contenitore
+/// `PulseSurface`) per non essere confuso con gli warning puntuali
+/// (`systemOrange`) che restano più sotto.
 class _EstrazioneAutomaticaBanner extends StatelessWidget {
   const _EstrazioneAutomaticaBanner();
 
   @override
   Widget build(BuildContext context) {
-    final secondaryAccent =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
-    final labelPrimary =
-        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-    return LiquidGlassSurface(
-      radius: AppRadius.glassSmall,
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
+    final textSecondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
+    return PulseSurface(
+      borderRadius: AppRadius.pulseSmall,
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.sm,
@@ -882,12 +886,12 @@ class _EstrazioneAutomaticaBanner extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(CupertinoIcons.info_circle, color: secondaryAccent, size: 18),
+          Icon(CupertinoIcons.info_circle, color: accent, size: 18),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               'Dati estratti automaticamente, verifica prima di salvare.',
-              style: AppTextStyles.subtitle.copyWith(color: labelPrimary),
+              style: AppTextStyles.pulseBody.copyWith(color: textSecondary),
             ),
           ),
         ],
@@ -911,29 +915,46 @@ class _WarningsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final orange =
         CupertinoDynamicColor.resolve(AppColors.systemOrange, context);
-    final labelPrimary =
-        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-    return GlassFormSection(
-      header: 'Da verificare',
+    final textPrimary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
+    final textSecondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final warning in warnings)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(CupertinoIcons.exclamationmark_triangle,
-                    color: orange, size: 18),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    warning,
-                    style: AppTextStyles.subtitle.copyWith(color: labelPrimary),
-                  ),
-                ),
-              ],
-            ),
+        Padding(
+          padding: const EdgeInsets.only(
+            left: AppSpacing.md,
+            bottom: AppSpacing.xs,
           ),
+          child: Text(
+            'Da verificare',
+            style: AppTextStyles.pulseLabel.copyWith(color: textSecondary),
+          ),
+        ),
+        PulseSectionCard(
+          rows: [
+            for (final warning in warnings)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(CupertinoIcons.exclamationmark_triangle,
+                        color: orange, size: 18),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        warning,
+                        style: AppTextStyles.pulseBody
+                            .copyWith(color: textPrimary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ],
     );
   }

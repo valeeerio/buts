@@ -3,7 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
-import 'glass_form_section.dart';
+import 'pulse_section_card.dart';
 import 'trattenuta_edit_row.dart';
 
 /// Tabella unica Ferie/Permessi/Ex festività con colonne
@@ -63,47 +63,48 @@ class BustaPagaMaturazioniSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelSecondary =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
-    return GlassFormSection(
-      children: [
-        _tableHeaderRow(labelSecondary),
-        _tableDataRow(
-          context,
-          label: 'Ferie',
-          maturato: ferieMaturate,
-          goduto: ferieGodute,
-          residuo: ferieResidue,
-          maturatoCtrl: ferieMaturateCtrl,
-          godutoCtrl: ferieGoduteCtrl,
-          residuoCtrl: ferieResidueCtrl,
-        ),
-        _tableDataRow(
-          context,
-          label: 'Permessi',
-          maturato: rolMaturati,
-          goduto: rolGoduti,
-          residuo: rolResidui,
-          maturatoCtrl: rolMaturatiCtrl,
-          godutoCtrl: rolGodutiCtrl,
-          residuoCtrl: rolResiduiCtrl,
-        ),
-        _tableDataRow(
-          context,
-          label: 'Ex festività',
-          maturato: exFestivitaMaturate,
-          goduto: exFestivitaGodute,
-          residuo: exFestivitaResidue,
-          maturatoCtrl: exFestivitaMaturateCtrl,
-          godutoCtrl: exFestivitaGoduteCtrl,
-          residuoCtrl: exFestivitaResidueCtrl,
-        ),
-      ],
-    );
+    final textSecondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
+
+    final rows = <Widget>[
+      _tableHeaderRow(textSecondary),
+      _tableDataRow(
+        context,
+        label: 'Ferie',
+        maturato: ferieMaturate,
+        goduto: ferieGodute,
+        residuo: ferieResidue,
+        maturatoCtrl: ferieMaturateCtrl,
+        godutoCtrl: ferieGoduteCtrl,
+        residuoCtrl: ferieResidueCtrl,
+      ),
+      _tableDataRow(
+        context,
+        label: 'Permessi',
+        maturato: rolMaturati,
+        goduto: rolGoduti,
+        residuo: rolResidui,
+        maturatoCtrl: rolMaturatiCtrl,
+        godutoCtrl: rolGodutiCtrl,
+        residuoCtrl: rolResiduiCtrl,
+      ),
+      _tableDataRow(
+        context,
+        label: 'Ex festività',
+        maturato: exFestivitaMaturate,
+        goduto: exFestivitaGodute,
+        residuo: exFestivitaResidue,
+        maturatoCtrl: exFestivitaMaturateCtrl,
+        godutoCtrl: exFestivitaGoduteCtrl,
+        residuoCtrl: exFestivitaResidueCtrl,
+      ),
+    ];
+
+    return PulseSectionCard(rows: rows);
   }
 
-  Widget _tableHeaderRow(Color labelSecondary) {
-    final style = AppTextStyles.cardLabel.copyWith(color: labelSecondary);
+  Widget _tableHeaderRow(Color textSecondary) {
+    final style = AppTextStyles.pulseLabel.copyWith(color: textSecondary);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: Row(
@@ -154,11 +155,13 @@ class BustaPagaMaturazioniSection extends StatelessWidget {
     TextEditingController? godutoCtrl,
     TextEditingController? residuoCtrl,
   }) {
-    final labelPrimary =
-        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-    final valueStyle = AppTextStyles.cardAmount.copyWith(
-      color: labelPrimary,
-      fontWeight: FontWeight.w400,
+    final textPrimary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
+    final textSecondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
+    final valueStyle = AppTextStyles.pulseDisplaySmall.copyWith(
+      color: textPrimary,
+      fontFeatures: const [FontFeature.tabularFigures()],
     );
 
     Widget cell(String value, TextEditingController? controller) {
@@ -176,10 +179,7 @@ class BustaPagaMaturazioniSection extends StatelessWidget {
             flex: 3,
             child: Text(
               label,
-              style: AppTextStyles.subtitle.copyWith(
-                color: labelPrimary,
-                fontWeight: FontWeight.w700,
-              ),
+              style: AppTextStyles.pulseLabel.copyWith(color: textSecondary),
             ),
           ),
           Expanded(flex: 2, child: cell(maturato, maturatoCtrl)),

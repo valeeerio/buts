@@ -8,7 +8,8 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/busta_paga_formatting.dart';
-import '../../widgets/liquid_glass_surface.dart';
+import '../../widgets/pulse_icon.dart';
+import '../../widgets/pulse_surface.dart';
 
 /// Contenuto della tab "Statistiche" della sezione Buste Paga: andamento
 /// netto/lordo, ferie/permessi residui e ore di straordinario nel tempo.
@@ -16,7 +17,11 @@ import '../../widgets/liquid_glass_surface.dart';
 /// Palette scelta per coerenza cross-chart: ogni serie usa un colore
 /// semantico di sistema fisso (non legato alle 4 aree Budget, dato che
 /// questi grafici non rappresentano aree) così la stessa grandezza è
-/// riconoscibile a colpo d'occhio tra i vari grafici della schermata.
+/// riconoscibile a colpo d'occhio tra i vari grafici della schermata. Dalla
+/// migrazione a "Pulse" (vedi CLAUDE.md, sfondo `pulseBackground`/
+/// `pulseSurface` scuro) ogni colore è stato riverificato per contrasto sullo
+/// sfondo scuro, non solo per distanza reciproca in isolamento — vedi note
+/// puntuali su ciascuna costante sotto.
 class BustePagaStatisticheScreen extends ConsumerWidget {
   final ({DateTime start, DateTime end})? periodoFiltro;
 
@@ -28,18 +33,21 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
   // sulla nota "non assumere lo stesso valore assoluto tra schermate".
   static const _fadeHeight = 90.0;
 
+  // systemGreen: la variante dark (0xFF30D158) resta ben leggibile e satura
+  // su `pulseSurface`/`pulseBackground` scuri, nessuna sostituzione
+  // necessaria.
   static const _nettoColor = AppColors.systemGreen;
-  // Riscaldata a `brandAccent` (era systemBlue): nel grafico Netto/Lordo è
-  // l'unica altra serie oltre a Netto (systemGreen), nessun rischio di
-  // confusione con systemOrange/systemRed che non compaiono in questo
-  // grafico.
-  static const _lordoColor = AppColors.brandAccent;
-  // Resta systemBlue (non riscaldata): nel grafico Ferie e permessi
-  // convive con systemOrange (permessi orario goduti) — troppo vicino in
-  // tonalità a `brandAccent` (coral/arancio) per restare distinguibile in
-  // un grafico a 4 serie, vedi CLAUDE.md sulla distanza HSL verificata solo
-  // rispetto a systemRed/systemOrange in isolamento, non nel contesto di un
-  // grafico che li affianca entrambi.
+  // Passata a `pulseAccent` (era `brandAccent`, il vecchio accento
+  // "riscaldato" ora superato dalla direzione Pulse, vedi CLAUDE.md): nel
+  // grafico Netto/Lordo è l'unica altra serie oltre a Netto (systemGreen),
+  // buon contrasto reciproco, e lega la grandezza "Lordo" all'accento
+  // ciano/cobalto che è ormai il colore di rilievo dell'intera app.
+  static const _lordoColor = AppColors.pulseAccent;
+  // Resta systemBlue: nel grafico Ferie e permessi convive con systemPurple,
+  // systemOrange e systemGreen — la nota precedente sul confronto con
+  // `brandAccent` non si applica più (quel token non compare più in nessuno
+  // dei grafici di questa schermata). systemBlue dark (0xFF0A84FF) resta ben
+  // distinguibile dalle altre tre serie e leggibile su sfondo scuro.
   static const _ferieColor = AppColors.systemBlue;
   static const _rolColor = AppColors.systemPurple;
   static const _permessiColor = AppColors.systemOrange;
@@ -187,7 +195,7 @@ class _NoDataMessage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final secondary =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
     final messaggio = busteNonConfermate <= 0
         ? 'Non ci sono dati'
         : busteNonConfermate == 1
@@ -201,18 +209,22 @@ class _NoDataMessage extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              busteNonConfermate > 0
-                  ? CupertinoIcons.checkmark_seal
-                  : CupertinoIcons.chart_bar_alt_fill,
-              size: 28,
-              color: secondary,
-            ),
+            busteNonConfermate > 0
+                ? Icon(
+                    CupertinoIcons.checkmark_seal,
+                    size: 28,
+                    color: secondary,
+                  )
+                : PulseIcon(
+                    glyph: PulseIconGlyph.chart,
+                    size: 28,
+                    color: secondary,
+                  ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               messaggio,
               textAlign: TextAlign.center,
-              style: AppTextStyles.cardLabel.copyWith(color: secondary),
+              style: AppTextStyles.pulseBody.copyWith(color: secondary),
             ),
           ],
         ),
@@ -243,8 +255,8 @@ class _ChartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LiquidGlassSurface(
-      radius: AppRadius.glass,
+    return PulseSurface(
+      borderRadius: AppRadius.pulse,
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: SizedBox(
         width: double.infinity,
@@ -253,10 +265,9 @@ class _ChartCard extends StatelessWidget {
           children: [
             Text(
               title,
-              style: AppTextStyles.subtitle.copyWith(
-                fontWeight: FontWeight.w600,
+              style: AppTextStyles.pulseBodyEmphasis.copyWith(
                 color: CupertinoDynamicColor.resolve(
-                    AppColors.labelPrimary, context),
+                    AppColors.pulseTextPrimary, context),
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
@@ -292,9 +303,8 @@ typedef _StatsTableData = ({
 /// stesso pattern di `_MaturazioniSection` nel dettaglio busta paga
 /// (`Row`+`Expanded` a flex fissi, non `Table`): riga header con i nomi
 /// delle serie, poi una riga per metrica con un valore per colonna. **Non**
-/// un'altra `LiquidGlassSurface`: vive già dentro il vetro di `_ChartCard`,
-/// e più superfici di vetro annidate/ravvicinate producono l'artefatto di
-/// rendering "cucitura" documentato in CLAUDE.md.
+/// un'altra `PulseSurface`: vive già dentro la superficie piatta di
+/// `_ChartCard`, nessun bisogno di un secondo contenitore annidato.
 class _StatsTable extends StatelessWidget {
   final _StatsTableData data;
 
@@ -303,17 +313,16 @@ class _StatsTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final labelColor =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
     final valueColor =
-        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-    final dividerColor =
-        CupertinoDynamicColor.resolve(AppColors.separator, context);
-    final headerStyle = AppTextStyles.cardLabel.copyWith(color: labelColor);
-    final labelStyle = AppTextStyles.cardLabel.copyWith(
+        CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
+    final dividerColor = labelColor.withValues(alpha: 0.3);
+    final headerStyle = AppTextStyles.pulseLabel.copyWith(color: labelColor);
+    final labelStyle = AppTextStyles.pulseBody.copyWith(
       color: valueColor,
       fontWeight: FontWeight.w600,
     );
-    final valueStyle = AppTextStyles.cardLabel.copyWith(color: valueColor);
+    final valueStyle = AppTextStyles.pulseBody.copyWith(color: valueColor);
 
     Widget divider() => Container(height: 0.5, color: dividerColor);
     Widget columnDivider() => Container(
@@ -578,9 +587,9 @@ class _LegendChip extends StatelessWidget {
         const SizedBox(width: 6),
         Text(
           entry.label,
-          style: AppTextStyles.cardLabel.copyWith(
+          style: AppTextStyles.pulseLabel.copyWith(
             color: CupertinoDynamicColor.resolve(
-                AppColors.labelSecondary, context),
+                AppColors.pulseTextSecondary, context),
           ),
         ),
       ],
@@ -750,7 +759,7 @@ AxisTitles _periodoBottomAxisTitles({
   String Function(DateTime periodo) shortLabelBuilder = meseAxisLabel,
 }) {
   final textStyle =
-      AppTextStyles.cardLabel.copyWith(color: labelColor, fontSize: 10);
+      AppTextStyles.pulseLabel.copyWith(color: labelColor, fontSize: 10);
 
   if (periodi.length > _yearlyLabelsThreshold) {
     final boundaries = _yearBoundaryIndices(periodi);
@@ -865,7 +874,7 @@ AxisTitles _valueLeftAxisTitles({
           padding: const EdgeInsets.only(right: 6),
           child: Text(
             formatValue(value),
-            style: AppTextStyles.cardLabel
+            style: AppTextStyles.pulseLabel
                 .copyWith(color: labelColor, fontSize: 10),
           ),
         );
@@ -895,8 +904,9 @@ AxisTitles _valueLeftAxisTitles({
 /// e tre i grafici — estratti per non avere tre calcoli divergenti.
 ({Color background, Color text}) _tooltipColors(BuildContext context) {
   return (
-    background: CupertinoDynamicColor.resolve(AppColors.labelPrimary, context),
-    text: CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
+    background:
+        CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context),
+    text: CupertinoDynamicColor.resolve(AppColors.pulseBackground, context),
   );
 }
 
@@ -917,9 +927,10 @@ class _NettoLordoChart extends StatelessWidget {
     final lordoColor = CupertinoDynamicColor.resolve(
         BustePagaStatisticheScreen._lordoColor, context);
     final gridColor =
-        CupertinoDynamicColor.resolve(AppColors.separator, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context)
+            .withValues(alpha: 0.18);
     final labelColor =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
     final tooltip = _tooltipColors(context);
 
     // Griglia continua mese per mese (vedi doc di libreria su
@@ -1022,7 +1033,7 @@ class _NettoLordoChart extends StatelessWidget {
         : '$label: ${formatEuroConSegno(spot.y)}';
     return LineTooltipItem(
       text,
-      AppTextStyles.cardLabel.copyWith(
+      AppTextStyles.pulseBody.copyWith(
         color: textColor,
         fontWeight: FontWeight.w600,
       ),
@@ -1082,9 +1093,10 @@ class _FerieRolPermessiChart extends StatelessWidget {
     final exFestivitaColor = CupertinoDynamicColor.resolve(
         BustePagaStatisticheScreen._exFestivitaColor, context);
     final gridColor =
-        CupertinoDynamicColor.resolve(AppColors.separator, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context)
+            .withValues(alpha: 0.18);
     final labelColor =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
     final tooltip = _tooltipColors(context);
 
     // Griglia continua mese per mese, stesso meccanismo di
@@ -1186,7 +1198,7 @@ class _FerieRolPermessiChart extends StatelessWidget {
         : '$label: ${formatNumber(spot.y)}';
     return LineTooltipItem(
       text,
-      AppTextStyles.cardLabel.copyWith(
+      AppTextStyles.pulseBody.copyWith(
         color: textColor,
         fontWeight: FontWeight.w600,
       ),
@@ -1289,9 +1301,10 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
     final barColor = CupertinoDynamicColor.resolve(
         BustePagaStatisticheScreen._straordinarioColor, context);
     final gridColor =
-        CupertinoDynamicColor.resolve(AppColors.separator, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context)
+            .withValues(alpha: 0.18);
     final labelColor =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
     final tooltip = _tooltipColors(context);
 
     // Griglia continua (mensile o trimestrale a seconda dell'aggregazione),
@@ -1366,7 +1379,7 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
                   return BarTooltipItem(
                     '${shortLabelBuilder(punto.periodo)}\n'
                     '${formatNumber(rod.toY)} h',
-                    AppTextStyles.cardLabel.copyWith(
+                    AppTextStyles.pulseBody.copyWith(
                       color: tooltip.text,
                       fontWeight: FontWeight.w600,
                     ),

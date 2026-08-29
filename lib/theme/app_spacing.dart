@@ -31,4 +31,11 @@ class AppRadius {
   // superficie/card di tutta l'app.
   static const double glass = 28; // hero card, contenitori principali
   static const double glassSmall = 18; // righe elenco, chip, CTA compatte
+
+  // --- Pulse ---
+  // Angoli arrotondati circolari classici (`BorderRadius.circular`, non
+  // squircle) per le superfici piatte Pulse (`PulseSurface`,
+  // `ProgressRingTile`), leggermente meno generosi del Liquid Glass.
+  static const double pulse = 22; // blocchi/tile principali
+  static const double pulseSmall = 16; // tile compatte, chip
 }

@@ -3,7 +3,8 @@ import 'package:flutter/cupertino.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
-import 'liquid_glass_surface.dart';
+import 'pulse_icon.dart';
+import 'pulse_surface.dart';
 
 /// Hero card in cima al dettaglio/form busta paga: mese, badge di stato e
 /// netto in massima evidenza. In modalità modifica il mese/tipo sono
@@ -28,8 +29,8 @@ import 'liquid_glass_surface.dart';
 /// CLAUDE.md) e il Netto (destra, il valore "hero" vero e proprio, anch'esso
 /// sempre derivato/di sola lettura). Entrambe le colonne hanno la stessa
 /// struttura (etichetta sopra, valore sotto); Lordo e Netto sono
-/// visivamente identici in tutto (stesso stile `AppTextStyles.sectionTitle`,
-/// 22pt, colore `labelPrimary`) — nessuna differenziazione tra i due, si
+/// visivamente identici in tutto (stesso stile `AppTextStyles.pulseDisplay`,
+/// colore `pulseTextPrimary`) — nessuna differenziazione tra i due, si
 /// distinguono solo tramite l'etichetta sopra.
 ///
 /// Non richiede un `BustaPaga` intero: solo `isConfermato` per il badge
@@ -64,23 +65,18 @@ class BustaPagaHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelPrimary =
-        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-    final labelSecondary =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
-    final badgeColor = CupertinoDynamicColor.resolve(
-      isConfermato ? AppColors.systemGreen : AppColors.systemRed,
-      context,
-    );
-    final separator =
-        CupertinoDynamicColor.resolve(AppColors.separator, context);
+    final textPrimary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
+    final textSecondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
+    final separator = textSecondary.withValues(alpha: 0.3);
     final amountValueStyle =
-        AppTextStyles.sectionTitle.copyWith(color: labelPrimary);
+        AppTextStyles.pulseDisplay.copyWith(color: textPrimary);
 
-    final labelStyle = AppTextStyles.cardLabel.copyWith(color: labelSecondary);
+    final labelStyle = AppTextStyles.pulseLabel.copyWith(color: textSecondary);
 
-    return LiquidGlassSurface(
-      radius: AppRadius.glass,
+    return PulseSurface(
+      borderRadius: AppRadius.pulse,
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,8 +92,8 @@ class BustaPagaHeroCard extends StatelessWidget {
                               periodoLabel,
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
-                              style: AppTextStyles.sectionTitle.copyWith(
-                                color: labelPrimary,
+                              style: AppTextStyles.pulseDisplay.copyWith(
+                                color: textPrimary,
                               ),
                             )
                           : Semantics(
@@ -114,13 +110,15 @@ class BustaPagaHeroCard extends StatelessWidget {
                                         periodoLabel,
                                         overflow: TextOverflow.ellipsis,
                                         maxLines: 1,
-                                        style: AppTextStyles.sectionTitle
-                                            .copyWith(color: labelPrimary),
+                                        style: AppTextStyles.pulseDisplay
+                                            .copyWith(color: textPrimary),
                                       ),
                                     ),
                                     const SizedBox(width: AppSpacing.xs),
-                                    Icon(CupertinoIcons.chevron_down,
-                                        size: 16, color: labelSecondary),
+                                    PulseIcon(
+                                        glyph: PulseIconGlyph.chevronDown,
+                                        size: 16,
+                                        color: textSecondary),
                                   ],
                                 ),
                               ),
@@ -136,18 +134,17 @@ class BustaPagaHeroCard extends StatelessWidget {
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: AppSpacing.xs),
-                            child: Icon(CupertinoIcons.chevron_down,
-                                size: 12, color: labelSecondary),
+                            child: PulseIcon(
+                                glyph: PulseIconGlyph.chevronDown,
+                                size: 12,
+                                color: textSecondary),
                           ),
                         ),
                       ),
                   ],
                 ),
               ),
-              _StatoBadge(
-                isConfermato: isConfermato,
-                badgeColor: badgeColor,
-              ),
+              _StatoBadge(isConfermato: isConfermato),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
@@ -215,19 +212,18 @@ class BustaPagaHeroCard extends StatelessWidget {
   }
 }
 
-/// Badge di stato (Confermato/Da confermare): sola visualizzazione, colori e
-/// aspetto sempre guidati dal chiamante (`isConfermato`/`badgeColor`, a loro
-/// volta derivati dallo stato letto dal provider, mai da variabili locali di
-/// editing). Aggiunge solo un piccolo "pop" a molla sulla scala quando
-/// [isConfermato] cambia rispetto al build precedente — mai al primo mount.
+/// Badge di stato (Confermato/Da confermare): sola visualizzazione, aspetto
+/// sempre guidato dal chiamante (`isConfermato`, a sua volta derivato dallo
+/// stato letto dal provider, mai da variabili locali di editing). Colori:
+/// riempimento pieno `pulsePositive`/`pulseNegative`, testo
+/// `pulseOnPositive`/`pulseOnNegative` — stesso pattern del badge di stato
+/// nell'Archivio (`BustaPagaSummaryHero`/`BustaPagaListItem`). Aggiunge solo
+/// un piccolo "pop" a molla sulla scala quando [isConfermato] cambia rispetto
+/// al build precedente — mai al primo mount.
 class _StatoBadge extends StatefulWidget {
   final bool isConfermato;
-  final Color badgeColor;
 
-  const _StatoBadge({
-    required this.isConfermato,
-    required this.badgeColor,
-  });
+  const _StatoBadge({required this.isConfermato});
 
   @override
   State<_StatoBadge> createState() => _StatoBadgeState();
@@ -275,6 +271,16 @@ class _StatoBadgeState extends State<_StatoBadge>
 
   @override
   Widget build(BuildContext context) {
+    final badgeFill = CupertinoDynamicColor.resolve(
+      widget.isConfermato ? AppColors.pulsePositive : AppColors.pulseNegative,
+      context,
+    );
+    final badgeText = CupertinoDynamicColor.resolve(
+      widget.isConfermato
+          ? AppColors.pulseOnPositive
+          : AppColors.pulseOnNegative,
+      context,
+    );
     return ScaleTransition(
       scale: _scale,
       child: Container(
@@ -283,12 +289,12 @@ class _StatoBadgeState extends State<_StatoBadge>
           vertical: AppSpacing.xs,
         ),
         decoration: BoxDecoration(
-          color: widget.badgeColor.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(AppRadius.small),
+          color: badgeFill,
+          borderRadius: BorderRadius.circular(AppRadius.pulseSmall),
         ),
         child: Text(
           widget.isConfermato ? 'Confermato' : 'Da confermare',
-          style: AppTextStyles.changeBadge.copyWith(color: widget.badgeColor),
+          style: AppTextStyles.pulseLabel.copyWith(color: badgeText),
         ),
       ),
     );

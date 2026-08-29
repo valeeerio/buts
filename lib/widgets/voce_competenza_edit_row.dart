@@ -97,11 +97,11 @@ Widget voceCompetenzaEditRow(
     key: ValueKey(row.id),
     direction: DismissDirection.endToStart,
     onDismissed: (_) => onDismissed(),
-    background: const SwipeDeleteBackground(radius: AppRadius.glassSmall),
+    background: const SwipeDeleteBackground(radius: AppRadius.pulseSmall),
     child: Builder(
       builder: (context) {
-        final labelPrimary =
-            CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
+        final textPrimary =
+            CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
           child: Row(
@@ -113,16 +113,18 @@ Widget voceCompetenzaEditRow(
                   placeholder: 'Voce',
                   decoration: const BoxDecoration(),
                   padding: EdgeInsets.zero,
-                  style: AppTextStyles.subtitle.copyWith(
-                    color: labelPrimary,
-                    fontWeight: FontWeight.w700,
+                  style: AppTextStyles.pulseBodyEmphasis.copyWith(
+                    color: textPrimary,
                   ),
                 ),
               ),
               Expanded(
                 flex: 2,
                 child: Center(
-                  child: inlineNumberField(row.quantita),
+                  child: inlineNumberField(
+                    row.quantita,
+                    style: AppTextStyles.pulseDisplaySmall,
+                  ),
                 ),
               ),
               Expanded(
@@ -138,6 +140,7 @@ Widget voceCompetenzaEditRow(
                   child: inlineNumberField(
                     row.importo,
                     prefix: row.negativo ? '− € ' : '€ ',
+                    style: AppTextStyles.pulseDisplaySmall,
                   ),
                 ),
               ),

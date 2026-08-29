@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_sticky_header/flutter_sticky_header.dart';
@@ -14,8 +12,9 @@ import '../../widgets/app_alert_dialog.dart';
 import '../../widgets/busta_paga_list_item.dart';
 import '../../widgets/busta_paga_summary_hero.dart';
 import '../../widgets/custom_illustration.dart';
-import '../../widgets/liquid_glass_button.dart';
-import '../../widgets/liquid_glass_surface.dart';
+import '../../widgets/progress_ring_tile.dart';
+import '../../widgets/pulse_icon.dart';
+import '../../widgets/pulse_surface.dart';
 import '../../widgets/spring_button.dart';
 import '../../widgets/staggered_fade_slide_in.dart';
 import '../../widgets/swipe_delete_background.dart';
@@ -213,7 +212,7 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
     } catch (_) {
       if (!context.mounted) return false;
       final accent =
-          CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
+          CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
       showAppAlertDialog<void>(
         context: context,
         title: 'Eliminazione non riuscita',
@@ -261,7 +260,7 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
         key: ValueKey('row-${bustaPaga.id}'),
         direction: DismissDirection.endToStart,
         confirmDismiss: (_) => _confermaEElimina(context, ref, bustaPaga),
-        background: const SwipeDeleteBackground(radius: AppRadius.glassSmall),
+        background: const SwipeDeleteBackground(radius: AppRadius.pulseSmall),
         child: BustaPagaListItem(
           bustaPaga: bustaPaga,
           onTap: () => widget.onOpenDetail(bustaPaga),
@@ -465,10 +464,9 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
               Expanded(
                 child: Text(
                   '$anno',
-                  style: AppTextStyles.subtitle.copyWith(
-                    fontWeight: FontWeight.w600,
+                  style: AppTextStyles.pulseBodyEmphasis.copyWith(
                     color: CupertinoDynamicColor.resolve(
-                        AppColors.labelPrimary, context),
+                        AppColors.pulseTextPrimary, context),
                   ),
                 ),
               ),
@@ -498,8 +496,8 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
   /// [_extraSliver], così i due effetti si percepiscono come un unico
   /// gesto.
   Widget _extraToggle(BuildContext context, int anno, bool espansa) {
-    final labelSecondary =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+    final textSecondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
     return SpringButton(
       onPressed: () => setState(() {
         if (espansa) {
@@ -513,20 +511,17 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
         children: [
           Text(
             'Extra',
-            style: AppTextStyles.cardLabel.copyWith(
-              fontWeight: FontWeight.w600,
-              color: labelSecondary,
-            ),
+            style: AppTextStyles.pulseLabel.copyWith(color: textSecondary),
           ),
           const SizedBox(width: AppSpacing.xs),
           AnimatedRotation(
-            turns: espansa ? 0.25 : 0,
+            turns: espansa ? 0.5 : 0,
             duration: _extraAnimationDuration,
             curve: _extraAnimationCurve,
-            child: Icon(
-              CupertinoIcons.chevron_right,
+            child: PulseIcon(
+              glyph: PulseIconGlyph.chevronDown,
               size: 14,
-              color: labelSecondary,
+              color: textSecondary,
             ),
           ),
         ],
@@ -568,12 +563,19 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
               key: ValueKey('hero-${ultima.id}'),
               direction: DismissDirection.endToStart,
               confirmDismiss: (_) => _confermaEElimina(context, ref, ultima),
-              background: const SwipeDeleteBackground(radius: AppRadius.glass),
+              background: const SwipeDeleteBackground(radius: AppRadius.pulse),
               child: BustaPagaSummaryHero(
                 bustaPaga: ultima,
                 onTap: () => widget.onOpenDetail(ultima),
               ),
             ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.screenHorizontal,
+            ),
+            child: _MaturazioniRingsRow(bustaPaga: ultima),
           ),
           const SizedBox(height: AppSpacing.lg),
         ],
@@ -642,21 +644,15 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
   }
 }
 
-/// Sfondo "chrome" traslucido/sfocato condiviso dai due header pinned
-/// (ricerca e anno): vero `BackdropFilter` sul contenuto scrollato
-/// sottostante, coerente con il materiale Liquid Glass invece di un
-/// riempimento piatto a tinta unita.
+/// Sfondo "chrome" condiviso dall'header pinned dell'anno: riempimento
+/// piatto a tinta piena (nessun `BackdropFilter`), coerente col materiale
+/// "Pulse" bold/dark-first — sostituisce il vecchio vetro sfocato.
 Widget _pinnedBackground(BuildContext context, {required Widget child}) {
   final fill =
-      CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context);
-  return ClipRect(
-    child: BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-      child: DecoratedBox(
-        decoration: BoxDecoration(color: fill.withValues(alpha: 0.8)),
-        child: child,
-      ),
-    ),
+      CupertinoDynamicColor.resolve(AppColors.pulseBackground, context);
+  return DecoratedBox(
+    decoration: BoxDecoration(color: fill),
+    child: child,
   );
 }
 
@@ -667,8 +663,8 @@ class _NessunRisultato extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LiquidGlassSurface(
-      radius: AppRadius.glassSmall,
+    return PulseSurface(
+      borderRadius: AppRadius.pulseSmall,
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: SizedBox(
         width: double.infinity,
@@ -682,10 +678,9 @@ class _NessunRisultato extends StatelessWidget {
             Text(
               'Nessun risultato per "$query"',
               textAlign: TextAlign.center,
-              style: AppTextStyles.subtitle.copyWith(
-                fontWeight: FontWeight.w600,
+              style: AppTextStyles.pulseBodyEmphasis.copyWith(
                 color: CupertinoDynamicColor.resolve(
-                    AppColors.labelPrimary, context),
+                    AppColors.pulseTextPrimary, context),
               ),
             ),
           ],
@@ -702,10 +697,10 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent =
-        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
-    return LiquidGlassSurface(
-      radius: AppRadius.glass,
+    final onAccent =
+        CupertinoDynamicColor.resolve(AppColors.pulseOnAccent, context);
+    return PulseSurface(
+      borderRadius: AppRadius.pulse,
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: SizedBox(
         width: double.infinity,
@@ -718,19 +713,18 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             Text(
               'Nessuna busta paga in archivio',
-              style: AppTextStyles.subtitle.copyWith(
-                fontWeight: FontWeight.w600,
+              style: AppTextStyles.pulseBodyEmphasis.copyWith(
                 color: CupertinoDynamicColor.resolve(
-                    AppColors.labelPrimary, context),
+                    AppColors.pulseTextPrimary, context),
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               'Aggiungi la tua prima busta paga per iniziare l\'archivio.',
               textAlign: TextAlign.center,
-              style: AppTextStyles.cardLabel.copyWith(
+              style: AppTextStyles.pulseBody.copyWith(
                 color: CupertinoDynamicColor.resolve(
-                    AppColors.labelSecondary, context),
+                    AppColors.pulseTextSecondary, context),
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
@@ -738,26 +732,87 @@ class _EmptyState extends StatelessWidget {
               'Importa il PDF della tua busta paga per iniziare — servono '
               'PDF con testo selezionabile, non foto o scansioni.',
               textAlign: TextAlign.center,
-              style: AppTextStyles.cardLabel.copyWith(
+              style: AppTextStyles.pulseBody.copyWith(
                 color: CupertinoDynamicColor.resolve(
-                    AppColors.labelSecondary, context),
+                    AppColors.pulseTextSecondary, context),
               ),
             ),
             const SizedBox(height: AppSpacing.md),
-            LiquidGlassButton(
-              onPressed: onAdd,
-              tint: accent,
+            PulseSurface(
+              filled: true,
+              borderRadius: AppRadius.pulseSmall,
+              onTap: onAdd,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg,
+                vertical: AppSpacing.sm + 2,
+              ),
               child: Text(
                 'Aggiungi busta paga',
-                style: AppTextStyles.subtitle.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: accent,
+                style: AppTextStyles.pulseBodyEmphasis.copyWith(
+                  color: onAccent,
                 ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Griglia di anelli di maturazione (Ferie/Permessi/Ex festività residue —
+/// vedi CLAUDE.md, "Voci di competenza": nel modello dati "Permessi"
+/// corrisponde ai campi `rol*`, stessa etichetta già usata da
+/// `BustaPagaMaturazioniSection` nel dettaglio, non una quarta categoria
+/// distinta dai ROL) per l'ultima busta paga in archivio. Una riga di 3
+/// tessere `ProgressRingTile`, non un `GridView` 2x2: il dominio dati traccia
+/// solo 3 categorie di ratei (Ferie, Permessi/ROL, Ex festività), non 4 —
+/// vedi CLAUDE.md "Ferie, ROL e permessi" nel dettaglio busta paga, stessa
+/// fonte di verità.
+class _MaturazioniRingsRow extends StatelessWidget {
+  final BustaPaga bustaPaga;
+
+  const _MaturazioniRingsRow({required this.bustaPaga});
+
+  /// Frazione residuo/maturato, clampata e senza dividere per zero se
+  /// `maturato` è 0 (nessun rateo maturato in questa busta paga).
+  double _progress(double residuo, double maturato) {
+    if (maturato <= 0) return 0;
+    return (residuo / maturato).clamp(0.0, 1.0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: ProgressRingTile(
+            label: 'Ferie',
+            value: formatNumber(bustaPaga.ferieResidue),
+            progress:
+                _progress(bustaPaga.ferieResidue, bustaPaga.ferieMaturate),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: ProgressRingTile(
+            label: 'Permessi',
+            value: formatNumber(bustaPaga.rolResidui),
+            progress: _progress(bustaPaga.rolResidui, bustaPaga.rolMaturati),
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: ProgressRingTile(
+            label: 'Ex festività',
+            value: formatNumber(bustaPaga.exFestivitaResidue),
+            progress: _progress(
+              bustaPaga.exFestivitaResidue,
+              bustaPaga.exFestivitaMaturate,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -13,8 +13,8 @@ enum CustomIllustrationVariant {
 
 /// Piccola illustrazione vettoriale line-art, disegnata a mano con
 /// `CustomPainter` (mai asset raster/SVG, mai emoji) e colorata con
-/// `AppColors.brandAccent` — riscaldamento dello stile Liquid Glass per
-/// momenti chiave come stati vuoti e onboarding.
+/// `AppColors.pulseAccent` — accento della direzione "Pulse" per momenti
+/// chiave come stati vuoti e onboarding.
 class CustomIllustration extends StatelessWidget {
   final CustomIllustrationVariant variant;
   final double size;
@@ -27,7 +27,7 @@ class CustomIllustration extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
+    final color = CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
     return SizedBox(
       width: size,
       height: size,

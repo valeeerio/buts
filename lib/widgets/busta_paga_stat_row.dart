@@ -3,16 +3,13 @@ import 'package:flutter/cupertino.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
-import 'liquid_glass_surface.dart';
+import 'pulse_surface.dart';
 
 /// Riga di statistiche compatte (residui, importi): **una sola**
-/// `LiquidGlassSurface` con scomparti interni separati da `VerticalDivider`,
-/// invece di N `LiquidGlassSurface` affiancate — più `BackdropFilter`
-/// ravvicinati (distanza di pochi pixel) producevano un artefatto di
-/// rendering visibile come una "cucitura" netta tra una card e l'altra.
-/// Stessa filosofia della sidecar in basso (`_BustePagaSidecar` in
-/// `buste_paga_section_screen.dart`): un'unica superficie di vetro con
-/// scomparti piatti dentro, mai vetro annidato.
+/// `PulseSurface` con scomparti interni separati da un divisore sottile,
+/// invece di N superfici affiancate — stessa filosofia di
+/// `BustaPagaListItem`/`_MaturazioniRingsRow` nell'Archivio, mai superfici
+/// annidate/affiancate.
 ///
 /// `items` accetta un `Widget` già costruito per il valore (invece di una
 /// stringa) per poter mostrare, in modalità modifica, un campo di testo al
@@ -24,15 +21,14 @@ class BustaPagaStatRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelPrimary =
-        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-    final separator =
-        CupertinoDynamicColor.resolve(AppColors.separator, context);
+    final textPrimary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
+    final textSecondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
+    final separator = textSecondary.withValues(alpha: 0.3);
 
-    return LiquidGlassSurface(
-      radius: AppRadius.glass,
-      blurSigma: 22,
-      elevation: 4,
+    return PulseSurface(
+      borderRadius: AppRadius.pulse,
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.md,
         vertical: AppSpacing.sm + 4,
@@ -57,18 +53,16 @@ class BustaPagaStatRow extends StatelessWidget {
                     Text(
                       items[i].$1,
                       textAlign: TextAlign.center,
-                      style: AppTextStyles.subtitle.copyWith(
-                        color: labelPrimary,
-                        fontWeight: FontWeight.w700,
+                      style: AppTextStyles.pulseLabel.copyWith(
+                        color: textSecondary,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     DefaultTextStyle.merge(
-                      style: AppTextStyles.cardAmount.copyWith(
-                        color: labelPrimary,
-                        fontWeight: FontWeight.w400,
+                      style: AppTextStyles.pulseDisplaySmall.copyWith(
+                        color: textPrimary,
                       ),
                       child: items[i].$2,
                     ),

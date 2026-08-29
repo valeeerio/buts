@@ -7,8 +7,8 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
 import 'app_alert_dialog.dart';
-import 'liquid_glass_surface.dart';
-import 'spring_button.dart';
+import 'pulse_icon.dart';
+import 'pulse_surface.dart';
 
 /// Riga compatta per il PDF di origine: icona documento e nome file. L'intera
 /// card è tappabile (nessuna etichetta/icona "Apri" separata, il tap ovunque
@@ -47,7 +47,7 @@ class BustaPagaDocumentoChip extends StatelessWidget {
 
   void _mostraErroreApertura(BuildContext context, String messaggio) {
     final accent =
-        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
     showAppAlertDialog<void>(
       context: context,
       title: 'Impossibile aprire il documento',
@@ -66,36 +66,32 @@ class BustaPagaDocumentoChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent =
-        CupertinoDynamicColor.resolve(AppColors.brandAccent, context);
-    final labelPrimary =
-        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
+    final textPrimary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
 
     return Semantics(
       label: 'Apri documento PDF',
       button: true,
-      child: SpringButton(
-        onPressed: () => _apri(context),
-        child: LiquidGlassSurface(
-          radius: AppRadius.glassSmall,
-          blurSigma: 22,
-          elevation: 4,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm + 4,
-          ),
-          child: Row(
-            children: [
-              Icon(CupertinoIcons.doc_text, size: 20, color: accent),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  p.basename(filePath),
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.subtitle.copyWith(color: labelPrimary),
-                ),
+      child: PulseSurface(
+        borderRadius: AppRadius.pulseSmall,
+        onTap: () => _apri(context),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm + 4,
+        ),
+        child: Row(
+          children: [
+            PulseIcon(glyph: PulseIconGlyph.document, size: 20, color: accent),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                p.basename(filePath),
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.pulseBody.copyWith(color: textPrimary),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

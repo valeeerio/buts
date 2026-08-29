@@ -29,12 +29,11 @@ class AppAlertAction {
 /// Popup di conferma/errore dell'app — ridisegnato da zero (2026-08-01) per
 /// essere un'estensione visiva della sidecar/barra Conferma-Modifica invece
 /// di una card in stile Liquid Glass: **nessun vetro/`BackdropFilter`**, solo
-/// una superficie piatta a colore pieno (`AppColors.surface`, la stessa
-/// superficie "solida" usata da fogli/form nativi Cupertino) con un'ombra
-/// leggera per staccarla dal barrier sottostante, e bottoni `FlatChipButton`
-/// con icona — stesso identico linguaggio dei chip della sidecar (icona +
-/// testo, riempimento pieno colorato). Titolo e messaggio centrati (stile
-/// alert nativo iOS).
+/// una superficie piatta a colore pieno (`AppColors.pulseSurface`, coerente
+/// con la direzione "Pulse") con un'ombra leggera per staccarla dal barrier
+/// sottostante, e bottoni `FlatChipButton` con icona — stesso identico
+/// linguaggio dei chip della sidecar (icona + testo, riempimento pieno
+/// colorato). Titolo e messaggio centrati (stile alert nativo iOS).
 class AppAlertDialog extends StatelessWidget {
   final String title;
   final String? message;
@@ -56,11 +55,12 @@ class AppAlertDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelPrimary =
-        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-    final labelSecondary =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
-    final surface = CupertinoDynamicColor.resolve(AppColors.surface, context);
+    final textPrimary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
+    final textSecondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
+    final surface =
+        CupertinoDynamicColor.resolve(AppColors.pulseSurface, context);
     final isDark = MediaQuery.platformBrightnessOf(context) == Brightness.dark;
 
     return Center(
@@ -69,7 +69,7 @@ class AppAlertDialog extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: surface,
-            borderRadius: BorderRadius.circular(AppRadius.glassSmall),
+            borderRadius: BorderRadius.circular(AppRadius.pulse),
             boxShadow: [
               BoxShadow(
                 color: CupertinoColors.black
@@ -92,9 +92,8 @@ class AppAlertDialog extends StatelessWidget {
                 Text(
                   title,
                   textAlign: TextAlign.center,
-                  style: AppTextStyles.subtitle.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: labelPrimary,
+                  style: AppTextStyles.pulseBodyEmphasis.copyWith(
+                    color: textPrimary,
                   ),
                 ),
                 if (message != null) ...[
@@ -102,8 +101,8 @@ class AppAlertDialog extends StatelessWidget {
                   Text(
                     message!,
                     textAlign: TextAlign.center,
-                    style: AppTextStyles.cardLabel.copyWith(
-                      color: labelSecondary,
+                    style: AppTextStyles.pulseBody.copyWith(
+                      color: textSecondary,
                     ),
                   ),
                 ],

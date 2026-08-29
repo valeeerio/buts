@@ -34,10 +34,10 @@ Widget inlineNumberField(
 }) {
   return Builder(
     builder: (context) {
-      final labelPrimary =
-          CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-      final resolvedStyle = (style ?? AppTextStyles.cardAmount).copyWith(
-        color: labelPrimary,
+      final textPrimary =
+          CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
+      final resolvedStyle = (style ?? AppTextStyles.pulseDisplaySmall).copyWith(
+        color: textPrimary,
         fontWeight: style == null ? FontWeight.w400 : style.fontWeight,
       );
       final field = CupertinoTextField(
@@ -141,11 +141,11 @@ Widget trattenutaEditRow(TrattenutaEditRow row,
     key: ValueKey(row.id),
     direction: DismissDirection.endToStart,
     onDismissed: (_) => onDismissed(),
-    background: const SwipeDeleteBackground(radius: AppRadius.glassSmall),
+    background: const SwipeDeleteBackground(radius: AppRadius.pulseSmall),
     child: Builder(
       builder: (context) {
-        final labelPrimary =
-            CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
+        final textPrimary =
+            CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
           child: Row(
@@ -170,9 +170,8 @@ Widget trattenutaEditRow(TrattenutaEditRow row,
                   maxLines: null,
                   decoration: const BoxDecoration(),
                   padding: EdgeInsets.zero,
-                  style: AppTextStyles.subtitle.copyWith(
-                    color: labelPrimary,
-                    fontWeight: FontWeight.w700,
+                  style: AppTextStyles.pulseBodyEmphasis.copyWith(
+                    color: textPrimary,
                   ),
                 ),
               ),
@@ -199,8 +198,7 @@ Widget trattenutaEditRow(TrattenutaEditRow row,
                   child: inlineNumberField(
                     row.importo,
                     prefix: trattenutaPrefix(row.valoreConSegno),
-                    style: AppTextStyles.cardAmount
-                        .copyWith(fontWeight: FontWeight.w400),
+                    style: AppTextStyles.pulseDisplaySmall,
                   ),
                 ),
               ),
