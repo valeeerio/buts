@@ -10,20 +10,26 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/busta_paga_formatting.dart';
+import '../../widgets/progress_ring_tile.dart';
 import '../../widgets/pulse_icon.dart';
 import '../../widgets/pulse_surface.dart';
 
-/// Contenuto della tab "Statistiche" della sezione Buste Paga: andamento
-/// netto/lordo, ferie/permessi residui e ore di straordinario nel tempo.
+/// Contenuto della tab "Statistiche" della sezione Buste Paga.
 ///
-/// Palette scelta per coerenza cross-chart: ogni serie usa un colore
-/// semantico di sistema fisso (non legato alle 4 aree Budget, dato che
-/// questi grafici non rappresentano aree) così la stessa grandezza è
-/// riconoscibile a colpo d'occhio tra i vari grafici della schermata. Dalla
-/// migrazione a "Pulse" (vedi CLAUDE.md, sfondo `pulseBackground`/
-/// `pulseSurface` scuro) ogni colore è stato riverificato per contrasto sullo
-/// sfondo scuro, non solo per distanza reciproca in isolamento — vedi note
-/// puntuali su ciascuna costante sotto.
+/// Redesign 2026-08-30 (approvato dall'utente su mockup, vedi CLAUDE.md):
+/// 3 card, ciascuna con una vista "protagonista" (numeri grandi + area
+/// chart con glow / anelli di progresso grandi / barre a gradiente) e le
+/// vecchie tabelle Media/Minimo/Massimo/Totale spostate dietro un link
+/// "Dettagli" collassabile — stessa logica di calcolo/aggregazione/filtro
+/// periodo di prima, solo riorganizzazione visiva (eccezione consapevole: il
+/// blocco Ferie/Permessi/Ex festività passa da un trend nel tempo a uno
+/// snapshot dell'ultima busta paga nel periodo filtrato).
+///
+/// Palette: `pulseAccent` (ciano) resta il colore funzionale primario,
+/// `pulseSecondaryGlow` (viola) è usato qui SOLO come seconda serie/accento
+/// decorativo di dati grafico (linea Lordo, anello Ferie, metà del
+/// gradiente delle barre Straordinario) — mai per icone/testo/bottoni
+/// interattivi, coerente con CLAUDE.md.
 class BustePagaStatisticheScreen extends ConsumerWidget {
   final ({DateTime start, DateTime end})? periodoFiltro;
 
@@ -35,26 +41,22 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
   // sulla nota "non assumere lo stesso valore assoluto tra schermate".
   static const _fadeHeight = 90.0;
 
-  // systemGreen: la variante dark (0xFF30D158) resta ben leggibile e satura
-  // su `pulseSurface`/`pulseBackground` scuri, nessuna sostituzione
-  // necessaria.
-  static const _nettoColor = AppColors.systemGreen;
-  // Passata a `pulseAccent` (era `brandAccent`, il vecchio accento
-  // "riscaldato" ora superato dalla direzione Pulse, vedi CLAUDE.md): nel
-  // grafico Netto/Lordo è l'unica altra serie oltre a Netto (systemGreen),
-  // buon contrasto reciproco, e lega la grandezza "Lordo" all'accento
-  // ciano/cobalto che è ormai il colore di rilievo dell'intera app.
-  static const _lordoColor = AppColors.pulseAccent;
-  // Resta systemBlue: nel grafico Ferie e permessi convive con systemPurple,
-  // systemOrange e systemGreen — la nota precedente sul confronto con
-  // `brandAccent` non si applica più (quel token non compare più in nessuno
-  // dei grafici di questa schermata). systemBlue dark (0xFF0A84FF) resta ben
-  // distinguibile dalle altre tre serie e leggibile su sfondo scuro.
-  static const _ferieColor = AppColors.systemBlue;
-  static const _rolColor = AppColors.systemPurple;
-  static const _permessiColor = AppColors.systemOrange;
-  static const _exFestivitaColor = AppColors.systemGreen;
-  static const _straordinarioColor = AppColors.systemOrange;
+  // Netto: area piena + linea con glow, colore funzionale primario
+  // dell'app (`pulseAccent`, ciano).
+  static const _nettoColor = AppColors.pulseAccent;
+  // Lordo: seconda linea più sottile, uso decorativo del viola come serie
+  // dati in un grafico (eccezione consapevole, vedi CLAUDE.md).
+  static const _lordoColor = AppColors.pulseSecondaryGlow;
+  // Anelli dello snapshot Ferie/Permessi/Ex festività: stessa terna di
+  // colori del mockup approvato.
+  static const _ferieColor = AppColors.pulseSecondaryGlow;
+  static const _permessiRolColor = AppColors.pulseAccent;
+  static const _exFestivitaColor = AppColors.pulsePositive;
+  // Gradiente delle barre Straordinario (verticale viola→ciano) e tinta del
+  // glow dietro la barra più alta.
+  static const _straordinarioGradientTop = AppColors.pulseSecondaryGlow;
+  static const _straordinarioGradientBottom = AppColors.pulseAccent;
+  static const _straordinarioGlowColor = AppColors.pulseAccent;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -114,15 +116,35 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
             ),
             sliver: SliverToBoxAdapter(
               child: _ChartCard(
-                title: 'Netto e lordo nel tempo',
-                legend: const [
-                  _LegendEntry(label: 'Netto', color: _nettoColor),
-                  _LegendEntry(label: 'Lordo', color: _lordoColor),
-                ],
-                chart: _NettoLordoChart(
-                  buste: filtrati,
-                  busteNonConfermate: busteNonConfermate,
-                ),
+                title: 'Netto e lordo',
+                chart: filtrati.isEmpty
+                    ? SizedBox(
+                        height: 180,
+                        child: _NoDataMessage(
+                            busteNonConfermate: busteNonConfermate),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _NettoLordoHeader(buste: filtrati),
+                          const SizedBox(height: AppSpacing.md),
+                          const Wrap(
+                            spacing: AppSpacing.md,
+                            runSpacing: AppSpacing.xs,
+                            children: [
+                              _LegendEntryChip(
+                                  label: 'Netto', color: _nettoColor),
+                              _LegendEntryChip(
+                                  label: 'Lordo', color: _lordoColor),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          SizedBox(
+                            height: 180,
+                            child: _NettoLordoChart(buste: filtrati),
+                          ),
+                        ],
+                      ),
                 stats: _nettoLordoStats(filtrati),
               ),
             ),
@@ -136,16 +158,11 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
             ),
             sliver: SliverToBoxAdapter(
               child: _ChartCard(
-                title: 'Ferie e permessi',
-                legend: const [
-                  _LegendEntry(label: 'Ferie residue', color: _ferieColor),
-                  _LegendEntry(label: 'Permessi residui', color: _rolColor),
-                  _LegendEntry(
-                      label: 'Permessi orario goduti', color: _permessiColor),
-                  _LegendEntry(
-                      label: 'Ex festività residue', color: _exFestivitaColor),
-                ],
-                chart: _FerieRolPermessiChart(
+                title: 'Ferie, permessi ed ex festività',
+                subtitle: filtrati.isEmpty
+                    ? null
+                    : 'Ultima busta paga: ${periodoLabel(filtrati.last)}',
+                chart: _FerieRolPermessiSnapshot(
                   buste: filtrati,
                   busteNonConfermate: busteNonConfermate,
                 ),
@@ -163,10 +180,6 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
             sliver: SliverToBoxAdapter(
               child: _ChartCard(
                 title: 'Straordinario per mese',
-                legend: const [
-                  _LegendEntry(
-                      label: 'Ore straordinario', color: _straordinarioColor),
-                ],
                 chart: _StraordinarioChart(
                   buste: filtrati,
                   busteNonConfermate: busteNonConfermate,
@@ -235,25 +248,63 @@ class _NoDataMessage extends StatelessWidget {
   }
 }
 
-class _LegendEntry {
+/// Chip di legenda (pallino colorato + etichetta) usato sotto i numeri
+/// grandi del blocco Netto/Lordo, per disambiguare area (Netto) e linea
+/// sottile (Lordo).
+class _LegendEntryChip extends StatelessWidget {
   final String label;
   final CupertinoDynamicColor color;
 
-  const _LegendEntry({required this.label, required this.color});
+  const _LegendEntryChip({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final resolved = CupertinoDynamicColor.resolve(color, context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: resolved, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: AppTextStyles.pulseLabel.copyWith(
+            color: CupertinoDynamicColor.resolve(
+                AppColors.pulseTextSecondary, context),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-class _ChartCard extends StatelessWidget {
+/// Card che ospita un grafico/vista principale, più — se [stats] non è
+/// `null` e ha righe — un link testuale "Dettagli" che espande/nasconde la
+/// vecchia tabella Media/Minimo/Massimo/Totale (`AnimatedSize`, collassata
+/// di default). Stessa superficie piatta con bordo a gradiente viola→ciano
+/// di prima (`PulseSurface` + `Container` esterno).
+class _ChartCard extends StatefulWidget {
   final String title;
-  final List<_LegendEntry> legend;
+  final String? subtitle;
   final Widget chart;
   final _StatsTableData? stats;
 
   const _ChartCard({
     required this.title,
-    required this.legend,
+    this.subtitle,
     required this.chart,
     this.stats,
   });
+
+  @override
+  State<_ChartCard> createState() => _ChartCardState();
+}
+
+class _ChartCardState extends State<_ChartCard> {
+  bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
@@ -267,6 +318,11 @@ class _ChartCard extends StatelessWidget {
     final violet =
         CupertinoDynamicColor.resolve(AppColors.pulseSecondaryGlow, context);
     final cyan = CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
+    final secondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
+    final hasStats = widget.stats != null && widget.stats!.righe.isNotEmpty;
 
     return Container(
       decoration: BoxDecoration(
@@ -290,25 +346,62 @@ class _ChartCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                title,
+                widget.title,
                 style: AppTextStyles.pulseBodyEmphasis.copyWith(
                   color: CupertinoDynamicColor.resolve(
                       AppColors.pulseTextPrimary, context),
                 ),
               ),
-              const SizedBox(height: AppSpacing.xs),
-              Wrap(
-                spacing: AppSpacing.md,
-                runSpacing: AppSpacing.xs,
-                children: [
-                  for (final entry in legend) _LegendChip(entry: entry),
-                ],
-              ),
+              if (widget.subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  widget.subtitle!,
+                  style: AppTextStyles.pulseLabel.copyWith(color: secondary),
+                ),
+              ],
               const SizedBox(height: AppSpacing.md),
-              SizedBox(height: 180, child: chart),
-              if (stats != null && stats!.righe.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.md),
-                _StatsTable(data: stats!),
+              widget.chart,
+              if (hasStats) ...[
+                const SizedBox(height: AppSpacing.sm),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => setState(() => _expanded = !_expanded),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _expanded ? 'Nascondi dettagli' : 'Dettagli',
+                          style:
+                              AppTextStyles.pulseLabel.copyWith(color: accent),
+                        ),
+                        const SizedBox(width: 4),
+                        AnimatedRotation(
+                          duration: const Duration(milliseconds: 220),
+                          turns: _expanded ? 0.5 : 0,
+                          child: PulseIcon(
+                            glyph: PulseIconGlyph.chevronDown,
+                            size: 12,
+                            color: accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.topCenter,
+                  child: _expanded
+                      ? Padding(
+                          padding: const EdgeInsets.only(top: AppSpacing.xs),
+                          child: _StatsTable(data: widget.stats!),
+                        )
+                      : const SizedBox(width: double.infinity, height: 0),
+                ),
               ],
             ],
           ),
@@ -329,9 +422,10 @@ typedef _StatsTableData = ({
 /// Tabella numerica (media/min/max/totale) sotto un grafico Statistiche —
 /// stesso pattern di `_MaturazioniSection` nel dettaglio busta paga
 /// (`Row`+`Expanded` a flex fissi, non `Table`): riga header con i nomi
-/// delle serie, poi una riga per metrica con un valore per colonna. **Non**
-/// un'altra `PulseSurface`: vive già dentro la superficie piatta di
-/// `_ChartCard`, nessun bisogno di un secondo contenitore annidato.
+/// delle serie, poi una riga per metrica con un valore per colonna. Dal
+/// redesign 2026-08-30 vive dietro il link "Dettagli" di `_ChartCard`
+/// invece di essere sempre visibile — nessun cambio al contenuto/struttura
+/// della tabella in sé.
 class _StatsTable extends StatelessWidget {
   final _StatsTableData data;
 
@@ -517,7 +611,10 @@ _StatsTableData? _nettoLordoStats(List<BustaPaga> buste) {
 /// (non quantità da sommare), quindi la riga "Totale" li mostra come `'—'`
 /// — solo i permessi orario goduti sono una quantità che ha senso cumulare
 /// nel periodo. Stessa convenzione già usata da `_MaturazioniSection` nel
-/// dettaglio busta paga per le celle non applicabili.
+/// dettaglio busta paga per le celle non applicabili. Contenuto invariato
+/// dal redesign 2026-08-30 (vive dietro "Dettagli"): il blocco visivo
+/// principale sopra è ora uno snapshot dell'ultima busta paga, ma questa
+/// tabella resta il trend su tutto il periodo filtrato, come prima.
 _StatsTableData? _ferieRolPermessiStats(List<BustaPaga> buste) {
   if (buste.isEmpty) return null;
   final minFerie = _bustaConMinimo(buste, (b) => b.ferieResidue);
@@ -609,35 +706,6 @@ _StatsTableData? _straordinarioStats(List<BustaPaga> buste) {
       ),
     ],
   );
-}
-
-class _LegendChip extends StatelessWidget {
-  final _LegendEntry entry;
-
-  const _LegendChip({required this.entry});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = CupertinoDynamicColor.resolve(entry.color, context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 6,
-          height: 6,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          entry.label,
-          style: AppTextStyles.pulseLabel.copyWith(
-            color: CupertinoDynamicColor.resolve(
-                AppColors.pulseTextSecondary, context),
-          ),
-        ),
-      ],
-    );
-  }
 }
 
 /// Interval degli indici mostrati sull'asse X: non solo in base al conteggio
@@ -909,9 +977,9 @@ AxisTitles _valueLeftAxisTitles({
   required double interval,
   String Function(double value) formatValue = formatNumber,
   // 40 di default (etichette corte tipo "12,5"/"20,0h" di `formatNumber`,
-  // usate da Ferie/Permessi e Straordinario). Il grafico Netto/Lordo passa
-  // esplicitamente `_euroCompactAxisReservedSize` (52): margine extra per il
-  // caso peggiore plausibile del suo formato compatto ("− € 12,3k", vedi
+  // usate da Straordinario). Il grafico Netto/Lordo passa esplicitamente
+  // `_euroCompactAxisReservedSize` (52): margine extra per il caso peggiore
+  // plausibile del suo formato compatto ("− € 12,3k", vedi
   // `formatEuroConSegnoCompatto`) alla dimensione naturale del font (fontSize
   // 10), senza affidarsi allo scale-down di `FittedBox` sotto la soglia di
   // leggibilità.
@@ -1028,18 +1096,129 @@ const _euroCompactAxisReservedSize = 52.0;
   );
 }
 
-class _NettoLordoChart extends StatelessWidget {
-  final List<BustaPaga> buste;
-  final int busteNonConfermate;
+/// Badge freccia + percentuale di variazione (▲ verde/▼ rossa) sotto un
+/// valore in evidenza — usato dai due numeri grandi del blocco Netto/Lordo.
+/// `null` produce un widget vuoto (nessun mese precedente nel periodo
+/// filtrato con cui confrontare, o precedente pari a zero — divisione non
+/// definita).
+class _VariationBadge extends StatelessWidget {
+  final double? variazione;
 
-  const _NettoLordoChart({required this.buste, this.busteNonConfermate = 0});
+  const _VariationBadge({required this.variazione});
 
   @override
   Widget build(BuildContext context) {
-    if (buste.isEmpty) {
-      return _NoDataMessage(busteNonConfermate: busteNonConfermate);
+    final variazione = this.variazione;
+    if (variazione == null) return const SizedBox.shrink();
+    final positiva = variazione >= 0;
+    final color = CupertinoDynamicColor.resolve(
+      positiva ? AppColors.pulsePositive : AppColors.pulseNegative,
+      context,
+    );
+    final percentuale = variazione.abs() * 100;
+    // Una sola cifra decimale sotto il 10% (es. "3,2%"), intero oltre (es.
+    // "18%") — coerente con la risoluzione già usata da `formatNumber` per
+    // valori piccoli senza appesantire percentuali a due cifre.
+    final testo = percentuale < 10
+        ? '${percentuale.toStringAsFixed(1).replaceAll('.', ',')}%'
+        : '${percentuale.round()}%';
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          positiva
+              ? CupertinoIcons.arrow_up_right
+              : CupertinoIcons.arrow_down_right,
+          size: 13,
+          color: color,
+        ),
+        const SizedBox(width: 2),
+        Text(testo, style: AppTextStyles.pulseLabel.copyWith(color: color)),
+      ],
+    );
+  }
+}
+
+/// Due numeri grandi affiancati (Netto/Lordo) in cima al blocco 1, con la
+/// variazione percentuale rispetto al mese immediatamente precedente
+/// nell'elenco già filtrato dal periodo — non necessariamente il mese
+/// solare precedente, se il periodo filtrato ha dei buchi. Richiede [buste]
+/// non vuota, ordinata per periodo crescente.
+class _NettoLordoHeader extends StatelessWidget {
+  final List<BustaPaga> buste;
+
+  const _NettoLordoHeader({required this.buste});
+
+  double? _variazione(double Function(BustaPaga) selettore) {
+    if (buste.length < 2) return null;
+    final attuale = selettore(buste.last);
+    final precedente = selettore(buste[buste.length - 2]);
+    if (precedente == 0) return null;
+    return (attuale - precedente) / precedente;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ultima = buste.last;
+    final primary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
+    final secondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
+    final dividerColor = secondary.withValues(alpha: 0.25);
+
+    Widget colonna(String label, double valore, double? variazione) {
+      return Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label,
+                style: AppTextStyles.pulseLabel.copyWith(color: secondary)),
+            const SizedBox(height: 4),
+            Text(
+              formatEuroConSegno(valore),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.pulseDisplayLarge
+                  .copyWith(fontSize: 24, color: primary),
+            ),
+            const SizedBox(height: 4),
+            _VariationBadge(variazione: variazione),
+          ],
+        ),
+      );
     }
 
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        colonna('Netto', ultima.netto, _variazione((b) => b.netto)),
+        Container(
+          width: 0.5,
+          height: 52,
+          margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          color: dividerColor,
+        ),
+        colonna('Lordo', ultima.lordo, _variazione((b) => b.lordo)),
+      ],
+    );
+  }
+}
+
+/// Grafico ad area del blocco Netto/Lordo: Netto è un'area piena con
+/// gradiente che sfuma a trasparente verso il basso più una linea con
+/// glow (`LineChartBarData.shadow`, supportato nativamente da fl_chart —
+/// applica un `MaskFilter.blur` dietro il tracciato del percorso, vedi
+/// `line_chart_painter.dart`); Lordo è una seconda linea più sottile senza
+/// riempimento. Stessa griglia mensile continua/bound "nice"/tooltip di
+/// prima del redesign, nessun cambio alla logica di aggregazione dei dati.
+class _NettoLordoChart extends StatelessWidget {
+  final List<BustaPaga> buste;
+
+  const _NettoLordoChart({required this.buste});
+
+  @override
+  Widget build(BuildContext context) {
     final nettoColor = CupertinoDynamicColor.resolve(
         BustePagaStatisticheScreen._nettoColor, context);
     final lordoColor = CupertinoDynamicColor.resolve(
@@ -1108,8 +1287,8 @@ class _NettoLordoChart extends StatelessWidget {
                 interval: step,
                 // Formato compatto SOLO per l'etichetta dell'asse (spazio
                 // ristretto): `formatEuroConSegno` resta usato per tooltip e
-                // tabella riepilogativa sopra, dove serve precisione a 2
-                // decimali — vedi doc di `formatEuroConSegnoCompatto`.
+                // tabella riepilogativa, dove serve precisione a 2 decimali
+                // — vedi doc di `formatEuroConSegnoCompatto`.
                 formatValue: formatEuroConSegnoCompatto,
                 reservedSize: _euroCompactAxisReservedSize,
               ),
@@ -1138,8 +1317,11 @@ class _NettoLordoChart extends StatelessWidget {
               ),
             ),
             lineBarsData: [
-              _line(griglia, (b) => b.netto, nettoColor),
-              _line(griglia, (b) => b.lordo, lordoColor),
+              // Lordo disegnato PRIMA (sotto) così la linea/area Netto con
+              // glow resta visivamente in primo piano sopra la linea sottile
+              // Lordo nei punti in cui si sovrappongono.
+              _lordoLine(griglia, lordoColor),
+              _nettoLine(griglia, nettoColor),
             ],
           ),
         );
@@ -1159,7 +1341,7 @@ class _NettoLordoChart extends StatelessWidget {
     // mai `null` qui — ma un tooltip mancante è comunque preferibile a un
     // crash se questa garanzia dovesse mai cambiare.
     if (busta == null) return null;
-    final label = spot.barIndex == 0 ? 'Netto' : 'Lordo';
+    final label = spot.barIndex == 0 ? 'Lordo' : 'Netto';
     final text = showPeriodo
         ? '${periodoAxisLabel(busta.periodo)}\n$label: ${formatEuroConSegno(spot.y)}'
         : '$label: ${formatEuroConSegno(spot.y)}';
@@ -1172,201 +1354,140 @@ class _NettoLordoChart extends StatelessWidget {
     );
   }
 
-  LineChartBarData _line(
+  List<FlSpot> _spots(
     List<({DateTime periodo, BustaPaga? busta})> griglia,
     double Function(BustaPaga) selettore,
+  ) {
+    return [
+      for (var i = 0; i < griglia.length; i++)
+        griglia[i].busta == null
+            ? FlSpot.nullSpot
+            : FlSpot(i.toDouble(), selettore(griglia[i].busta!)),
+    ];
+  }
+
+  LineChartBarData _nettoLine(
+    List<({DateTime periodo, BustaPaga? busta})> griglia,
     Color color,
   ) {
     return LineChartBarData(
-      spots: [
-        for (var i = 0; i < griglia.length; i++)
-          griglia[i].busta == null
-              ? FlSpot.nullSpot
-              : FlSpot(i.toDouble(), selettore(griglia[i].busta!)),
-      ],
+      spots: _spots(griglia, (b) => b.netto),
       isCurved: true,
       curveSmoothness: 0.2,
       color: color,
       barWidth: 2.5,
-      dotData: FlDotData(
+      // Glow nativo dietro il tracciato — vedi doc di libreria.
+      shadow: Shadow(color: color.withValues(alpha: 0.55), blurRadius: 14),
+      dotData: const FlDotData(show: false),
+      belowBarData: BarAreaData(
         show: true,
-        getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
-          radius: 4,
-          color: color,
-          strokeWidth: 0,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            color.withValues(alpha: 0.32),
+            color.withValues(alpha: 0.0),
+          ],
         ),
       ),
+    );
+  }
+
+  LineChartBarData _lordoLine(
+    List<({DateTime periodo, BustaPaga? busta})> griglia,
+    Color color,
+  ) {
+    return LineChartBarData(
+      spots: _spots(griglia, (b) => b.lordo),
+      isCurved: true,
+      curveSmoothness: 0.2,
+      color: color.withValues(alpha: 0.85),
+      barWidth: 1.5,
+      dotData: const FlDotData(show: false),
       belowBarData: BarAreaData(show: false),
     );
   }
 }
 
-class _FerieRolPermessiChart extends StatelessWidget {
+/// Frazione residuo/maturato, clampata e senza dividere per zero se
+/// `maturato` è 0 (nessun rateo maturato in questa busta paga) — stesso
+/// pattern di `_MaturazioniRingsRow._progress` in `buste_paga_archivio_view.
+/// dart`.
+double _progressoResiduo(double residuo, double maturato) {
+  if (maturato <= 0) return 0;
+  return (residuo / maturato).clamp(0.0, 1.0);
+}
+
+/// Snapshot Ferie/Permessi/Ex festività residui: 3 anelli di progresso
+/// grandi sull'ULTIMA busta paga del periodo filtrato (non più un trend nel
+/// tempo, unica eccezione consapevole di questo redesign — vedi CLAUDE.md).
+class _FerieRolPermessiSnapshot extends StatelessWidget {
   final List<BustaPaga> buste;
   final int busteNonConfermate;
 
-  const _FerieRolPermessiChart({
+  const _FerieRolPermessiSnapshot({
     required this.buste,
     this.busteNonConfermate = 0,
   });
 
+  static const _diameter = 60.0;
+
   @override
   Widget build(BuildContext context) {
     if (buste.isEmpty) {
-      return _NoDataMessage(busteNonConfermate: busteNonConfermate);
+      return SizedBox(
+        height: 180,
+        child: _NoDataMessage(busteNonConfermate: busteNonConfermate),
+      );
     }
 
+    final ultima = buste.last;
     final ferieColor = CupertinoDynamicColor.resolve(
         BustePagaStatisticheScreen._ferieColor, context);
-    final rolColor = CupertinoDynamicColor.resolve(
-        BustePagaStatisticheScreen._rolColor, context);
-    final permessiColor = CupertinoDynamicColor.resolve(
-        BustePagaStatisticheScreen._permessiColor, context);
+    final permessiRolColor = CupertinoDynamicColor.resolve(
+        BustePagaStatisticheScreen._permessiRolColor, context);
     final exFestivitaColor = CupertinoDynamicColor.resolve(
         BustePagaStatisticheScreen._exFestivitaColor, context);
-    final gridColor =
-        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context)
-            .withValues(alpha: 0.18);
-    final labelColor =
-        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
-    final tooltip = _tooltipColors(context);
 
-    // Griglia continua mese per mese, stesso meccanismo di
-    // `_NettoLordoChart` (vedi doc di libreria su `_grigliaMensile`).
-    final griglia = _grigliaMensile(buste);
-
-    // Solo bound "puliti" (fix sovrapposizione etichette): a differenza di
-    // Netto/Lordo, qui il range resta da 0 — non richiesto restringerlo,
-    // SALVO che uno di questi residui risulti negativo (es. ferie godute
-    // oltre il maturato): senza estendere `minY` sotto zero in quel caso, il
-    // punto verrebbe disegnato fuori dall'area di plot (fl_chart non clippa
-    // di default, `clipData` è `FlClipData.none()`) — bug reale corretto
-    // qui, non un'ipotesi.
-    final valori = [
-      ...buste.map((b) => b.ferieResidue),
-      ...buste.map((b) => b.rolResidui),
-      ...buste.map((b) => b.permessiGodutiMese),
-      ...buste.map((b) => b.exFestivitaResidue),
-    ];
-    final valoriMax = valori.reduce((a, b) => a > b ? a : b);
-    final valoriMin = valori.reduce((a, b) => a < b ? a : b);
-    final ferieBoundsMin = valoriMin < 0 ? valoriMin : 0.0;
-    final step = _niceStep(valoriMax - ferieBoundsMin, minStep: 1);
-    final bounds = _niceAxisBounds(
-      ferieBoundsMin,
-      valoriMax,
-      step: step,
-    );
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return LineChart(
-          LineChartData(
-            minY: bounds.min,
-            maxY: bounds.max,
-            gridData: FlGridData(
-              show: true,
-              drawVerticalLine: false,
-              getDrawingHorizontalLine: (_) =>
-                  FlLine(color: gridColor, strokeWidth: 0.5),
-            ),
-            borderData: FlBorderData(show: false),
-            titlesData: FlTitlesData(
-              topTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              leftTitles: _valueLeftAxisTitles(
-                labelColor: labelColor,
-                interval: step,
-              ),
-              bottomTitles: _periodoBottomAxisTitles(
-                periodi: [for (final g in griglia) g.periodo],
-                availableWidth: constraints.maxWidth,
-                labelColor: labelColor,
-              ),
-            ),
-            lineTouchData: LineTouchData(
-              touchTooltipData: LineTouchTooltipData(
-                getTooltipColor: (_) => tooltip.background,
-                fitInsideHorizontally: true,
-                fitInsideVertically: true,
-                getTooltipItems: (touchedSpots) {
-                  return [
-                    for (var i = 0; i < touchedSpots.length; i++)
-                      _tooltipItem(
-                        griglia,
-                        touchedSpots[i],
-                        showPeriodo: i == 0,
-                        textColor: tooltip.text,
-                      ),
-                  ];
-                },
-              ),
-            ),
-            lineBarsData: [
-              _line(griglia, (b) => b.ferieResidue, ferieColor),
-              _line(griglia, (b) => b.rolResidui, rolColor),
-              _line(griglia, (b) => b.permessiGodutiMese, permessiColor),
-              _line(griglia, (b) => b.exFestivitaResidue, exFestivitaColor),
-            ],
+    return Row(
+      children: [
+        Expanded(
+          child: ProgressRingTile(
+            label: 'Ferie',
+            value: formatNumber(ultima.ferieResidue),
+            progress:
+                _progressoResiduo(ultima.ferieResidue, ultima.ferieMaturate),
+            accentColor: ferieColor,
+            diameter: _diameter,
+            showGradientBorder: true,
           ),
-        );
-      },
-    );
-  }
-
-  LineTooltipItem? _tooltipItem(
-    List<({DateTime periodo, BustaPaga? busta})> griglia,
-    LineBarSpot spot, {
-    required bool showPeriodo,
-    required Color textColor,
-  }) {
-    final busta = griglia[spot.x.toInt()].busta;
-    if (busta == null) return null;
-    final label = switch (spot.barIndex) {
-      0 => 'Ferie residue',
-      1 => 'Permessi residui',
-      2 => 'Permessi orario goduti',
-      _ => 'Ex festività residue',
-    };
-    final text = showPeriodo
-        ? '${periodoAxisLabel(busta.periodo)}\n$label: ${formatNumber(spot.y)}'
-        : '$label: ${formatNumber(spot.y)}';
-    return LineTooltipItem(
-      text,
-      AppTextStyles.pulseBody.copyWith(
-        color: textColor,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
-
-  LineChartBarData _line(
-    List<({DateTime periodo, BustaPaga? busta})> griglia,
-    double Function(BustaPaga) selettore,
-    Color color,
-  ) {
-    return LineChartBarData(
-      spots: [
-        for (var i = 0; i < griglia.length; i++)
-          griglia[i].busta == null
-              ? FlSpot.nullSpot
-              : FlSpot(i.toDouble(), selettore(griglia[i].busta!)),
-      ],
-      isCurved: true,
-      curveSmoothness: 0.2,
-      color: color,
-      barWidth: 2.5,
-      dotData: FlDotData(
-        show: true,
-        getDotPainter: (spot, percent, bar, index) => FlDotCirclePainter(
-          radius: 4,
-          color: color,
-          strokeWidth: 0,
         ),
-      ),
-      belowBarData: BarAreaData(show: false),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: ProgressRingTile(
+            label: 'Permessi',
+            value: formatNumber(ultima.rolResidui),
+            progress: _progressoResiduo(ultima.rolResidui, ultima.rolMaturati),
+            accentColor: permessiRolColor,
+            diameter: _diameter,
+            showGradientBorder: true,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: ProgressRingTile(
+            label: 'Ex festività',
+            value: formatNumber(ultima.exFestivitaResidue),
+            progress: _progressoResiduo(
+              ultima.exFestivitaResidue,
+              ultima.exFestivitaMaturate,
+            ),
+            accentColor: exFestivitaColor,
+            diameter: _diameter,
+            showGradientBorder: true,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1378,7 +1499,14 @@ class _FerieRolPermessiChart extends StatelessWidget {
 /// scrollabile in orizzontale (barre a larghezza fissa leggibile) con
 /// l'asse valori a sinistra tenuto fisso in un `BarChart` "scheletro"
 /// separato — fl_chart non supporta nativamente un asse fisso + plot
-/// scrollabile in un singolo chart.
+/// scrollabile in un singolo chart. Ogni barra ha un gradiente verticale
+/// viola→ciano (invece del vecchio arancione piatto); la barra del valore
+/// più alto nel periodo filtrato ha in più un alone sfumato dietro di sé
+/// (approssimazione del "glow": `BarChartRodData` in questa versione di
+/// fl_chart non espone un parametro `shadow` nativo come `LineChartBarData`
+/// — un cerchio sfumato posizionato dietro la barra via `BoxShadow`, alla
+/// stessa coordinata X approssimata del centro del gruppo, è il miglior
+/// risultato ottenibile senza reimplementare il layout interno del chart).
 class _StraordinarioChart extends StatefulWidget {
   final List<BustaPaga> buste;
   final int busteNonConfermate;
@@ -1405,6 +1533,11 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
   // esplicitamente a entrambe le chiamate sotto, mai lasciato disallineato.
   static const _leftAxisWidth = 40.0;
   static const _rightFadeWidth = 28.0;
+  // Coincide con `reservedSize: 22` di `_periodoBottomAxisTitles` — il glow
+  // dietro la barra più alta è ancorato appena sopra l'asse X, non alla
+  // sommità reale della barra (vedi doc di libreria della classe).
+  static const _bottomAxisReservedSize = 22.0;
+  static const _glowDiameter = 64.0;
 
   final _scrollController = ScrollController();
 
@@ -1439,11 +1572,18 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
   Widget build(BuildContext context) {
     final buste = widget.buste;
     if (buste.isEmpty) {
-      return _NoDataMessage(busteNonConfermate: widget.busteNonConfermate);
+      return SizedBox(
+        height: 180,
+        child: _NoDataMessage(busteNonConfermate: widget.busteNonConfermate),
+      );
     }
 
-    final barColor = CupertinoDynamicColor.resolve(
-        BustePagaStatisticheScreen._straordinarioColor, context);
+    final gradientTop = CupertinoDynamicColor.resolve(
+        BustePagaStatisticheScreen._straordinarioGradientTop, context);
+    final gradientBottom = CupertinoDynamicColor.resolve(
+        BustePagaStatisticheScreen._straordinarioGradientBottom, context);
+    final glowColor = CupertinoDynamicColor.resolve(
+        BustePagaStatisticheScreen._straordinarioGlowColor, context);
     final gridColor =
         CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context)
             .withValues(alpha: 0.18);
@@ -1452,12 +1592,10 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
     final tooltip = _tooltipColors(context);
 
     // Griglia continua (mensile o trimestrale a seconda dell'aggregazione),
-    // stesso meccanismo di `_NettoLordoChart`/`_FerieRolPermessiChart` (vedi
-    // doc di libreria su `_grigliaMensile`/`_grigliaTrimestrale`): un
-    // mese/trimestre senza dati resta un buco visibile (nessuna barra
-    // disegnata per quello slot) invece di sparire silenziosamente
-    // avvicinando le barre dei mesi/trimestri adiacenti come se fossero
-    // consecutivi.
+    // stesso meccanismo di `_NettoLordoChart`: un mese/trimestre senza dati
+    // resta un buco visibile (nessuna barra disegnata per quello slot)
+    // invece di sparire silenziosamente avvicinando le barre dei
+    // mesi/trimestri adiacenti come se fossero consecutivi.
     final grigliaMensile = _grigliaMensile(buste);
     // Decisione basata sull'ampiezza temporale reale coperta dalla griglia
     // (numero di slot mensili, buchi inclusi), non sul numero di buste paga
@@ -1483,78 +1621,135 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
     final step = _niceStep(straordinarioAxisMax, minStep: 1);
     final bounds = _niceAxisBounds(0, straordinarioAxisMax, step: step);
 
+    // Posizione X approssimata (centro del gruppo `maxIndex`, layout
+    // `BarChartAlignment.spaceEvenly` — il default di fl_chart quando non
+    // specificato esplicitamente, vedi `BarChartData.alignment`): con N
+    // gruppi equidistanziati su una larghezza `width`, il centro del gruppo
+    // i-esimo è a `(i + 0.5) / N * width`. Un'approssimazione dichiarata,
+    // non un valore pixel-perfect letto dal layout interno del chart (fl_
+    // chart non lo espone) — sufficiente per un effetto decorativo di glow.
+    // IMPORTANTE: `barGroups` sotto include SOLO le voci con `totale != null`
+    // (`if (punti[i].totale != null)`) — fl_chart spazia equamente solo i
+    // gruppi realmente renderizzati, "comprimendo via" i mesi mancanti invece
+    // di lasciare uno slot vuoto proporzionale. `N` e l'indice del gruppo
+    // massimo vanno quindi calcolati sul sottoinsieme filtrato (numero di
+    // gruppi disegnati), non sull'indice grezzo/lunghezza di `punti` — con
+    // anche un solo mese mancante prima della barra massima, usare l'indice
+    // grezzo disallinea visibilmente l'alone dalla barra reale.
+    Widget glowDietroBarraMassima(double width) {
+      if (maxIndex < 0 || maxValue <= 0) return const SizedBox.shrink();
+      final renderedCount = punti.where((p) => p.totale != null).length;
+      final renderedMaxIndex =
+          punti.take(maxIndex).where((p) => p.totale != null).length;
+      final slotWidth = width / renderedCount;
+      final centerX = (renderedMaxIndex + 0.5) * slotWidth;
+      return Positioned(
+        left: centerX - _glowDiameter / 2,
+        bottom: _bottomAxisReservedSize,
+        child: IgnorePointer(
+          child: Container(
+            width: _glowDiameter,
+            height: _glowDiameter,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: glowColor.withValues(alpha: 0.5),
+                  blurRadius: 36,
+                  spreadRadius: 4,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     Widget buildPlot({required double width, required bool showLeftAxis}) {
       return SizedBox(
         width: width,
-        child: BarChart(
-          BarChartData(
-            minY: bounds.min,
-            maxY: bounds.max,
-            groupsSpace: _groupsSpace,
-            gridData: FlGridData(
-              show: true,
-              drawVerticalLine: false,
-              getDrawingHorizontalLine: (_) =>
-                  FlLine(color: gridColor, strokeWidth: 0.5),
-            ),
-            borderData: FlBorderData(show: false),
-            titlesData: FlTitlesData(
-              topTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              leftTitles: showLeftAxis
-                  ? _valueLeftAxisTitles(
-                      labelColor: labelColor,
-                      interval: step,
-                      reservedSize: _leftAxisWidth,
-                    )
-                  : const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              bottomTitles: _periodoBottomAxisTitles(
-                periodi: [for (final p in punti) p.periodo],
-                availableWidth: width,
-                labelColor: labelColor,
-                shortLabelBuilder: shortLabelBuilder,
-              ),
-            ),
-            barTouchData: BarTouchData(
-              enabled: true,
-              touchTooltipData: BarTouchTooltipData(
-                getTooltipColor: (_) => tooltip.background,
-                fitInsideHorizontally: true,
-                fitInsideVertically: true,
-                getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                  final punto = punti[group.x];
-                  return BarTooltipItem(
-                    '${shortLabelBuilder(punto.periodo)}\n'
-                    '${formatNumber(rod.toY)} h',
-                    AppTextStyles.pulseBody.copyWith(
-                      color: tooltip.text,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  );
-                },
-              ),
-            ),
-            barGroups: [
-              for (var i = 0; i < punti.length; i++)
-                if (punti[i].totale != null)
-                  BarChartGroupData(
-                    x: i,
-                    barRods: [
-                      BarChartRodData(
-                        toY: punti[i].totale!,
-                        color: i == maxIndex
-                            ? barColor
-                            : barColor.withValues(alpha: 0.55),
-                        width: _barWidth,
-                        borderRadius:
-                            BorderRadius.circular(AppRadius.small / 2),
-                      ),
-                    ],
+        child: Stack(
+          children: [
+            glowDietroBarraMassima(width),
+            BarChart(
+              BarChartData(
+                minY: bounds.min,
+                maxY: bounds.max,
+                groupsSpace: _groupsSpace,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  getDrawingHorizontalLine: (_) =>
+                      FlLine(color: gridColor, strokeWidth: 0.5),
+                ),
+                borderData: FlBorderData(show: false),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: showLeftAxis
+                      ? _valueLeftAxisTitles(
+                          labelColor: labelColor,
+                          interval: step,
+                          reservedSize: _leftAxisWidth,
+                        )
+                      : const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false)),
+                  bottomTitles: _periodoBottomAxisTitles(
+                    periodi: [for (final p in punti) p.periodo],
+                    availableWidth: width,
+                    labelColor: labelColor,
+                    shortLabelBuilder: shortLabelBuilder,
                   ),
-            ],
-          ),
+                ),
+                barTouchData: BarTouchData(
+                  enabled: true,
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipColor: (_) => tooltip.background,
+                    fitInsideHorizontally: true,
+                    fitInsideVertically: true,
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      final punto = punti[group.x];
+                      return BarTooltipItem(
+                        '${shortLabelBuilder(punto.periodo)}\n'
+                        '${formatNumber(rod.toY)} h',
+                        AppTextStyles.pulseBody.copyWith(
+                          color: tooltip.text,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                barGroups: [
+                  for (var i = 0; i < punti.length; i++)
+                    if (punti[i].totale != null)
+                      BarChartGroupData(
+                        x: i,
+                        barRods: [
+                          BarChartRodData(
+                            toY: punti[i].totale!,
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: i == maxIndex
+                                  ? [gradientTop, gradientBottom]
+                                  : [
+                                      gradientTop.withValues(alpha: 0.55),
+                                      gradientBottom.withValues(alpha: 0.55),
+                                    ],
+                            ),
+                            width: _barWidth,
+                            borderRadius:
+                                BorderRadius.circular(AppRadius.small / 2),
+                          ),
+                        ],
+                      ),
+                ],
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -1587,47 +1782,70 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final viewportWidth = constraints.maxWidth;
-        final contentWidth = punti.length * _minGroupSlotWidth;
-        final needsScroll = contentWidth > viewportWidth - _leftAxisWidth;
+    // `SizedBox(height: 180, ...)` esplicito attorno al `LayoutBuilder`:
+    // il ramo "archivio vuoto" sopra usa la stessa altezza fissa, ma questo
+    // ramo con dati reali ne era rimasto privo dopo il redesign "Pulse"
+    // 2026-08-30 — prima di quel redesign `_ChartCard` avvolgeva SEMPRE
+    // `chart` in un `SizedBox(height: 180, ...)` uniforme per tutti e tre i
+    // grafici, ma la nuova `_ChartCard` (vedi sopra) passa `widget.chart`
+    // così com'è, e solo il grafico Netto/Lordo si è portato dietro
+    // un'altezza fissa propria. Senza un limite esplicito qui,
+    // `LayoutBuilder`/`BarChart` ricevono un vincolo di altezza ILLIMITATO
+    // dalla `Column` di `PulseSurface` dentro lo `SliverToBoxAdapter` (che
+    // non vincola l'altezza dei figli) — bug reale riprodotto e corretto
+    // qui, non un'ipotesi: fl_chart usa a sua volta un `LayoutBuilder` +
+    // `Stack` interni (`AxisChartScaffoldWidget`) che assumono un'altezza
+    // FINITA per posizionare gli assi; con altezza infinita il layout del
+    // renderer del grafico fallisce a metà (un `RenderBox` resta senza
+    // dimensione assegnata), il che in questa versione di Flutter/fl_chart
+    // si manifesta come un "Null check operator used on a null value" che
+    // si ripete a ogni frame (l'animazione implicita di `BarChart` continua
+    // a ritentare il rebuild) invece di un errore di asserzione più
+    // esplicito sui vincoli illimitati.
+    return SizedBox(
+      height: 180,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final viewportWidth = constraints.maxWidth;
+          final contentWidth = punti.length * _minGroupSlotWidth;
+          final needsScroll = contentWidth > viewportWidth - _leftAxisWidth;
 
-        if (!needsScroll) {
-          return buildPlot(width: viewportWidth, showLeftAxis: true);
-        }
+          if (!needsScroll) {
+            return buildPlot(width: viewportWidth, showLeftAxis: true);
+          }
 
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            buildAxisOnly(),
-            Expanded(
-              child: ShaderMask(
-                blendMode: BlendMode.dstIn,
-                shaderCallback: (rect) {
-                  final fadeWidth = _showRightFade ? _rightFadeWidth : 0.0;
-                  final stop = 1 - (fadeWidth / rect.width).clamp(0.0, 1.0);
-                  return LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: const [
-                      CupertinoColors.white,
-                      CupertinoColors.white,
-                      CupertinoColors.transparent,
-                    ],
-                    stops: [0.0, stop, 1.0],
-                  ).createShader(rect);
-                },
-                child: SingleChildScrollView(
-                  controller: _scrollController,
-                  scrollDirection: Axis.horizontal,
-                  child: buildPlot(width: contentWidth, showLeftAxis: false),
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              buildAxisOnly(),
+              Expanded(
+                child: ShaderMask(
+                  blendMode: BlendMode.dstIn,
+                  shaderCallback: (rect) {
+                    final fadeWidth = _showRightFade ? _rightFadeWidth : 0.0;
+                    final stop = 1 - (fadeWidth / rect.width).clamp(0.0, 1.0);
+                    return LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: const [
+                        CupertinoColors.white,
+                        CupertinoColors.white,
+                        CupertinoColors.transparent,
+                      ],
+                      stops: [0.0, stop, 1.0],
+                    ).createShader(rect);
+                  },
+                  child: SingleChildScrollView(
+                    controller: _scrollController,
+                    scrollDirection: Axis.horizontal,
+                    child: buildPlot(width: contentWidth, showLeftAxis: false),
+                  ),
                 ),
               ),
-            ),
-          ],
-        );
-      },
+            ],
+          );
+        },
+      ),
     );
   }
 }

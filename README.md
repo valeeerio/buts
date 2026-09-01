@@ -40,7 +40,7 @@ lib/
   (`busta_paga_hero_card.dart`, `busta_paga_stat_row.dart`,
   `busta_paga_maturazioni_section.dart`, `busta_paga_documento_chip.dart`,
   `busta_paga_summary_hero.dart`, `busta_paga_list_item.dart`,
-  `trattenuta_edit_row.dart`, `cupertino_range_slider.dart`).
+  `trattenuta_edit_row.dart`, `period_year_month_picker.dart`).
 
 Vedi `CLAUDE.md` per il contesto di progetto completo (decisioni prese,
 regole di stile non negoziabili, cosa manca) e `BACKLOG.md` per lo stato di

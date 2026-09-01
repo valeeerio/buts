@@ -183,11 +183,20 @@ fuori sincrono col contenuto). `lib/widgets/busta_paga_hero_card.dart`,
 `busta_paga_stat_row.dart`, `busta_paga_maturazioni_section.dart`,
 `busta_paga_documento_chip.dart`, `trattenuta_edit_row.dart` sono i widget
 condivisi tra dettaglio e form di import descritti sopra.
-`lib/widgets/cupertino_range_slider.dart` è lo slider a doppio cursore del
-filtro periodo in Statistiche: tracking assoluto della posizione del dito
-(non a delta relativo, per evitare che il pallino "sfasi" dal punto di
-presa), thumb che cresce con animazione a molla durante il drag, vibrazione
-(`HapticFeedback.selectionClick()`) ad ogni cambio di mese attraversato.
+`lib/widgets/period_year_month_picker.dart` (`PeriodYearMonthPicker`) è il
+selettore del filtro periodo in Statistiche, a tocchi anziché a
+trascinamento: schede anno (calcolate dinamicamente dal range di buste paga
+disponibili, scorrevoli orizzontalmente con scroll automatico verso l'anno
+attivo) sopra una griglia di 12 mesi tappabili per l'anno selezionato,
+selezione a due tocchi (primo tocco = inizio, secondo = fine, con swap
+automatico se il secondo tocco è cronologicamente precedente al primo),
+evidenziazione del range selezionato mantenuta anche cambiando scheda anno,
+mesi fuori dal range disponibile disabilitati, etichetta testuale del
+periodo selezionato sempre visibile sopra il picker, vibrazione
+(`HapticFeedback.selectionClick()`) ad ogni tocco valido su un mese.
+Sostituisce il precedente `CupertinoRangeSlider` a doppio cursore
+(rimosso), percepito impreciso e poco chiaro durante l'uso da parte
+dell'utente con molti mesi di storico.
 
 ## Navigazione
 
