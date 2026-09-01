@@ -252,4 +252,112 @@ void main() {
       expect(trattenutaPrefix(parseItalianNumber('-3')), '+ € ');
     });
   });
+
+  group('formatEuroConSegnoCompatto', () {
+    // Regressione: la soglia `abs >= 1000` per scegliere tra notazione "k" e
+    // numero secco era verificata sul valore NON arrotondato, ma il ramo
+    // "secco" arrotondava comunque con `.round()`. Per valori come 999.6 la
+    // soglia risultava falsa (ramo secco) ma l'arrotondamento produceva 1000,
+    // quindi l'output era "€ 1000" invece di "€ 1k". Il fix decide il ramo
+    // sul valore già arrotondato all'euro.
+    test('valori normali sotto soglia (nessuna notazione "k")', () {
+      expect(formatEuroConSegnoCompatto(0), '€ 0');
+      expect(formatEuroConSegnoCompatto(1), '€ 1');
+      expect(formatEuroConSegnoCompatto(42.3), '€ 42');
+      expect(formatEuroConSegnoCompatto(999.0), '€ 999');
+    });
+
+    test('valori normali sopra soglia (notazione "k")', () {
+      expect(formatEuroConSegnoCompatto(1500.0), '€ 1,5k');
+      expect(formatEuroConSegnoCompatto(2000.0), '€ 2k');
+      expect(formatEuroConSegnoCompatto(3245.67), '€ 3,2k');
+    });
+
+    test(
+        'boundary 999.5-1000.4: la scelta tra "k" e numero secco è sempre '
+        'coerente con l\'arrotondamento effettivamente mostrato', () {
+      expect(formatEuroConSegnoCompatto(999.5), '€ 1k');
+      expect(formatEuroConSegnoCompatto(999.6), '€ 1k');
+      expect(formatEuroConSegnoCompatto(999.9), '€ 1k');
+      expect(formatEuroConSegnoCompatto(1000.0), '€ 1k');
+      expect(formatEuroConSegnoCompatto(1000.4), '€ 1k');
+    });
+
+    test('valore appena sotto il boundary resta un numero secco', () {
+      expect(formatEuroConSegnoCompatto(999.4), '€ 999');
+    });
+
+    test('zero', () {
+      expect(formatEuroConSegnoCompatto(0.0), '€ 0');
+    });
+
+    test('valori negativi: prefisso "− €" prima del simbolo', () {
+      expect(formatEuroConSegnoCompatto(-42.3), '− € 42');
+      expect(formatEuroConSegnoCompatto(-999.6), '− € 1k');
+      expect(formatEuroConSegnoCompatto(-1500.0), '− € 1,5k');
+    });
+
+    test('valore molto grande', () {
+      expect(formatEuroConSegnoCompatto(-99999.0), '− € 100k');
+    });
+  });
+
+  group('isValidItalianNumberField / tryParseItalianNumber', () {
+    // Regressione bug 1: `parseItalianNumber` azzerava silenziosamente
+    // qualunque testo non numerico (lettere, testo incollato per errore),
+    // senza bloccare il salvataggio né segnalare l'errore — vedi
+    // istruzioni task/CLAUDE.md.
+    test('testo con lettere: non valido', () {
+      expect(isValidItalianNumberField('abc'), isFalse);
+      expect(isValidItalianNumberField('12a'), isFalse);
+      expect(tryParseItalianNumber('abc'), isNull);
+    });
+
+    test('testo vuoto/spazi: valido (equivale a 0, placeholder dei campi)', () {
+      expect(isValidItalianNumberField(''), isTrue);
+      expect(isValidItalianNumberField('   '), isTrue);
+      expect(tryParseItalianNumber(''), isNull);
+    });
+
+    test('numero italiano valido (virgola decimale): valido', () {
+      expect(isValidItalianNumberField('12,5'), isTrue);
+      expect(isValidItalianNumberField('1234,56'), isTrue);
+      expect(tryParseItalianNumber('12,5'), closeTo(12.5, 0.001));
+    });
+
+    // Regressione bug 2: "12.5" (formato USA/tastiera inglese) veniva
+    // interpretato come "125" con il punto trattato da separatore delle
+    // migliaia — un valore 10 volte più grande di quanto l'utente intendeva,
+    // salvato senza errori. Un punto seguito da un gruppo di 1-2 cifre (non
+    // allineato a un raggruppamento da migliaia) resta non valido.
+    test('testo con un punto in formato USA ambiguo: non valido', () {
+      expect(isValidItalianNumberField('12.5'), isFalse);
+      expect(isValidItalianNumberField('1.5'), isFalse);
+    });
+
+    // Regressione bug critico (fix successivo): un punto SINTATTICAMENTE
+    // corretto come separatore delle migliaia (gruppi di esattamente 3
+    // cifre) va invece accettato — [formatEuro] lo produce per ogni importo
+    // ≥ 1.000 (es. "1.483,54") e precompila i controller di editing di
+    // Competenze/Trattenute: un cedolino reale con una voce ≥ 1.000€ non
+    // toccata dall'utente veniva erroneamente bloccato al salvataggio prima
+    // di questo fix.
+    test('testo con punto come separatore delle migliaia valido: valido', () {
+      expect(isValidItalianNumberField('1.483,54'), isTrue);
+      expect(isValidItalianNumberField('12.345,00'), isTrue);
+      expect(isValidItalianNumberField('1.234.567,89'), isTrue);
+      expect(isValidItalianNumberField('123'), isTrue);
+      expect(isValidItalianNumberField('1234'), isTrue);
+      expect(tryParseItalianNumber('1.483,54'), closeTo(1483.54, 0.001));
+    });
+
+    test(
+        'segno "-" nel testo: resta un numero valido (mai digitato dalla UI, '
+        'ma se presente — es. testo del controller precompilato — il segno è '
+        'neutralizzato altrove con .abs(), non è responsabilità di questo '
+        'controllo respingerlo)', () {
+      expect(isValidItalianNumberField('-12,5'), isTrue);
+      expect(tryParseItalianNumber('-12,5'), closeTo(-12.5, 0.001));
+    });
+  });
 }

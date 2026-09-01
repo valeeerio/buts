@@ -5,7 +5,8 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/busta_paga_formatting.dart';
-import 'glass_form_section.dart';
+import 'pulse_icon.dart';
+import 'pulse_section_card.dart';
 import 'spring_button.dart';
 import 'voce_competenza_edit_row.dart';
 
@@ -33,30 +34,31 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelSecondary =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final textSecondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
 
-    return GlassFormSection(
-      children: [
-        _tableHeaderRow(labelSecondary),
-        if (isEditing) ...[
-          for (var i = 0; i < (righeEdit?.length ?? 0); i++)
-            voceCompetenzaEditRow(
-              righeEdit![i],
-              onDismissed: () => onRimuovi?.call(i),
-            ),
-          _aggiungiVoceButton(accent),
-        ] else if (competenze.isEmpty)
-          _readOnlyMessageRow(context, 'Nessuna competenza dettagliata')
-        else
-          for (final voce in competenze) _readOnlyRow(context, voce),
-      ],
-    );
+    final rows = <Widget>[
+      _tableHeaderRow(textSecondary),
+      if (isEditing) ...[
+        for (var i = 0; i < (righeEdit?.length ?? 0); i++)
+          voceCompetenzaEditRow(
+            righeEdit![i],
+            onDismissed: () => onRimuovi?.call(i),
+          ),
+        _aggiungiVoceButton(accent),
+      ] else if (competenze.isEmpty)
+        _readOnlyMessageRow(context, 'Nessuna competenza dettagliata')
+      else
+        for (final voce in competenze) _readOnlyRow(context, voce),
+    ];
+
+    return PulseSectionCard(rows: rows);
   }
 
-  Widget _tableHeaderRow(Color labelSecondary) {
-    final style = AppTextStyles.cardLabel.copyWith(color: labelSecondary);
+  Widget _tableHeaderRow(Color textSecondary) {
+    final style = AppTextStyles.pulseLabel.copyWith(color: textSecondary);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: Row(
@@ -96,23 +98,21 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
   }
 
   Widget _readOnlyRow(BuildContext context, VoceCompetenza voce) {
-    final labelPrimary =
-        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-    final valueStyle = AppTextStyles.cardAmount.copyWith(
-      color: labelPrimary,
-      fontWeight: FontWeight.w400,
+    final textPrimary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
+    final valueStyle = AppTextStyles.pulseDisplaySmall.copyWith(
+      color: textPrimary,
     );
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.smPlus),
       child: Row(
         children: [
           Expanded(
             flex: 3,
             child: Text(
               voce.descrizione,
-              style: AppTextStyles.subtitle.copyWith(
-                color: labelPrimary,
-                fontWeight: FontWeight.w700,
+              style: AppTextStyles.pulseBodyEmphasis.copyWith(
+                color: textPrimary,
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -145,13 +145,13 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
   }
 
   Widget _readOnlyMessageRow(BuildContext context, String message) {
-    final labelSecondary =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+    final textSecondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.smPlus),
       child: Text(
         message,
-        style: AppTextStyles.subtitle.copyWith(color: labelSecondary),
+        style: AppTextStyles.pulseBody.copyWith(color: textSecondary),
       ),
     );
   }
@@ -164,10 +164,10 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(CupertinoIcons.add_circled, color: accent, size: 18),
+            PulseIcon(glyph: PulseIconGlyph.add, color: accent, size: 18),
             const SizedBox(width: AppSpacing.xs),
             Text('Aggiungi voce',
-                style: AppTextStyles.subtitle.copyWith(color: accent)),
+                style: AppTextStyles.pulseBodyEmphasis.copyWith(color: accent)),
           ],
         ),
       ),

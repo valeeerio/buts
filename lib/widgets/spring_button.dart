@@ -23,10 +23,11 @@ class _SpringButtonState extends State<SpringButton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
-  static const double _pressedScale = 0.96;
+  static const double _pressedScale = 0.94;
   static const Curve _pressCurve = Curves.easeOut;
-  // Equivalente a cubic-bezier(0.34, 1.56, 0.64, 1): overshoot elastico.
-  static const Curve _releaseCurve = Cubic(0.34, 1.56, 0.64, 1.0);
+  // Equivalente a cubic-bezier(0.34, 2.1, 0.64, 1): overshoot elastico più
+  // marcato ("riscaldamento" dello stile, vedi CLAUDE.md).
+  static const Curve _releaseCurve = Cubic(0.34, 2.1, 0.64, 1.0);
 
   @override
   void initState() {
@@ -51,7 +52,7 @@ class _SpringButtonState extends State<SpringButton>
   void _release() {
     _controller.animateTo(
       0.0,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 340),
       curve: _releaseCurve,
     );
   }

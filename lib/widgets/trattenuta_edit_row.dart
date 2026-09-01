@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
@@ -34,10 +35,10 @@ Widget inlineNumberField(
 }) {
   return Builder(
     builder: (context) {
-      final labelPrimary =
-          CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-      final resolvedStyle = (style ?? AppTextStyles.cardAmount).copyWith(
-        color: labelPrimary,
+      final textPrimary =
+          CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
+      final resolvedStyle = (style ?? AppTextStyles.pulseDisplaySmall).copyWith(
+        color: textPrimary,
         fontWeight: style == null ? FontWeight.w400 : style.fontWeight,
       );
       final field = CupertinoTextField(
@@ -45,6 +46,19 @@ Widget inlineNumberField(
         placeholder: '0',
         textAlign: TextAlign.center,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        // Livello 1 della validazione numerica (vedi
+        // `isValidItalianNumberField`): filtra in scrittura solo cifre e
+        // virgola, MAI il punto (la convenzione dell'app è sempre virgola
+        // decimale — un punto digitato per errore, es. formato USA "12.5",
+        // verrebbe altrimenti interpretato come separatore delle migliaia e
+        // gonfierebbe il valore di 10 volte, vedi doc di
+        // `isValidItalianNumberField`) né lettere (che azzererebbero
+        // silenziosamente il valore al salvataggio). Blocca a monte quello
+        // che la validazione al salvataggio (livello 2, rete di sicurezza per
+        // un eventuale incolla che bypassa questo filtro su alcune
+        // piattaforme) segnala esplicitamente — bug reale corretto qui, non
+        // un'ipotesi.
+        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9,]'))],
         decoration: const BoxDecoration(),
         padding: EdgeInsets.zero,
         style: resolvedStyle,
@@ -141,13 +155,13 @@ Widget trattenutaEditRow(TrattenutaEditRow row,
     key: ValueKey(row.id),
     direction: DismissDirection.endToStart,
     onDismissed: (_) => onDismissed(),
-    background: const SwipeDeleteBackground(radius: AppRadius.glassSmall),
+    background: const SwipeDeleteBackground(radius: AppRadius.pulseSmall),
     child: Builder(
       builder: (context) {
-        final labelPrimary =
-            CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
+        final textPrimary =
+            CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm + 2),
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.smPlus),
           child: Row(
             children: [
               Expanded(
@@ -170,9 +184,8 @@ Widget trattenutaEditRow(TrattenutaEditRow row,
                   maxLines: null,
                   decoration: const BoxDecoration(),
                   padding: EdgeInsets.zero,
-                  style: AppTextStyles.subtitle.copyWith(
-                    color: labelPrimary,
-                    fontWeight: FontWeight.w700,
+                  style: AppTextStyles.pulseBodyEmphasis.copyWith(
+                    color: textPrimary,
                   ),
                 ),
               ),
@@ -199,8 +212,7 @@ Widget trattenutaEditRow(TrattenutaEditRow row,
                   child: inlineNumberField(
                     row.importo,
                     prefix: trattenutaPrefix(row.valoreConSegno),
-                    style: AppTextStyles.cardAmount
-                        .copyWith(fontWeight: FontWeight.w400),
+                    style: AppTextStyles.pulseDisplaySmall,
                   ),
                 ),
               ),
@@ -209,5 +221,43 @@ Widget trattenutaEditRow(TrattenutaEditRow row,
         );
       },
     ),
+  );
+}
+
+/// Riga di trattenuta in sola lettura: stesso layout a due colonne
+/// label/valore della versione editabile (`trattenutaEditRow`), condivisa tra
+/// dettaglio busta paga e form di import.
+Widget trattenutaReadOnlyRow(String label, String value) {
+  return Builder(
+    builder: (context) {
+      final textPrimary =
+          CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.smPlus),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: Text(
+                label,
+                style: AppTextStyles.pulseBodyEmphasis.copyWith(
+                  color: textPrimary,
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Text(
+                value,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.pulseDisplaySmall.copyWith(
+                  color: textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
   );
 }

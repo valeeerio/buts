@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
@@ -16,10 +15,12 @@ import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/busta_paga_formatting.dart';
 import '../../widgets/app_alert_dialog.dart';
-import '../../widgets/cupertino_range_slider.dart';
-import '../../widgets/flat_chip_button.dart';
+import '../../widgets/collapsible_period_picker.dart';
+import '../../widgets/custom_illustration.dart';
+import '../../widgets/pulse_icon.dart';
+import '../../widgets/pulse_mesh_background.dart';
+import '../../widgets/pulse_surface.dart';
 import '../../widgets/spring_button.dart';
-import '../../widgets/squircle_clipper.dart';
 import 'busta_paga_detail_screen.dart';
 import 'busta_paga_form_screen.dart';
 import 'buste_paga_archivio_view.dart';
@@ -165,7 +166,8 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
     await service.schedulaNotificaDiProvaPerDebug();
     if (!mounted) return;
 
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
     await showAppAlertDialog<void>(
       context: context,
       title: 'Notifica di prova',
@@ -193,12 +195,17 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
     if (service == null || !service.onboardingDaMostrare) return;
     if (!mounted) return;
 
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
     final secondary =
         CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
 
     await showAppAlertDialog<void>(
       context: context,
+      illustration: const CustomIllustration(
+        variant: CustomIllustrationVariant.onboardingNotifiche,
+        size: 72,
+      ),
       title: 'Promemoria busta paga',
       message: 'Il 1° di ogni mese Buts può ricordarti di importare la '
           'busta paga del mese appena concluso, con altri due solleciti '
@@ -237,7 +244,8 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
   /// seconda volta, va spiegato che si riattiva da Impostazioni.
   void _showPermessoNotificheNegatoAlert() {
     if (!mounted) return;
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
     showAppAlertDialog<void>(
       context: context,
       title: 'Notifiche disattivate',
@@ -417,8 +425,9 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
   /// minimale (nessun bordo/riempimento) quando la lente è attiva: icona
   /// lente come prefix (tappabile per chiudere), campo borderless, tasto
   /// "Annulla" per chiudere in alternativa.
-  Widget _buildSearchField(Color labelPrimary, Color labelSecondary) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+  Widget _buildSearchField(Color textPrimary, Color textSecondary) {
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
     return Row(
       children: [
         Semantics(
@@ -430,8 +439,8 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
               width: 44,
               height: 44,
               alignment: Alignment.center,
-              child: Icon(
-                CupertinoIcons.search,
+              child: PulseIcon(
+                glyph: PulseIconGlyph.search,
                 size: 20,
                 color: accent,
               ),
@@ -444,10 +453,10 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
             autofocus: true,
             padding: EdgeInsets.zero,
             placeholder: 'Cerca per mese o anno',
-            placeholderStyle: AppTextStyles.subtitle.copyWith(
-              color: labelSecondary,
+            placeholderStyle: AppTextStyles.pulseBody.copyWith(
+              color: textSecondary,
             ),
-            style: AppTextStyles.subtitle.copyWith(color: labelPrimary),
+            style: AppTextStyles.pulseBody.copyWith(color: textPrimary),
             onChanged: (_) => setState(() {}),
           ),
         ),
@@ -459,7 +468,7 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
             alignment: Alignment.center,
             child: Text(
               'Annulla',
-              style: AppTextStyles.subtitle.copyWith(color: accent),
+              style: AppTextStyles.pulseBodyEmphasis.copyWith(color: accent),
             ),
           ),
         ),
@@ -494,7 +503,8 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
   }
 
   void _showImportError(String title, String message) {
-    final accent = CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
     showAppAlertDialog<void>(
       context: context,
       title: title,
@@ -512,10 +522,12 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
 
   @override
   Widget build(BuildContext context) {
-    final labelPrimary =
-        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-    final labelSecondary =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+    final textPrimary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
+    final textSecondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
     final now = DateTime.now();
     // Ogni volta che il range disponibile cambia (nuova busta paga importata
     // con un periodo più vecchio/recente di quelli già filtrati), un filtro
@@ -549,66 +561,71 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
       return formatted[0].toUpperCase() + formatted.substring(1);
     }();
 
-    return Container(
-      color:
-          CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context),
+    return PulseMeshBackground(
       child: Stack(
         children: [
           Column(
             children: [
-              // Fascia di benvenuto: gradiente dedicato (blu elettrico in
-              // cima che sfuma in trasparenza) per separarla visivamente dal
-              // resto dell'app, sempre fissa sopra il contenuto scrollabile
-              // (fuori da Expanded/CustomScrollView).
-              Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    // Dissolvenza continua su tutta l'altezza della fascia
-                    // (niente più plateau di blu pieno): passaggio più
-                    // lungo e leggero verso il contenuto sotto, in linea
-                    // col trattamento "wash" leggero già usato dai chip
-                    // pieni della sidecar (`FlatChipButton`).
-                    colors: [
-                      CupertinoDynamicColor.resolve(
-                              AppColors.systemBlue, context)
-                          .withValues(alpha: 0.55),
-                      CupertinoDynamicColor.resolve(
-                              AppColors.systemBlue, context)
-                          .withValues(alpha: 0),
-                    ],
+              // Header di benvenuto: saluto dinamico + data, sempre fisso
+              // sopra il contenuto scrollabile (fuori da
+              // Expanded/CustomScrollView). Niente più fascia a gradiente
+              // colorato — direzione "Pulse" (vedi CLAUDE.md), il saluto
+              // vive direttamente sullo sfondo della pagina. Nella tab
+              // Archivio, il bottone di ricerca sostituisce il saluto con il
+              // campo di ricerca quando attivo.
+              SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.screenHorizontal,
+                    AppSpacing.lg,
+                    AppSpacing.screenHorizontal,
+                    AppSpacing.md,
                   ),
-                ),
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.screenHorizontal,
-                      AppSpacing.lg,
-                      AppSpacing.screenHorizontal,
-                      AppSpacing.lg,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          greetingFor(now),
-                          style: AppTextStyles.greeting.copyWith(
-                            color: labelPrimary,
-                          ),
+                  child: _tab == _BustePagaTab.archivio && _searchActive
+                      ? _buildSearchField(textPrimary, textSecondary)
+                      : Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    greetingFor(now),
+                                    style: AppTextStyles.pulseDisplay
+                                        .copyWith(color: textPrimary),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    dataLabel,
+                                    style: AppTextStyles.pulseBody
+                                        .copyWith(color: textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (_tab == _BustePagaTab.archivio)
+                              Semantics(
+                                label: 'Cerca',
+                                button: true,
+                                child: SpringButton(
+                                  onPressed: () =>
+                                      setState(() => _searchActive = true),
+                                  child: Container(
+                                    width: 44,
+                                    height: 44,
+                                    alignment: Alignment.center,
+                                    child: PulseIcon(
+                                      glyph: PulseIconGlyph.search,
+                                      size: 22,
+                                      color: accent,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          dataLabel,
-                          style: AppTextStyles.subtitle.copyWith(
-                            color: labelSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
               ),
               Expanded(
@@ -623,7 +640,7 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
                           AppSpacing.screenHorizontal,
                           0,
                         ),
-                        child: CupertinoRangeSlider(
+                        child: CollapsiblePeriodPicker(
                           minDate: periodoRangeDisponibile.start,
                           maxDate: periodoRangeDisponibile.end,
                           startValue: _periodoFiltro?.start ??
@@ -643,52 +660,8 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
                         ),
                         child: Container(
                           height: 0.5,
-                          color: CupertinoDynamicColor.resolve(
-                              AppColors.separator, context),
+                          color: textSecondary.withValues(alpha: 0.24),
                         ),
-                      ),
-                    if (_tab == _BustePagaTab.archivio)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.screenHorizontal,
-                          AppSpacing.md,
-                          AppSpacing.screenHorizontal,
-                          AppSpacing.sm,
-                        ),
-                        child: _searchActive
-                            ? _buildSearchField(labelPrimary, labelSecondary)
-                            : Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      'Archivio buste paga',
-                                      style:
-                                          AppTextStyles.sectionTitle.copyWith(
-                                        color: labelPrimary,
-                                      ),
-                                    ),
-                                  ),
-                                  Semantics(
-                                    label: 'Cerca',
-                                    button: true,
-                                    child: SpringButton(
-                                      onPressed: () =>
-                                          setState(() => _searchActive = true),
-                                      child: Container(
-                                        width: 44,
-                                        height: 44,
-                                        alignment: Alignment.center,
-                                        child: Icon(
-                                          CupertinoIcons.search,
-                                          size: 22,
-                                          color: CupertinoDynamicColor.resolve(
-                                              AppColors.systemBlue, context),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
                       ),
                     Expanded(
                       child: Padding(
@@ -723,7 +696,7 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
               top: false,
               child: Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: _BustePagaSidecar(
+                child: _BustePagaNavBar(
                   tab: _tab,
                   onTabChanged: _changeTab,
                   onAdd: _importingPdf ? null : () => _startImport(),
@@ -740,9 +713,11 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
   }
 }
 
-/// Barra flottante ancorata in basso: sotto-navigazione Archivio/
-/// Statistiche + CTA "+" (import PDF) come terzo elemento, tint accent.
-class _BustePagaSidecar extends StatelessWidget {
+/// Barra di navigazione flottante ancorata in basso (redesign "Pulse", vedi
+/// CLAUDE.md): `PulseSurface` non filled con i due tab Archivio/Statistiche,
+/// più il bottone "+" (import PDF) come cerchio pieno separato accanto ad
+/// essa.
+class _BustePagaNavBar extends StatelessWidget {
   final _BustePagaTab tab;
   final ValueChanged<_BustePagaTab> onTabChanged;
   final VoidCallback? onAdd;
@@ -755,7 +730,7 @@ class _BustePagaSidecar extends StatelessWidget {
   /// nessuna delle due build.
   final VoidCallback? onDebugLongPress;
 
-  const _BustePagaSidecar({
+  const _BustePagaNavBar({
     required this.tab,
     required this.onTabChanged,
     required this.onAdd,
@@ -765,107 +740,129 @@ class _BustePagaSidecar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Stesso colore della fascia di benvenuto in alto, usato per il "+" e
-    // per il tab attivo.
-    final plusAccent =
-        CupertinoDynamicColor.resolve(AppColors.systemBlue, context);
-    final labelSecondary =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
+    final onAccent =
+        CupertinoDynamicColor.resolve(AppColors.pulseOnAccent, context);
+    final textSecondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
 
-    // Chip piatti senza superficie di vetro dietro (stessa resa di
-    // "Conferma"/"Modifica" nel dettaglio busta paga, vedi
-    // `FlatChipButton`): solo il tab attivo ha il riempimento colorato, il
-    // tab non attivo resta icona+testo grigi senza sfondo. Il blur di sfondo
-    // (`_floatingBarBackground`) resta comunque dietro l'intera fascia, non
-    // solo dietro ai singoli chip.
-    return Stack(
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Positioned.fill(child: _floatingBarBackground(context)),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: FlatChipButton(
-                icon: CupertinoIcons.archivebox,
-                label: 'Archivio',
-                color:
-                    tab == _BustePagaTab.archivio ? plusAccent : labelSecondary,
-                filled: tab == _BustePagaTab.archivio,
-                onPressed: () => onTabChanged(_BustePagaTab.archivio),
-              ),
+        Expanded(
+          child: PulseSurface(
+            borderRadius: AppRadius.pulse,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.sm,
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              child: FlatChipButton(
-                icon: CupertinoIcons.chart_bar_alt_fill,
-                label: 'Statistiche',
-                color: tab == _BustePagaTab.statistiche
-                    ? plusAccent
-                    : labelSecondary,
-                filled: tab == _BustePagaTab.statistiche,
-                onPressed: () => onTabChanged(_BustePagaTab.statistiche),
-              ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _NavBarTab(
+                    glyph: PulseIconGlyph.archive,
+                    label: 'Archivio',
+                    active: tab == _BustePagaTab.archivio,
+                    accent: accent,
+                    inactive: textSecondary,
+                    onPressed: () => onTabChanged(_BustePagaTab.archivio),
+                  ),
+                ),
+                Expanded(
+                  child: _NavBarTab(
+                    glyph: PulseIconGlyph.chart,
+                    label: 'Statistiche',
+                    active: tab == _BustePagaTab.statistiche,
+                    accent: accent,
+                    inactive: textSecondary,
+                    onPressed: () => onTabChanged(_BustePagaTab.statistiche),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: AppSpacing.sm),
-            Semantics(
-              label: 'Aggiungi busta paga',
-              button: true,
-              // Long-press per la notifica di prova: SOLO sotto kDebugMode
-              // (vedi `onDebugLongPress`), un GestureDetector aggiuntivo
-              // attorno al bottone "+", nessun cambiamento visivo — stessa
-              // icona, stesso colore, stesso layout in entrambe le build.
-              child: onDebugLongPress == null
-                  ? _plusButton(plusAccent)
-                  : GestureDetector(
-                      onLongPress: onDebugLongPress,
-                      child: _plusButton(plusAccent),
-                    ),
-            ),
-          ],
+          ),
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Semantics(
+          label: 'Aggiungi busta paga',
+          button: true,
+          // Long-press per la notifica di prova: SOLO sotto kDebugMode (vedi
+          // `onDebugLongPress`), un GestureDetector aggiuntivo attorno al
+          // "+", nessun cambiamento visivo — stessa icona, stesso colore,
+          // stesso layout in entrambe le build.
+          child: onDebugLongPress == null
+              ? _plusButton(accent, onAccent)
+              : GestureDetector(
+                  onLongPress: onDebugLongPress,
+                  child: _plusButton(accent, onAccent),
+                ),
         ),
       ],
     );
   }
 
-  Widget _plusButton(Color plusAccent) {
+  Widget _plusButton(Color accent, Color onAccent) {
     return SpringButton(
       onPressed: onAdd ?? () {},
-      child: ClipPath(
-        clipper: const SquircleClipper(radius: AppRadius.glassSmall),
-        child: Container(
-          width: 48,
-          height: 48,
-          color: plusAccent.withValues(alpha: 0.16),
-          alignment: Alignment.center,
-          child: importing
-              ? CupertinoActivityIndicator(color: plusAccent)
-              : Icon(
-                  CupertinoIcons.add,
-                  size: 24,
-                  color: plusAccent,
-                ),
-        ),
+      child: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+        alignment: Alignment.center,
+        child: importing
+            ? CupertinoActivityIndicator(color: onAccent)
+            : PulseIcon(
+                glyph: PulseIconGlyph.add,
+                size: 24,
+                color: onAccent,
+              ),
       ),
     );
   }
 }
 
-/// Sfondo "chrome" traslucido/sfocato dietro le barre flottanti in basso
-/// (sidecar, `_ActionBar` del dettaglio, barra Salva/Annulla del form
-/// import): stesso `BackdropFilter` di `_pinnedBackground` in
-/// `buste_paga_archivio_view.dart` (stesso raggio di blur, stesso fill di
-/// opacità, stesso `ClipRect` come antenato diretto del `BackdropFilter` —
-/// vincolo critico per Impeller su device reale, vedi CLAUDE.md), copre
-/// l'intera fascia della barra e non solo i singoli chip sopra di essa.
-Widget _floatingBarBackground(BuildContext context) {
-  final fill =
-      CupertinoDynamicColor.resolve(AppColors.backgroundPrimary, context);
-  return ClipRect(
-    child: BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-      child: DecoratedBox(
-        decoration: BoxDecoration(color: fill.withValues(alpha: 0.8)),
+/// Singolo tab della barra di navigazione: icona+label, colorati con
+/// `accent` quando attivo, `inactive` altrimenti — nessun riempimento di
+/// sfondo per il tab attivo (a differenza dei vecchi `FlatChipButton`), solo
+/// il colore cambia, coerente con la superficie `PulseSurface` unica che li
+/// contiene entrambi.
+class _NavBarTab extends StatelessWidget {
+  final PulseIconGlyph glyph;
+  final String label;
+  final bool active;
+  final Color accent;
+  final Color inactive;
+  final VoidCallback onPressed;
+
+  const _NavBarTab({
+    required this.glyph,
+    required this.label,
+    required this.active,
+    required this.accent,
+    required this.inactive,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = active ? accent : inactive;
+    return SpringButton(
+      onPressed: onPressed,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PulseIcon(glyph: glyph, size: 22, color: color),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: AppTextStyles.pulseLabel.copyWith(color: color),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

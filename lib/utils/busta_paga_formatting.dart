@@ -18,7 +18,7 @@ String meseLabel(BustaPaga bustaPaga) {
 }
 
 /// Etichetta breve di una data periodo (es. "gen '24"), usata sull'asse X
-/// dei grafici Statistiche e dal selettore di periodo (`CupertinoRangeSlider`)
+/// dei grafici Statistiche e dal selettore di periodo (`PeriodYearMonthPicker`)
 /// — condivisa perché entrambi devono restare coerenti nel formato.
 String periodoAxisLabel(DateTime periodo) {
   final month = DateFormat('MMM', 'it_IT').format(periodo);
@@ -179,6 +179,42 @@ String formatEuroConSegno(double value) {
       : '€ ${formatEuro(value)}';
 }
 
+/// Versione COMPATTA di [formatEuroConSegno], per etichette con spazio
+/// ristretto (asse Y del grafico Netto/Lordo in Statistiche, vedi
+/// `_valueLeftAxisTitles` in `buste_paga_statistiche_screen.dart`) — NON per
+/// importi normali (tooltip, tabella riepilogativa), che restano su
+/// [formatEuroConSegno] con i due decimali esatti. Arrotonda all'euro (zero
+/// decimali) e, per i valori con modulo ≥ 1000, passa a notazione "k" con al
+/// più una cifra decimale (es. "1,5k", oppure "2k" se il migliaio è esatto) —
+/// una stringa come "− € 3.245,67" (12 caratteri) forzava lo scale-down di
+/// `FittedBox` ben sotto la soglia di leggibilità (~9-11px) nello spazio
+/// riservato all'asse; la versione compatta ("− € 3,2k", 8 caratteri) ci sta
+/// alla dimensione naturale del font. Stessa convenzione di segno/simbolo di
+/// [formatEuroConSegno]: "−" prima di "€" per i negativi.
+String formatEuroConSegnoCompatto(double value) {
+  final negative = value < 0;
+  final abs = value.abs();
+  // La decisione tra notazione "k" e numero secco va presa sul valore GIÀ
+  // arrotondato all'euro (stesso arrotondamento poi effettivamente
+  // mostrato nel ramo secco) — non su `abs` non arrotondato. Altrimenti un
+  // valore come 999.6 (sotto soglia, ma che arrotonda a 1000) finiva nel
+  // ramo secco producendo "€ 1000" invece di "€ 1k" (bug corretto qui). Il
+  // ramo "k" riparte a sua volta da questo intero già arrotondato, così non
+  // ci sono due arrotondamenti indipendenti che possano disallinearsi tra
+  // soglia e cifra mostrata.
+  final roundedAbs = abs.round();
+  final String numberPart;
+  if (roundedAbs >= 1000) {
+    final kRounded = (roundedAbs / 100).round() / 10;
+    numberPart = kRounded == kRounded.roundToDouble()
+        ? '${kRounded.toStringAsFixed(0)}k'
+        : '${kRounded.toStringAsFixed(1).replaceAll('.', ',')}k';
+  } else {
+    numberPart = roundedAbs.toString();
+  }
+  return negative ? '− € $numberPart' : '€ $numberPart';
+}
+
 /// Converte un numero in formato italiano digitato dall'utente (punto come
 /// separatore delle migliaia, virgola come separatore decimale — es.
 /// "1.234,56" o "1234,56") in un `double`, tornando `0` se il testo è vuoto o
@@ -192,3 +228,71 @@ double parseItalianNumber(String text) {
   final normalized = trimmed.replaceAll('.', '').replaceAll(',', '.');
   return double.tryParse(normalized) ?? 0;
 }
+
+/// Come [parseItalianNumber], ma ritorna `null` invece di azzerare
+/// silenziosamente un testo non numerico (lettere, testo incollato per
+/// errore) — usata dalla validazione al salvataggio (vedi
+/// [isValidItalianNumberField]), non da [parseItalianNumber] stesso, che
+/// resta usato ovunque nell'app un valore "sicuro" (già validato prima del
+/// salvataggio) serva senza dover propagare un `null`. Un testo vuoto ritorna
+/// `null` qui: la distinzione fra "vuoto" e "non valido" è responsabilità del
+/// chiamante (vedi [isValidItalianNumberField], che tratta il vuoto come
+/// valido — placeholder "0" dei campi numerici dell'app).
+double? tryParseItalianNumber(String text) {
+  final trimmed = text.trim();
+  if (trimmed.isEmpty) return null;
+  final normalized = trimmed.replaceAll('.', '').replaceAll(',', '.');
+  return double.tryParse(normalized);
+}
+
+/// `true` se [text] è un input accettabile per un campo numerico dell'app
+/// (Ore lavorate, Ferie/ROL/Ex festività Maturato-Goduto-Residuo, quantità e
+/// importo delle voci di Competenze, importo delle Trattenute) — usata dalla
+/// validazione al salvataggio in `busta_paga_detail_screen.dart`/
+/// `busta_paga_form_screen.dart` (bug reale corretto: prima di questo fix
+/// `parseItalianNumber` azzerava silenziosamente qualunque testo non
+/// numerico, senza bloccare il salvataggio né avvisare l'utente — vedi
+/// istruzioni task/CLAUDE.md).
+///
+/// Un testo VUOTO è considerato valido (equivale a "0"): ogni campo numerico
+/// di questa app mostra un placeholder "0" grigio quando vuoto
+/// (`inlineNumberField`) e più punti del codice si affidano esplicitamente a
+/// questa convenzione (es. `VoceCompetenzaEditRow.quantitaValue`, dove vuoto
+/// significa "quantità assente" nel PDF, un valore reale e distinto da "0"
+/// digitato) — bloccare il salvataggio per un campo lasciato vuoto
+/// romperebbe quell'invariante consolidata, non è il bug da correggere qui.
+///
+/// Un testo che contiene un punto è valido SOLO se il punto è un separatore
+/// delle migliaia sintatticamente corretto (gruppi di esattamente 3 cifre fra
+/// un punto e l'altro, es. "1.483,54", "12.345,00", "1.234.567,89") — mai se
+/// il punto è seguito da un gruppo di 1-2 cifre non allineato a un
+/// raggruppamento da migliaia (es. "12.5", "1.5": notazione decimale
+/// ambigua stile USA). Prima di questo fix qualunque punto veniva rifiutato
+/// in blocco: i controller di editing di Competenze/Trattenute vengono però
+/// precompilati con [formatEuro], che INSERISCE il punto delle migliaia per
+/// ogni importo ≥ 1.000 (es. "1.483,54") — un cedolino reale con una sola
+/// voce ≥ 1.000€ non toccata dall'utente veniva quindi bloccato al
+/// salvataggio come "valore non valido", bug reale corretto qui, non
+/// un'ipotesi. `inputFormatters` su `inlineNumberField` impedisce comunque
+/// di DIGITARE il punto (livello 1); questo controllo (livello 2, rete di
+/// sicurezza per valori precompilati o incollati) valida la sintassi del
+/// punto invece di rifiutarlo sempre.
+bool isValidItalianNumberField(String text) {
+  final trimmed = text.trim();
+  if (trimmed.isEmpty) return true;
+  if (!_italianNumberPattern.hasMatch(trimmed)) return false;
+  return tryParseItalianNumber(trimmed) != null;
+}
+
+/// Pattern di un numero in formato italiano sintatticamente valido: o senza
+/// alcun punto (`-?\d+(,\d+)?`, es. "123", "1234,56" — l'utente può digitare
+/// senza separatore delle migliaia, non è obbligatorio), oppure con punti
+/// SOLO come separatore delle migliaia in posizione corretta
+/// (`-?\d{1,3}(\.\d{3})*(,\d+)?`, es. "1.483,54", "12.345,00",
+/// "1.234.567,89" — ogni gruppo fra un punto e l'altro deve avere
+/// esattamente 3 cifre). Qualunque altro uso del punto (es. "12.5", "1.5":
+/// un gruppo di 1-2 cifre dopo il punto, tipico della notazione decimale
+/// USA) non soddisfa nessuna delle due alternative e viene quindi rifiutato.
+final RegExp _italianNumberPattern = RegExp(
+  r'^-?\d{1,3}(\.\d{3})*(,\d+)?$|^-?\d+(,\d+)?$',
+);

@@ -433,6 +433,154 @@ Firma per quietanza
 1.404,77 104,06 679,64 610,72 1.290,36 1.404,77 389,16 0,28-0,11 1.016,00
 ''';
 
+/// Testo REALE (non sintetico) estratto via `syncfusion_flutter_pdf`
+/// (`PdfTextExtractor`) da un cedolino "Mens.supplementare 12/2025"
+/// (tredicesima), layout "JOB" — ground-truth per il riconoscimento
+/// esplicito del tipo mensilità dalla voce di competenza "13.ma
+/// mensilita'" (vedi `_numeroMensilitaSupplementare` in
+/// `busta_paga_regex_parser.dart`) — come
+/// [_testoRealeQuattordicesimaGiugno2026], che contiene la voce equivalente
+/// "14.ma mensilita'" ed è quindi anch'esso letto esplicitamente, non
+/// dedotto dal mese. Dati anagrafici (nome, CF, indirizzo, IBAN,
+/// matricola, posizione INPS/INAIL, ragione sociale e sede del datore di
+/// lavoro) sostituiti con placeholder fittizi; struttura del documento e
+/// TUTTI i valori numerici (competenze, ratei, trattenute, netto) sono
+/// quelli reali del cedolino. La riga dopo "Firma per quietanza" contiene
+/// caratteri illeggibili per un artefatto noto di estrazione del font su
+/// questo specifico PDF (sostituzione di glifi) tranne l'ultimo numero
+/// ("455,00", il netto in busta stampato): mantenuta verbatim perché è
+/// comunque il caso reale su cui il parser deve restare robusto (vedi
+/// estrazione del netto in `parse()`, che cerca solo pattern numerici sulla
+/// riga, non l'intera riga).
+const _testoRealeTredicesimaDicembre2025 = '''
+POS. INPSMESE DI RETRIBUZIONE
+POS. INAILVoci di tariffa
+COD.DIP.
+COGNOME E NOMECODICE FISCALENATO A
+IL
+DESCRIZIONE QUALIFICA
+CONTRATTO DI LAVORO
+INDIRIZZO
+ANZ. SERVIZIO
+ASSUNZIONEANZ. CONV.
+SCADENZA CONTR.
+FINE RAPPORTOCENTRO DI COSTOSEDE DI LAVORO
+ANNI
+MESI
+MODALITA' DI PAGAMENTORIFERIMENTI BANCARISCATTI ANZIANITA'
+LIVELLO
+% PART TIME
+DATAPROSSIMO
+N.
+RATEI
+MATURATI
+GODUTI
+RESIDUI A.P.ELEMENTI RETRIBUTIVIRESIDUI TOTALI
+A.P.A.C.
+FERIE
+PERMESSI (R.O.L.)
+EX FESTIVITA'
+RETRIBUZIONE ORARIA
+RETRIBUZIONE GIORNALIERA
+RETRIBUZIONE MENSILE
+Unita' di
+C*
+I*
+T*
+N*VOCEDESCRIZIONEQuantita'BaseTRATTENUTECOMPETENZE* = C - Imponibile contributivo ; I - Imponibile Irpef ; T - Imponibile TFR ; N - Considerato nel netto in bustamisura
+DESCRIZIONE CONTRIBUTOIMPONIBILE% C/DIPC/DIPENDENTEC/DITTA: ASS.SAN-PREV.COMPL.DESCRIZIONE CONTRIBUTOIMPONIBILE% C/DIPC/DIPENDENTEC/DITTA: ASS.SAN-PREV.COMPL.
+QTASETT. RETR.GG. RETR.
+GG. LAV.
+ORE LAV.
+CTRIMPON.CONTRIBUTIVO ANNOCONTRIBUTI ANNOIMPON.CONTRIBUTIVO MESEIMPON.CONTRIB. ARROT. MESETOTALE CONTRIBUTI
+IMPONIBILE FISCALE
+IRPEF LORDA
+DETR. LAV.DIPENDENTEGGDETR. CONIUGEDETR. FIGLIDETR. ALTRI FAMILIARIDETR. ONERIMESE
+IMPOSTA SOSTITUTIVA
+IRPEF NETTAIRPEF + IMP. SOST.
+IMPONIBILE
+IMPOSTA
+IMPONIBILE FISCALE
+IRPEF LORDA
+DETR.LAV.DIPENDENTEGGDETR. CONIUGEDETR. FIGLIDETR. ALTRI FAMILIARIDETR.ONERI/CANONIANNO
+IMPOSTA SOSTITUTIVAIRPEF NETTA
+IRPEF TRATTENUTA
+IRPEF CONGUAGLIO
+CONG.IRPEF+IMP.SOST.
+IMPONIBILE
+IMPOSTA
+IMPOSTA TRATTENUTA
+IMPOSTA CONGUAGLIO
+RETRIBUZIONE UTILE TFR
+CONTR. AGG. TFRTFR MESE
+TFR ANNUO PROGR.
+F.DO TFR 31/12 APANTICIPAZIONI ANNOTFR SPETTANTE AZIENDATFR A F.DO PENSIONETFR
+IMPONIBILE LORDO
+RIDUZIONE
+IMPONIBILE NETTO
+%
+IRPEF
+IRPEF ANT. / ACC.
+TOTALE DETRAZIONIAAP
+IMPONIBILE ARRETRATI AP
+%
+IRPEF TFR / ARR. A.P.
+TABELLAN.COMPON.
+FIGLI MIN.
+LIV.REDDITO
+GIORNI
+IMPORTO ASSEGNO
+TOTALE COMPETENZETOTALE TRATTENUTE
+ARR. PRECED.
+ARR. ATTUALE
+NETTO IN BUSTAANFTOT
+JOB - Copyright Sistemi S.p.A. - Autorizzazione INAIL   N°  792   del  03/01/20185Mens.supplementare 12/2025
+0000000000
+BETA SERVIZI S.R.L.
+VIA DEI PLATANI 15
+Autorizzazione unica:
+00100  ROMA  (RM)
+00000000/00
+0000
+N°000000
+00000000000
+C.F.: 1/01/2020Del
+00000000000
+P.IVA:01/06/202600:00Stampato ilOra000
+VERDI ANNA
+VRDNNA80A41H501U
+MILANO  (MI)
+01/01/1980
+VIA GARIBALDI 3
+N°
+APPR.PROFES.IMPIEG. 10%
+Trasporto e spedizioni merci
+00100  ROMA  (RM)
+00000
+sede di Roma
+ 1/08/2020 1/08/2020
+Amministrazione
+5
+BONIFICO BANCARIO
+IT00 X000 0000 000X X000 0000 000
+ 1/09/2027
+4J
+MINIMOEPA -CCNL 06/12/241.479,1600022,670007,33 2,00 5,33 (GIORNI)13,33 13,33 (ORE)10,67 10,67 (ORE)8,9394668,265001.501,83250
+13.ma mensilita'
+RATEI
+5,000 628,96
+*
+*
+*
+*
+INPS629,00 5,84036,73
+FONDO INTEGR. SALARIALE - FIS
+629,00 0,2671,68
+6.737,00 411,41 628,96 629,00 38,41 590,55 135,83 135,83 135,83 6.337,83 653,44 122
+Firma per quietanza
+GaIXSG QGXPS QSIXS. QSIXS. GaIXSG .tQXaQ OX.QyOX.Q 455,00
+''';
+
 void main() {
   group('BustaPagaRegexParser', () {
     const parser = BustaPagaRegexParser();
@@ -729,6 +877,64 @@ void main() {
       expect(risultato.tipo, TipoBustaPaga.tredicesima);
       expect(
         risultato.warnings.any((w) => w.contains('dedotto dal mese')),
+        isTrue,
+      );
+    });
+
+    test(
+        'riconosce il tipo tredicesima dalla voce di competenza "13.ma '
+        'mensilita\'" (segnale esplicito, non dedotto dal mese) anche '
+        'quando manca la parola "tredicesima" per esteso', () {
+      final testo = _testoSintetico
+          .replaceFirst('MARZO 2026', 'Mens.supplementare 12/2025 MARZO 2026')
+          .replaceFirst(
+            'Retribuzione ordinaria',
+            "13.ma mensilita'\nRATEI\n5,000 628,96\nRetribuzione ordinaria",
+          );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.tipo, TipoBustaPaga.tredicesima);
+      expect(
+        risultato.warnings.any((w) => w.contains('dedotto dal mese')),
+        isFalse,
+      );
+    });
+
+    test(
+        'riconosce il tipo quattordicesima dalla voce di competenza "14.ma '
+        'mensilita\'" (segnale esplicito, non dedotto dal mese)', () {
+      final testo = _testoSintetico
+          .replaceFirst('MARZO 2026', 'Mens.supplementare 06/2026 MARZO 2026')
+          .replaceFirst(
+            'Retribuzione ordinaria',
+            "14.ma mensilita'\nRATEI\n5,000 628,96\nRetribuzione ordinaria",
+          );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.tipo, TipoBustaPaga.quattordicesima);
+      expect(
+        risultato.warnings.any((w) => w.contains('dedotto dal mese')),
+        isFalse,
+      );
+    });
+
+    test(
+        'segnala con un warning esplicito quando "Mens.supplementare" cade '
+        'in un mese atipico (nessuna deduzione possibile), senza lasciare '
+        'il tipo mensile in silenzio', () {
+      final testo = _testoSintetico.replaceFirst(
+        'MARZO 2026',
+        'Mens.supplementare 03/2026 MARZO 2026',
+      );
+      final risultato = parser.parse(testo);
+
+      expect(risultato.tipo, TipoBustaPaga.mensile);
+      expect(
+        risultato.warnings.any(
+          (w) =>
+              w.contains('tipo mensilità non determinato') &&
+              w.contains('Mens.supplementare'),
+        ),
         isTrue,
       );
     });
@@ -1461,13 +1667,16 @@ void main() {
 
       // Periodo letto da "Mens.supplementare 6/2026".
       expect(risultato.periodo, '2026-06');
-      // Nessuna delle due parole "tredicesima"/"quattordicesima" compare
-      // nel testo reale: il tipo è dedotto dal mese (giugno -> 14esima),
-      // con warning esplicito di deduzione.
+      // Nessuna delle due parole per esteso "tredicesima"/"quattordicesima"
+      // compare nel testo reale, ma la voce di competenza nomina
+      // esplicitamente "14.ma mensilita'": il tipo è letto da
+      // `_numeroMensilitaSupplementare` con priorità sulla deduzione dal
+      // mese (che pure coinciderebbe: giugno -> 14esima), quindi NESSUN
+      // warning di deduzione.
       expect(risultato.tipo, TipoBustaPaga.quattordicesima);
       expect(
         risultato.warnings.any((w) => w.contains('tipo mensilità dedotto')),
-        isTrue,
+        isFalse,
       );
 
       // Competenze: una sola voce "14.ma mensilita'" (tag "RATEI", non
@@ -1519,6 +1728,83 @@ void main() {
       // mensilità supplementare non retribuisce ore lavorate nel mese) e
       // nessuna voce "Retribuzione ordinaria" da cui stimarlo con
       // giorni×8 — warning esplicito, nessun dato inventato.
+      expect(risultato.oreLavorate, isNull);
+      expect(
+        risultato.warnings,
+        contains('ore lavorate non determinabili'),
+      );
+    });
+  });
+
+  group(
+      'BustaPagaRegexParser - ground-truth su PDF reale di mensilità '
+      'supplementare (Dicembre 2025, tredicesima): test di '
+      'non-regressione per il riconoscimento esplicito del tipo dalla voce '
+      'di competenza "13.ma mensilita\'" — dati anagrafici fittizi, '
+      'struttura e valori numerici reali, vedi doc su '
+      '_testoRealeTredicesimaDicembre2025', () {
+    const parser = BustaPagaRegexParser();
+
+    test(
+        'estrae correttamente periodo, tipo (letto, non dedotto), lordo e '
+        'netto dal testo reale', () {
+      final risultato = parser.parse(_testoRealeTredicesimaDicembre2025);
+
+      // Periodo letto da "Mens.supplementare 12/2025".
+      expect(risultato.periodo, '2025-12');
+
+      // A differenza di _testoRealeQuattordicesimaGiugno2026, qui la voce
+      // di competenza nomina esplicitamente "13.ma mensilita'": il tipo va
+      // letto da _numeroMensilitaSupplementare con priorità sulla
+      // deduzione dal mese, quindi NESSUN warning di deduzione, pur non
+      // comparendo la parola "tredicesima" per esteso nel testo.
+      expect(risultato.tipo, TipoBustaPaga.tredicesima);
+      expect(
+        risultato.warnings.any((w) => w.contains('tipo mensilità dedotto')),
+        isFalse,
+      );
+
+      // Competenze: una sola voce "13.ma mensilita'" (tag "RATEI"), 5 mesi
+      // maturati, importo 628,96.
+      expect(risultato.competenze, hasLength(1));
+      final voce = risultato.competenze.single;
+      expect(voce.descrizione, "13.ma mensilita'");
+      expect(voce.quantita, closeTo(5.0, 0.001));
+      expect(voce.importo, closeTo(628.96, 0.001));
+
+      expect(risultato.lordo, closeTo(628.96, 0.001));
+      expect(risultato.straordinari, closeTo(0.0, 0.001));
+
+      // Ferie/ROL/Ex festività dal blocco ratei presente su questo PDF
+      // reale.
+      expect(risultato.ferieMaturate, closeTo(7.33, 0.001));
+      expect(risultato.ferieGodute, closeTo(2.00, 0.001));
+      expect(risultato.ferieResidue, closeTo(5.33, 0.001));
+      expect(risultato.rolMaturati, closeTo(13.33, 0.001));
+      expect(risultato.rolGoduti, closeTo(0.0, 0.001));
+      expect(risultato.rolResidui, closeTo(13.33, 0.001));
+      expect(risultato.exFestivitaMaturate, closeTo(10.67, 0.001));
+      expect(risultato.exFestivitaGodute, closeTo(0.0, 0.001));
+      expect(risultato.exFestivitaResidue, closeTo(10.67, 0.001));
+
+      // Trattenute: INPS letta direttamente (36,73); "FONDO INTEGR.
+      // SALARIALE - FIS" resta aggregato nel residuo "Altre trattenute",
+      // come nel caso di Giugno 2026.
+      expect(risultato.trattenute['INPS'], closeTo(36.73, 0.001));
+      expect(
+        risultato.trattenute['Altre trattenute (IRPEF + varie)'],
+        closeTo(137.23, 0.001),
+      );
+
+      // Netto derivato (lordo - trattenute): 628,96 - 36,73 - 137,23 =
+      // 455,00, coincide col netto grezzo letto dal PDF (ultimo numero
+      // della riga dopo "Firma per quietanza", nonostante il resto della
+      // riga sia illeggibile per l'artefatto di estrazione del font — vedi
+      // doc sulla fixture).
+      expect(risultato.netto, closeTo(455.00, 0.01));
+
+      // Ore lavorate: non determinabili su questo layout, come per la
+      // mensilità supplementare di Giugno 2026.
       expect(risultato.oreLavorate, isNull);
       expect(
         risultato.warnings,
@@ -1820,6 +2106,211 @@ void main() {
             w.contains('sia in colonna')),
         isFalse,
       );
+    });
+  });
+
+  group(
+      'BustaPagaEstratti - flag lordoVerificato/trattenuteVerificate/'
+      'nettoVerificato', () {
+    const parser = BustaPagaRegexParser();
+
+    test(
+        'percorso a coordinate, tutto coerente → i 3 flag sono true e '
+        'nessun warning di divergenza', () {
+      const voci = VociEstratteDaCoordinate(
+        righe: [
+          RigaVoceCoordinate(
+            codice: '10',
+            descrizione: 'Retribuzione ordinaria',
+            tag: 'GIORNI',
+            quantita: 20.0,
+            importo: 1000.0,
+            colonna: ColonnaVoceCoordinate.competenze,
+            flagN: true,
+          ),
+        ],
+        contributiDipendente: {'INPS': 90.0},
+        irpefTrattenuta: 100.0,
+        totali: TotaliCoordinate(
+          totaleCompetenze: 1000.0,
+          totaleTrattenute: 190.0,
+          nettoInBusta: 810.0,
+        ),
+      );
+
+      final risultato = parser.parse(_testoSintetico, null, voci);
+
+      expect(risultato.lordoVerificato, isTrue);
+      expect(risultato.trattenuteVerificate, isTrue);
+      expect(risultato.nettoVerificato, isTrue);
+      expect(
+        risultato.warnings
+            .any((w) => w.contains('diverge dal totale competenze')),
+        isFalse,
+      );
+      expect(
+        risultato.warnings
+            .any((w) => w.contains('divergono dal totale trattenute')),
+        isFalse,
+      );
+      expect(
+        risultato.warnings.any((w) => w.contains('diverge dal netto in busta')),
+        isFalse,
+      );
+    });
+
+    test(
+        'lordo calcolato diverge dal totale competenze stampato → '
+        'lordoVerificato false con warning presente', () {
+      const voci = VociEstratteDaCoordinate(
+        righe: [
+          RigaVoceCoordinate(
+            codice: '10',
+            descrizione: 'Retribuzione ordinaria',
+            tag: 'GIORNI',
+            quantita: 20.0,
+            importo: 1000.0,
+            colonna: ColonnaVoceCoordinate.competenze,
+            flagN: true,
+          ),
+        ],
+        contributiDipendente: {'INPS': 90.0},
+        irpefTrattenuta: 100.0,
+        totali: TotaliCoordinate(
+          // Totale competenze stampato diverge apposta dal lordo calcolato
+          // (1000.0) oltre la tolleranza (0.05).
+          totaleCompetenze: 1100.0,
+          totaleTrattenute: 190.0,
+          nettoInBusta: 910.0,
+        ),
+      );
+
+      final risultato = parser.parse(_testoSintetico, null, voci);
+
+      expect(risultato.lordoVerificato, isFalse);
+      expect(
+        risultato.warnings
+            .any((w) => w.contains('diverge dal totale competenze')),
+        isTrue,
+      );
+    });
+
+    test(
+        'IRPEF non trovata dalle coordinate → trattenuteVerificate false '
+        'con warning dedicato', () {
+      const voci = VociEstratteDaCoordinate(
+        righe: [
+          RigaVoceCoordinate(
+            codice: '10',
+            descrizione: 'Retribuzione ordinaria',
+            tag: 'GIORNI',
+            quantita: 20.0,
+            importo: 1000.0,
+            colonna: ColonnaVoceCoordinate.competenze,
+            flagN: true,
+          ),
+        ],
+        contributiDipendente: {'INPS': 90.0},
+        totali: TotaliCoordinate(
+          totaleCompetenze: 1000.0,
+          totaleTrattenute: 90.0,
+          nettoInBusta: 910.0,
+        ),
+      );
+
+      final risultato = parser.parse(_testoSintetico, null, voci);
+
+      expect(risultato.trattenuteVerificate, isFalse);
+      expect(
+        risultato.warnings
+            .any((w) => w.contains('trattenuta IRPEF non trovata')),
+        isTrue,
+      );
+    });
+
+    test(
+        'somma trattenute nominate diverge dal totale stampato → '
+        'trattenuteVerificate false e nettoVerificato false a cascata', () {
+      const voci = VociEstratteDaCoordinate(
+        righe: [
+          RigaVoceCoordinate(
+            codice: '10',
+            descrizione: 'Retribuzione ordinaria',
+            tag: 'GIORNI',
+            quantita: 20.0,
+            importo: 1000.0,
+            colonna: ColonnaVoceCoordinate.competenze,
+            flagN: true,
+          ),
+        ],
+        contributiDipendente: {'INPS': 90.0},
+        irpefTrattenuta: 100.0,
+        totali: TotaliCoordinate(
+          totaleCompetenze: 1000.0,
+          // Totale trattenute stampato diverge apposta dalla somma nominata
+          // (90 + 100 = 190) oltre la tolleranza.
+          totaleTrattenute: 250.0,
+          nettoInBusta: 750.0,
+        ),
+      );
+
+      final risultato = parser.parse(_testoSintetico, null, voci);
+
+      expect(risultato.trattenuteVerificate, isFalse);
+      expect(risultato.nettoVerificato, isFalse);
+      expect(
+        risultato.warnings
+            .any((w) => w.contains('divergono dal totale trattenute')),
+        isTrue,
+      );
+    });
+
+    test(
+        'lordo e trattenute OK ma il netto finale diverge dal netto in '
+        'busta stampato → nettoVerificato false pur con gli altri due true',
+        () {
+      const voci = VociEstratteDaCoordinate(
+        righe: [
+          RigaVoceCoordinate(
+            codice: '10',
+            descrizione: 'Retribuzione ordinaria',
+            tag: 'GIORNI',
+            quantita: 20.0,
+            importo: 1000.0,
+            colonna: ColonnaVoceCoordinate.competenze,
+            flagN: true,
+          ),
+        ],
+        contributiDipendente: {'INPS': 90.0},
+        irpefTrattenuta: 100.0,
+        totali: TotaliCoordinate(
+          totaleCompetenze: 1000.0,
+          totaleTrattenute: 190.0,
+          // Netto in busta stampato diverge apposta dal netto derivato
+          // (lordo 1000 - trattenute 190 = 810) oltre la tolleranza.
+          nettoInBusta: 900.0,
+        ),
+      );
+
+      final risultato = parser.parse(_testoSintetico, null, voci);
+
+      expect(risultato.lordoVerificato, isTrue);
+      expect(risultato.trattenuteVerificate, isTrue);
+      expect(risultato.nettoVerificato, isFalse);
+      expect(
+        risultato.warnings.any((w) => w.contains('diverge dal netto in busta')),
+        isTrue,
+      );
+    });
+
+    test(
+        'percorso testuale puro (nessun voci/coordinate sufficienti) → i 3 '
+        'flag sono false', () {
+      final risultato = parser.parse(_testoRealeLuglio2026);
+
+      expect(risultato.lordoVerificato, isFalse);
+      expect(risultato.trattenuteVerificate, isFalse);
+      expect(risultato.nettoVerificato, isFalse);
     });
   });
 }

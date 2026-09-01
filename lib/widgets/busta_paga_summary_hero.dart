@@ -4,18 +4,16 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
 import '../utils/busta_paga_formatting.dart';
-import 'liquid_glass_surface.dart';
-import 'spring_button.dart';
+import 'pulse_surface.dart';
 
-/// Card in evidenza per l'ultima busta paga in archivio: mese e netto
-/// impilati a sinistra (pallino di stato + mese sopra, netto in evidenza
-/// sotto), gruppetto compatto Ferie/Permessi/Ex fest. (`_StatTrio`, con
-/// divisori verticali sottili tra le 3 colonne) a destra, centrato
-/// verticalmente rispetto all'altezza combinata di mese+netto. Tap-only,
-/// apre il dettaglio.
-///
-/// Usa `LiquidGlassSurface`, vedi `liquid_glass_surface.dart` per i dettagli
-/// del materiale approssimato.
+/// Blocco "Netto" in evidenza per l'ultima busta paga in archivio (redesign
+/// "Pulse", vedi CLAUDE.md): superficie piena color accento con label
+/// "NETTO · {MESE} {ANNO}", il netto in grande e un badge di stato
+/// Confermato/Da confermare — sostituisce la vecchia hero in vetro con
+/// gruppetto Ferie/Permessi/Ex fest. inline (quei dati vivono ora nella
+/// griglia di anelli di maturazione sotto questo blocco, vedi
+/// `BustePagaArchivioView`, per evitare la stessa ridondanza già corretta nel
+/// dettaglio busta paga). Tap-only, apre il dettaglio.
 class BustaPagaSummaryHero extends StatelessWidget {
   final BustaPaga bustaPaga;
   final VoidCallback onTap;
@@ -28,135 +26,131 @@ class BustaPagaSummaryHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelPrimary =
-        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
+    final onAccent =
+        CupertinoDynamicColor.resolve(AppColors.pulseOnAccent, context);
+    final secondaryGlow =
+        CupertinoDynamicColor.resolve(AppColors.pulseSecondaryGlow, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
     final isConfermato =
         bustaPaga.statoVerifica == StatoVerificaBustaPaga.confermato;
-    final statoColor = CupertinoDynamicColor.resolve(
-      isConfermato ? AppColors.systemGreen : AppColors.systemRed,
+    final badgeFill = CupertinoDynamicColor.resolve(
+      isConfermato ? AppColors.pulsePositive : AppColors.pulseNegative,
+      context,
+    );
+    final badgeText = CupertinoDynamicColor.resolve(
+      isConfermato ? AppColors.pulseOnPositive : AppColors.pulseOnNegative,
       context,
     );
 
-    return SpringButton(
-      onPressed: onTap,
-      child: LiquidGlassSurface(
-        radius: AppRadius.glass,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Row(
+    return PulseSurface(
+      filled: true,
+      // Gradiente diagonale viola→ciano ("mesh gradient", mockup B — vedi
+      // CLAUDE.md/piano sessione): il viola resta puramente decorativo qui.
+      // `pulseOnAccent` sopra regge benissimo (~10:1) contro l'estremo
+      // `pulseAccent` (ciano chiaro), ma contro `pulseSecondaryGlow` (viola,
+      // più scuro) scende a ~3.79:1 — sotto la soglia 4.5:1 per testo
+      // normale. La label "NETTO · ..." (`_NettoLabel`), che siede proprio
+      // nell'angolo in alto a sinistra dominato dal viola, ha quindi uno
+      // scrim chiaro dedicato per riportare quel punto sopra soglia — vedi
+      // commento su `_NettoLabel`.
+      filledGradientColors: [secondaryGlow, accent],
+      borderRadius: AppRadius.pulse,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          margin: const EdgeInsets.only(right: AppSpacing.sm),
-                          decoration: BoxDecoration(
-                            color: statoColor,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            bustaPagaMeseDisplay(bustaPaga),
-                            style: AppTextStyles.subtitle.copyWith(
-                              color: labelPrimary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      // `formatEuroConSegno`, non "€ ${formatEuro(...)}":
-                      // stessa coerenza di `BustaPagaListItem`, vedi
-                      // `busta_paga_formatting.dart`.
-                      formatEuroConSegno(bustaPaga.netto),
-                      style: AppTextStyles.greeting.copyWith(
-                        color: labelPrimary,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                  ],
+                child: _NettoLabel(
+                  text:
+                      'NETTO · ${bustaPagaPeriodoDisplay(bustaPaga).toUpperCase()}',
+                  color: onAccent,
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
-              _StatTrio(
-                items: [
-                  ('Ferie', formatNumber(bustaPaga.ferieResidue)),
-                  ('Permessi', formatNumber(bustaPaga.rolResidui)),
-                  ('Ex fest.', formatNumber(bustaPaga.exFestivitaResidue)),
-                ],
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sm,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: badgeFill,
+                  borderRadius: BorderRadius.circular(AppRadius.pulseSmall),
+                ),
+                child: Text(
+                  isConfermato ? 'Confermato' : 'Da confermare',
+                  style: AppTextStyles.pulseLabel.copyWith(color: badgeText),
+                ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            // `formatEuroConSegno`, non "€ ${formatEuro(...)}": stessa
+            // coerenza di `BustaPagaListItem`, vedi `busta_paga_formatting.dart`.
+            formatEuroConSegno(bustaPaga.netto),
+            style: AppTextStyles.pulseDisplayLarge.copyWith(color: onAccent),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// Gruppetto compatto di 3 colonne (label sopra, valore sotto, entrambi
-/// centrati), separate da divisori verticali sottili — dimensionato al
-/// proprio contenuto (`MainAxisSize.min`), non a piena larghezza come
-/// `BustaPagaStatRow`/`StatColumns`, pensati per un blocco a piena larghezza
-/// con padding generoso.
-class _StatTrio extends StatelessWidget {
-  final List<(String label, String value)> items;
+/// Label "NETTO · MESE ANNO", nell'angolo in alto a sinistra del blocco
+/// Netto (vedi `BustaPagaSummaryHero`), dove il gradiente diagonale è al suo
+/// estremo `pulseSecondaryGlow` (viola). `pulseOnAccent` (testo quasi-nero,
+/// pensato per un fondo chiaro come `pulseAccent`) contro quel viola dà solo
+/// ~3.79:1, sotto la soglia 4.5:1 per testo normale — il viola, pur scuro,
+/// non è abbastanza scuro da reggere un testo quasi-nero sopra. Uno scrim
+/// **chiaro** (bianco al 16% di opacità, sempre attivo — l'app forza sempre
+/// `Brightness.dark`, vedi `main.dart`, quindi non condizionato al tema)
+/// dietro la sola label schiarisce localmente il fondo sotto il testo scuro,
+/// portando il contrasto a ~4.9:1 (ricalcolato componendo il bianco al 16%
+/// sopra `pulseSecondaryGlow` e la luminanza risultante contro
+/// `pulseOnAccent`). Contro l'altro estremo del gradiente (`pulseAccent`,
+/// già chiaro) lo stesso scrim schiarisce ulteriormente il fondo, quindi non
+/// può che aumentare un contrasto già ampiamente sopra soglia (~10:1) — nessun
+/// rischio di regressione su quel lato.
+class _NettoLabel extends StatelessWidget {
+  final String text;
+  final Color color;
 
-  const _StatTrio({required this.items});
+  const _NettoLabel({
+    required this.text,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final labelSecondary =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
-    final labelPrimary =
-        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-    final separator =
-        CupertinoDynamicColor.resolve(AppColors.separator, context);
+    final label = Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: AppTextStyles.pulseLabel.copyWith(
+        color: color,
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+      ),
+    );
 
-    return IntrinsicHeight(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0)
-              Container(
-                width: 0.5,
-                margin: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-                color: separator,
-              ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  items[i].$1,
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.cardLabel.copyWith(
-                    color: labelSecondary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  items[i].$2,
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.cardAmount.copyWith(
-                    color: labelPrimary,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ],
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: CupertinoColors.white.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(AppRadius.pulseSmall / 2),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 4,
+            vertical: 2,
+          ),
+          child: label,
+        ),
       ),
     );
   }

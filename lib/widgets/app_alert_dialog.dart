@@ -29,90 +29,101 @@ class AppAlertAction {
 /// Popup di conferma/errore dell'app — ridisegnato da zero (2026-08-01) per
 /// essere un'estensione visiva della sidecar/barra Conferma-Modifica invece
 /// di una card in stile Liquid Glass: **nessun vetro/`BackdropFilter`**, solo
-/// una superficie piatta a colore pieno (`AppColors.surface`, la stessa
-/// superficie "solida" usata da fogli/form nativi Cupertino) con un'ombra
-/// leggera per staccarla dal barrier sottostante, e bottoni `FlatChipButton`
-/// con icona — stesso identico linguaggio dei chip della sidecar (icona +
-/// testo, riempimento pieno colorato). Titolo e messaggio centrati (stile
-/// alert nativo iOS).
+/// una superficie piatta a colore pieno (`AppColors.pulseSurface`, coerente
+/// con la direzione "Pulse") con un'ombra leggera per staccarla dal barrier
+/// sottostante, e bottoni `FlatChipButton` con icona — stesso identico
+/// linguaggio dei chip della sidecar (icona + testo, riempimento pieno
+/// colorato). Titolo e messaggio centrati (stile alert nativo iOS).
 class AppAlertDialog extends StatelessWidget {
   final String title;
   final String? message;
   final List<AppAlertAction> actions;
+
+  /// Illustrazione opzionale (`CustomIllustration`) mostrata sopra il
+  /// titolo, es. per l'onboarding dei promemoria. Additivo: se `null` (il
+  /// caso di ogni chiamata esistente), l'aspetto del popup resta identico a
+  /// prima.
+  final Widget? illustration;
 
   const AppAlertDialog({
     super.key,
     required this.title,
     this.message,
     required this.actions,
+    this.illustration,
   });
 
   @override
   Widget build(BuildContext context) {
-    final labelPrimary =
-        CupertinoDynamicColor.resolve(AppColors.labelPrimary, context);
-    final labelSecondary =
-        CupertinoDynamicColor.resolve(AppColors.labelSecondary, context);
-    final surface = CupertinoDynamicColor.resolve(AppColors.surface, context);
-    final isDark = MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+    final textPrimary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
+    final textSecondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
+    final surface =
+        CupertinoDynamicColor.resolve(AppColors.pulseSurface, context);
 
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(AppRadius.glassSmall),
-            boxShadow: [
-              BoxShadow(
-                color: CupertinoColors.black
-                    .withValues(alpha: isDark ? 0.5 : 0.18),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.subtitle.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: labelPrimary,
-                  ),
-                ),
-                if (message != null) ...[
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    message!,
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.cardLabel.copyWith(
-                      color: labelSecondary,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: AppSpacing.lg),
-                Row(
-                  children: [
-                    for (var i = 0; i < actions.length; i++) ...[
-                      if (i > 0) const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: FlatChipButton(
-                          icon: actions[i].icon,
-                          label: actions[i].label,
-                          color: actions[i].color,
-                          onPressed: actions[i].onPressed,
-                        ),
-                      ),
-                    ],
-                  ],
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(AppRadius.pulse),
+              boxShadow: [
+                BoxShadow(
+                  color: CupertinoColors.black.withValues(alpha: 0.5),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
                 ),
               ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  if (illustration != null) ...[
+                    illustration!,
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.pulseBodyEmphasis.copyWith(
+                      color: textPrimary,
+                    ),
+                  ),
+                  if (message != null) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      message!,
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.pulseBody.copyWith(
+                        color: textSecondary,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.lg),
+                  Row(
+                    children: [
+                      for (var i = 0; i < actions.length; i++) ...[
+                        if (i > 0) const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: FlatChipButton(
+                            icon: actions[i].icon,
+                            label: actions[i].label,
+                            color: actions[i].color,
+                            onPressed: actions[i].onPressed,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -131,6 +142,7 @@ Future<T?> showAppAlertDialog<T>({
   required String title,
   String? message,
   required List<AppAlertAction> actions,
+  Widget? illustration,
 }) {
   return showGeneralDialog<T>(
     context: context,
@@ -139,7 +151,12 @@ Future<T?> showAppAlertDialog<T>({
     barrierColor: const Color(0x00000000),
     transitionDuration: const Duration(milliseconds: 200),
     pageBuilder: (context, animation, secondaryAnimation) {
-      return AppAlertDialog(title: title, message: message, actions: actions);
+      return AppAlertDialog(
+        title: title,
+        message: message,
+        actions: actions,
+        illustration: illustration,
+      );
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       return _AlertTransition(animation: animation, child: child);

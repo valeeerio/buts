@@ -54,16 +54,55 @@ parser. Relazione tra i due valori non confermata (ipotesi più probabile:
 cumulativo da inizio anno vs goduto del mese) — da chiarire con l'utente
 prima di decidere se serve un fix al parser.
 
-## Rilascio (obiettivo sessione 2026-08-09)
+## Redesign "Pulse" e lavoro pre-rilascio (sessione 2026-08-28 → 2026-09-01)
+
+Restyling totale da "Liquid Glass" a "Pulse" (sistema bold/dark-first
+ispirato a Revolut, validato dall'utente il 2026-08-28) — vedi CLAUDE.md
+sezione "Stile visivo" per il dettaglio completo del sistema di design.
+Applicato ad Archivio/sidecar, dettaglio, form di import, Statistiche.
+
+Lavoro aggiuntivo della sessione conclusa il 2026-09-01, in attesa di
+merge in `main` via Pull Request (vedi commit su
+`worktree-liquid-glass-riscaldato`):
+- Nuovo selettore periodo a tocchi in Statistiche (`PeriodYearMonthPicker`),
+  sostituisce il precedente `CupertinoRangeSlider` (rimosso, percepito
+  impreciso dall'utente).
+- Fix multi-round della barra flottante Salva/Annulla e Conferma/Modifica:
+  artefatti d'angolo su device reale (causa: raggio del `ClipRRect` esterno
+  disallineato dal riempimento interno di `FlatChipButton`), poi bug di
+  layout che rendeva la barra invisibile (`CrossAxisAlignment.stretch` su
+  vincolo di altezza infinito, risolto con `IntrinsicHeight`), poi angoli
+  tondi su tutti i lati invece del taglio piatto al centro, poi vuoto reale
+  nel gap tra i due chip.
+- Form di import: editing "a fiducia" — netto/lordo/trattenute diventano
+  di sola lettura quando il parser li ha verificati aritmeticamente contro
+  i totali stampati sul PDF (nuovi flag `lordoVerificato`/
+  `trattenuteVerificate`/`nettoVerificato` su `BustaPagaEstratti`); periodo
+  non riconosciuto ora blocca esplicitamente "Salva" finché l'utente non lo
+  conferma (non più un default silenzioso sul mese corrente).
+- Parser: tipo mensilità (13a/14a) ora letto direttamente da una voce di
+  competenza esplicita ("N.ma mensilità") quando presente, invece di
+  essere sempre dedotto dal mese — scoperto analizzando 5 PDF reali forniti
+  dall'utente, con nuove fixture di test permanenti (dati anagrafici
+  anonimizzati).
+- Pulizia repo: rimossi dal tracking file scratch (`.superpowers/`) e
+  artefatti Android auto-generati finiti in un commit per errore (l'app è
+  iOS-primaria, nessun target Android attivo) — vedi `.gitignore`.
+
+## Rilascio (obiettivo sessione 2026-08-09, ancora valido)
 
 - [x] Merge del branch `redesign-schema-busta-paga` in `main` (voci di
       competenza, permessi mensili, ex festività) — mergiato 2026-08-09,
       branch locale e remoto ripuliti dopo il merge
+- [ ] Merge del redesign "Pulse" + lavoro sessione 2026-09-01 in `main`
+      (vedi sezione sopra) — Pull Request aperta, in attesa di revisione/
+      merge dell'utente da GitHub
 - [ ] Build e installazione diretta su iPhone via Xcode/cavo (no
       TestFlight/App Store per questa prima versione — decisione utente
       2026-08-09). Serve: iPhone collegato (nessuno rilevato da `flutter
       devices` in questa sessione, solo simulatore), Apple ID come firma di
-      sviluppo gratuita in Xcode
+      sviluppo gratuita in Xcode — **resta il blocco principale prima del
+      primo rilascio**
 - [x] Icona app impostata (2026-08-09): sorgente in `assets/icon/app_icon.png`,
       generata su tutte le dimensioni iOS via `flutter_launcher_icons`
       (`dart run flutter_launcher_icons`), sostituisce il placeholder Flutter

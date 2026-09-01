@@ -24,8 +24,7 @@ class SwipeDeleteBackground extends StatelessWidget {
     // `CupertinoColors.white` letterale invece di un token `AppColors`:
     // l'icona va comunque risolta esplicitamente tramite
     // `CupertinoDynamicColor.resolve` (convenzione di progetto per ogni
-    // colore), anche se il valore risultante coincide nei due temi — stesso
-    // pattern già usato in `cupertino_range_slider.dart` per il thumb.
+    // colore), anche se il valore risultante coincide nei due temi.
     final iconColor = CupertinoDynamicColor.resolve(
       CupertinoColors.white,
       context,

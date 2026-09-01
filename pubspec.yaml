@@ -32,10 +32,39 @@ dev_dependencies:
   build_runner: ^2.4.13
   flutter_launcher_icons: ^0.14.3
 
+# Android non è un target funzionante di questo repo (la cartella android/
+# non è versionata: manca AndroidManifest.xml/build.gradle, è uno stub
+# incompleto locale) — vedi CLAUDE.md, "iOS come target primario". La
+# generazione qui è quindi limitata a iOS. `adaptive_icon_*` restano
+# configurati e pronti: se in futuro il progetto viene esteso ad Android
+# (`flutter create --platforms=android .`), basta impostare `android: true`.
 flutter_launcher_icons:
-  image_path: "assets/icon/app_icon.png"
+  image_path: "assets/icon/icon.png"
   ios: true
-  android: false
   remove_alpha_ios: true
+  android: false
+  adaptive_icon_background: "#0B1016"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
 
 flutter:
+  # Font bundlati offline per lo stile "Pulse" (vedi CLAUDE.md, "Stile
+  # visivo"): Space Grotesk (titoli/numeri/valori) + Inter (corpo/label).
+  # Licenza SIL Open Font License, file in assets/fonts/ (vedi
+  # assets/fonts/README.md per provenienza e come rigenerarli).
+  fonts:
+    - family: Space Grotesk
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/SpaceGrotesk-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/SpaceGrotesk-ExtraBold.ttf
+          weight: 800
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600

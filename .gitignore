@@ -27,3 +27,11 @@ ios/Runner.xcworkspace/xcshareddata/swiftpm/
 
 # Modelli LLM locali (estrazione AI busta paga) — mai committati, troppo pesanti
 *.gguf
+
+# Scratch di sessioni Claude Code (brainstorming, mai da versionare)
+.superpowers/
+
+# Artefatti Android generati (app iOS-primaria, nessun target Android attivo;
+# si rigenerano da soli se in futuro serve supporto Android)
+android/local.properties
+android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java

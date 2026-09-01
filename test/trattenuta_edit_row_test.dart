@@ -153,4 +153,41 @@ void main() {
       expect(campoChiave.maxLines, isNull);
     });
   });
+
+  group('inlineNumberField — filtro in scrittura (bug 1+2, livello 1)', () {
+    // Regressione: senza `inputFormatters`, l'utente poteva digitare
+    // lettere (bug 1, azzerate silenziosamente al salvataggio da
+    // `parseItalianNumber`) o il punto in formato USA (bug 2, interpretato
+    // come separatore delle migliaia e gonfiava il valore x10) in qualunque
+    // campo numerico — vedi CLAUDE.md/istruzioni task. Il campo blocca ora a
+    // monte entrambi i caratteri, digitando solo cifre e virgola.
+    testWidgets(
+        'un tap seguito da testo con lettere/punto: solo cifre e '
+        'virgola restano nel controller', (tester) async {
+      final row = TrattenutaEditRow(chiave: 'INPS');
+      addTearDown(row.dispose);
+
+      await tester.pumpWidget(
+        CupertinoApp(
+          home: CupertinoPageScaffold(
+            child: Center(
+              child: SizedBox(
+                width: 340,
+                child: trattenutaEditRow(row, onDismissed: () {}),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final campoImporto = find.byWidgetPredicate(
+        (w) => w is CupertinoTextField && w.controller == row.importo,
+      );
+      await tester.enterText(campoImporto, '12.a5,3');
+      await tester.pumpAndSettle();
+
+      expect(row.importo.text, '125,3');
+    });
+  });
 }
