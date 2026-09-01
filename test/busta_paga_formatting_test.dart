@@ -301,4 +301,63 @@ void main() {
       expect(formatEuroConSegnoCompatto(-99999.0), '− € 100k');
     });
   });
+
+  group('isValidItalianNumberField / tryParseItalianNumber', () {
+    // Regressione bug 1: `parseItalianNumber` azzerava silenziosamente
+    // qualunque testo non numerico (lettere, testo incollato per errore),
+    // senza bloccare il salvataggio né segnalare l'errore — vedi
+    // istruzioni task/CLAUDE.md.
+    test('testo con lettere: non valido', () {
+      expect(isValidItalianNumberField('abc'), isFalse);
+      expect(isValidItalianNumberField('12a'), isFalse);
+      expect(tryParseItalianNumber('abc'), isNull);
+    });
+
+    test('testo vuoto/spazi: valido (equivale a 0, placeholder dei campi)', () {
+      expect(isValidItalianNumberField(''), isTrue);
+      expect(isValidItalianNumberField('   '), isTrue);
+      expect(tryParseItalianNumber(''), isNull);
+    });
+
+    test('numero italiano valido (virgola decimale): valido', () {
+      expect(isValidItalianNumberField('12,5'), isTrue);
+      expect(isValidItalianNumberField('1234,56'), isTrue);
+      expect(tryParseItalianNumber('12,5'), closeTo(12.5, 0.001));
+    });
+
+    // Regressione bug 2: "12.5" (formato USA/tastiera inglese) veniva
+    // interpretato come "125" con il punto trattato da separatore delle
+    // migliaia — un valore 10 volte più grande di quanto l'utente intendeva,
+    // salvato senza errori. Un punto seguito da un gruppo di 1-2 cifre (non
+    // allineato a un raggruppamento da migliaia) resta non valido.
+    test('testo con un punto in formato USA ambiguo: non valido', () {
+      expect(isValidItalianNumberField('12.5'), isFalse);
+      expect(isValidItalianNumberField('1.5'), isFalse);
+    });
+
+    // Regressione bug critico (fix successivo): un punto SINTATTICAMENTE
+    // corretto come separatore delle migliaia (gruppi di esattamente 3
+    // cifre) va invece accettato — [formatEuro] lo produce per ogni importo
+    // ≥ 1.000 (es. "1.483,54") e precompila i controller di editing di
+    // Competenze/Trattenute: un cedolino reale con una voce ≥ 1.000€ non
+    // toccata dall'utente veniva erroneamente bloccato al salvataggio prima
+    // di questo fix.
+    test('testo con punto come separatore delle migliaia valido: valido', () {
+      expect(isValidItalianNumberField('1.483,54'), isTrue);
+      expect(isValidItalianNumberField('12.345,00'), isTrue);
+      expect(isValidItalianNumberField('1.234.567,89'), isTrue);
+      expect(isValidItalianNumberField('123'), isTrue);
+      expect(isValidItalianNumberField('1234'), isTrue);
+      expect(tryParseItalianNumber('1.483,54'), closeTo(1483.54, 0.001));
+    });
+
+    test(
+        'segno "-" nel testo: resta un numero valido (mai digitato dalla UI, '
+        'ma se presente — es. testo del controller precompilato — il segno è '
+        'neutralizzato altrove con .abs(), non è responsabilità di questo '
+        'controllo respingerlo)', () {
+      expect(isValidItalianNumberField('-12,5'), isTrue);
+      expect(tryParseItalianNumber('-12,5'), closeTo(-12.5, 0.001));
+    });
+  });
 }

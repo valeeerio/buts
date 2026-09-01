@@ -92,6 +92,24 @@ class BustaPagaEstratti {
   /// all'utente come promemoria di verifica manuale.
   final List<String> warnings;
 
+  /// `true` solo quando il lordo è stato letto dal percorso a coordinate
+  /// ([VociEstratteDaCoordinate]) E il controllo aritmetico contro il totale
+  /// competenze stampato sul PDF è tornato positivo (nessuna divergenza oltre
+  /// la tolleranza) — vedi `BustaPagaRegexParser.parse`. Sempre `false` sul
+  /// percorso testuale.
+  final bool lordoVerificato;
+
+  /// `true` solo quando le trattenute sono state lette dal percorso a
+  /// coordinate E sia l'IRPEF sia il totale trattenute sono stati letti e
+  /// riconciliati correttamente (vedi `_trattenuteDaCoordinate`). Sempre
+  /// `false` sul percorso testuale.
+  final bool trattenuteVerificate;
+
+  /// `true` solo quando [lordoVerificato] e [trattenuteVerificate] sono
+  /// entrambi `true` E il netto derivato coincide (entro tolleranza) col
+  /// netto in busta stampato sul PDF. Sempre `false` sul percorso testuale.
+  final bool nettoVerificato;
+
   const BustaPagaEstratti({
     this.periodo,
     this.lordo,
@@ -113,6 +131,9 @@ class BustaPagaEstratti {
     this.competenze = const [],
     this.tipo = TipoBustaPaga.mensile,
     required this.warnings,
+    this.lordoVerificato = false,
+    this.trattenuteVerificate = false,
+    this.nettoVerificato = false,
   });
 }
 
@@ -656,11 +677,12 @@ class BustaPagaRegexParser {
   // libreria in testa al file: "mai nascosta nel residuo 'Altre
   // trattenute'"), aggiunta solo quando non trascurabile. Solo chiamata
   // quando `voci.haDatiSufficienti` (quindi `voci.totali` non nullo).
-  Map<String, double> _trattenuteDaCoordinate(
+  ({Map<String, double> trattenute, bool verificate}) _trattenuteDaCoordinate(
     VociEstratteDaCoordinate voci,
     List<String> warnings,
   ) {
     final trattenute = <String, double>{...voci.contributiDipendente};
+    var verificate = true;
 
     if (voci.irpefTrattenuta != null) {
       trattenute['IRPEF'] = voci.irpefTrattenuta!;
@@ -668,6 +690,7 @@ class BustaPagaRegexParser {
       warnings.add(
         'trattenuta IRPEF non trovata dalle coordinate del PDF, verifica manualmente',
       );
+      verificate = false;
     }
 
     for (final riga in voci.righe) {
@@ -691,9 +714,10 @@ class BustaPagaRegexParser {
         'divergono dal totale trattenute stampato sul PDF '
         '(€${totali.totaleTrattenute.toStringAsFixed(2)}): verifica manualmente',
       );
+      verificate = false;
     }
 
-    return trattenute;
+    return (trattenute: trattenute, verificate: verificate);
   }
 
   // Ore lavorate reali ("ORE LAV.", campo del blocco "Q.T.A." del
@@ -785,6 +809,16 @@ class BustaPagaRegexParser {
       RegExp(r'quattordicesima', caseSensitive: false);
   static final _tredicesima = RegExp(r'tredicesima', caseSensitive: false);
 
+  /// Riconosce "13.ma mensilita'"/"14ª mensilità"/varianti simili in una voce
+  /// di competenza (tag RATEI): quando presente è un segnale ESPLICITO del
+  /// tipo mensilità (13a/14a), più affidabile della deduzione dal mese in
+  /// `_tipoDaMeseSupplementare` — usato con priorità su quella deduzione. Vedi
+  /// `parse()`, blocco `--- tipo ---`.
+  static final _numeroMensilitaSupplementare = RegExp(
+    r"(\d{1,2})\s*[.,ª']?\s*ma\s+mensilit",
+    caseSensitive: false,
+  );
+
   double _toDouble(String raw) =>
       double.parse(raw.replaceAll('.', '').replaceAll(',', '.'));
 
@@ -827,10 +861,20 @@ class BustaPagaRegexParser {
     // --- tipo: 13esima/14esima se il testo le nomina esplicitamente,
     // altrimenti mensile. "Quattordicesima" controllata per prima solo per
     // ordine, non per ambiguità: sono parole distinte, nessun rischio di
-    // falsi positivi incrociati. Se nessuna delle due parole matcha ma il
-    // testo contiene "Mens.supplementare MM/YYYY", il tipo viene dedotto dal
-    // mese (vedi `_tipoDaMeseSupplementare`) con un warning esplicito, dato
-    // che è una deduzione e non una lettura diretta. ---
+    // falsi positivi incrociati. Se nessuna delle due parole matcha, si
+    // cerca poi il numero esplicito della mensilità in una voce di
+    // competenza tipo "13.ma mensilita'" (`_numeroMensilitaSupplementare`):
+    // è un dato LETTO, non dedotto, quindi ha priorità sulla deduzione dal
+    // mese e non produce warning. Solo se anche questo pattern non matcha,
+    // e il testo contiene "Mens.supplementare MM/YYYY", il tipo viene
+    // dedotto dal mese (vedi `_tipoDaMeseSupplementare`) con un warning
+    // esplicito, dato che è una deduzione e non una lettura diretta. Se il
+    // mese è "atipico" (fuori dai periodi tipici di erogazione,
+    // `_tipoDaMeseSupplementare` ritorna null), il tipo resta `mensile`
+    // come fallback ma viene comunque aggiunto un warning esplicito: il
+    // tipo è modificabile manualmente nel form, quindi un warning (non un
+    // blocco) è sufficiente a far verificare il dato prima del
+    // salvataggio. ---
     TipoBustaPaga tipo;
     if (_quattordicesima.hasMatch(testo)) {
       tipo = TipoBustaPaga.quattordicesima;
@@ -838,13 +882,26 @@ class BustaPagaRegexParser {
       tipo = TipoBustaPaga.tredicesima;
     } else {
       tipo = TipoBustaPaga.mensile;
-      if (supplementareMatch != null) {
+      final numeroMensilitaMatch =
+          _numeroMensilitaSupplementare.firstMatch(testo);
+      final numeroMensilita = numeroMensilitaMatch?.group(1);
+      if (numeroMensilita == '13') {
+        tipo = TipoBustaPaga.tredicesima;
+      } else if (numeroMensilita == '14') {
+        tipo = TipoBustaPaga.quattordicesima;
+      } else if (supplementareMatch != null) {
         final meseSupplementare = int.parse(supplementareMatch.group(1)!);
         final tipoDedotto = _tipoDaMeseSupplementare(meseSupplementare);
         if (tipoDedotto != null) {
           tipo = tipoDedotto;
           warnings.add(
             'tipo mensilità dedotto dal mese "Mens.supplementare", verifica',
+          );
+        } else {
+          warnings.add(
+            'tipo mensilità non determinato per "Mens.supplementare '
+            '${supplementareMatch.group(1)}/${supplementareMatch.group(2)}": '
+            'verifica manualmente il tipo (mensile/13a/14a) prima di salvare',
           );
         }
       }
@@ -992,9 +1049,11 @@ class BustaPagaRegexParser {
     // assente non c'è una posizione affidabile da cui cercare il terzo
     // numero. In nessuno dei due casi si altera mai `lordo`, solo si
     // segnala una divergenza. ---
+    var lordoVerificato = false;
     if (usaVociCoordinate) {
       final totaleStampato = voci.totali!.totaleCompetenze;
-      if ((totaleStampato - lordo).abs() > 0.05) {
+      lordoVerificato = (totaleStampato - lordo).abs() <= 0.05;
+      if (!lordoVerificato) {
         warnings.add(
           'lordo calcolato (€${lordo.toStringAsFixed(2)}) diverge dal '
           'totale competenze stampato sul PDF (€${totaleStampato.toStringAsFixed(2)}): '
@@ -1186,8 +1245,11 @@ class BustaPagaRegexParser {
     // tutto-o-niente, non per singolo campo). ---
     final Map<String, double> trattenute;
     double? netto;
+    var trattenuteVerificate = false;
     if (usaVociCoordinate) {
-      trattenute = _trattenuteDaCoordinate(voci, warnings);
+      final esitoTrattenute = _trattenuteDaCoordinate(voci, warnings);
+      trattenute = esitoTrattenute.trattenute;
+      trattenuteVerificate = esitoTrattenute.verificate;
       // Netto "grezzo" di riferimento (riga totali del PDF): usato solo per
       // il controllo di coerenza "netto superiore al lordo" più sotto e come
       // termine di paragone nella verifica aritmetica finale — il valore
@@ -1276,14 +1338,19 @@ class BustaPagaRegexParser {
     // silenziosamente inconsistente (può succedere se una riga della
     // tabella voci non è stata riconosciuta correttamente su un layout non
     // ancora osservato).
-    if (usaVociCoordinate &&
-        nettoDerivato != null &&
-        (nettoDerivato - voci.totali!.nettoInBusta).abs() > 0.05) {
-      warnings.add(
-        'netto calcolato (€${nettoDerivato.toStringAsFixed(2)}) diverge dal '
-        'netto in busta stampato sul PDF (€${voci.totali!.nettoInBusta.toStringAsFixed(2)}): '
-        'verifica manualmente',
-      );
+    var nettoVerificato = false;
+    if (usaVociCoordinate && nettoDerivato != null) {
+      final nettoCoerente =
+          (nettoDerivato - voci.totali!.nettoInBusta).abs() <= 0.05;
+      if (!nettoCoerente) {
+        warnings.add(
+          'netto calcolato (€${nettoDerivato.toStringAsFixed(2)}) diverge dal '
+          'netto in busta stampato sul PDF (€${voci.totali!.nettoInBusta.toStringAsFixed(2)}): '
+          'verifica manualmente',
+        );
+      }
+      nettoVerificato =
+          lordoVerificato && trattenuteVerificate && nettoCoerente;
     }
 
     return BustaPagaEstratti(
@@ -1307,6 +1374,9 @@ class BustaPagaRegexParser {
       competenze: competenze,
       tipo: tipo,
       warnings: warnings,
+      lordoVerificato: lordoVerificato,
+      trattenuteVerificate: trattenuteVerificate,
+      nettoVerificato: nettoVerificato,
     );
   }
 }

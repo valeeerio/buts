@@ -10,6 +10,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/busta_paga_formatting.dart';
+import '../../utils/busta_paga_validation.dart';
 import '../../widgets/app_alert_dialog.dart';
 import '../../widgets/busta_paga_competenze_section.dart';
 import '../../widgets/busta_paga_documento_chip.dart';
@@ -69,6 +70,15 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   late DateTime _periodo;
   late TipoBustaPaga _tipo;
 
+  /// True quando lordo/trattenute sono stati letti dal percorso a
+  /// coordinate del PDF e verificati aritmeticamente contro i totali
+  /// stampati (`BustaPagaEstratti.lordoVerificato`/`trattenuteVerificate`,
+  /// vedi `busta_paga_regex_parser.dart`): in tal caso le rispettive
+  /// sezioni restano in sola lettura invece di editabili, per non
+  /// permettere modifiche a dati già verificati.
+  late final bool _lordoVerificato;
+  late final bool _trattenuteVerificate;
+
   late final TextEditingController _ferieMaturateController;
   late final TextEditingController _ferieGoduteController;
   late final TextEditingController _ferieResidueController;
@@ -98,6 +108,11 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   /// True quando i campi sono stati popolati dall'estrazione automatica e
   /// non ancora confermati esplicitamente (salvataggio) dall'utente.
   bool _valoriDaConferma = false;
+
+  /// `true` quando il periodo è stato riconosciuto dal parser, OPPURE
+  /// l'utente lo ha confermato esplicitamente tramite `_pickPeriodo()`.
+  /// `false` blocca `_save()`.
+  bool _periodoConfermato = true;
 
   final _pdfImportService = const PdfImportService();
 
@@ -138,6 +153,8 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     super.initState();
     _scrollController.addListener(_updateBottomFade);
     final estratti = widget.estratti;
+    _lordoVerificato = estratti.lordoVerificato;
+    _trattenuteVerificate = estratti.trattenuteVerificate;
 
     _fileOrigine = widget.fileOrigine;
     _valoriDaConferma = true;
@@ -159,14 +176,25 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     _periodo = _periodoFromEstratti(estratti.periodo) ??
         DateTime(DateTime.now().year, DateTime.now().month);
     _tipo = estratti.tipo;
+    _periodoConfermato = estratti.periodo != null;
 
     _warnings = [
       if (estratti.periodo == null)
-        'Periodo non riconosciuto automaticamente: verifica il mese e '
-            'l\'anno prima di salvare — impostati provvisoriamente su '
-            '${periodoDisplayFor(periodo: _periodo, tipo: _tipo)}.',
+        'Periodo non riconosciuto automaticamente: scegli il mese e '
+            'l\'anno corretti toccando il periodo qui sopra — non potrai '
+            'salvare finché non lo confermi.',
       ...estratti.warnings,
     ];
+
+    // Se il periodo non è stato riconosciuto, forza subito l'utente a
+    // sceglierlo aprendo il picker al primo frame — one-shot dedicato,
+    // separato da `_updateBottomFade` (che gira a ogni frame/build).
+    if (!_periodoConfermato) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _periodoConfermato) return;
+        _pickPeriodo();
+      });
+    }
 
     _ferieMaturateController =
         TextEditingController(text: formatNumber(estratti.ferieMaturate));
@@ -333,7 +361,10 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                       children: [
                         SpringButton(
                           onPressed: () {
-                            setState(() => _periodo = tempSelection);
+                            setState(() {
+                              _periodo = tempSelection;
+                              _periodoConfermato = true;
+                            });
                             Navigator.of(context).pop();
                           },
                           child: Padding(
@@ -434,6 +465,22 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
           ))
       .toList();
 
+  /// Coppie etichetta/testo dei campi numerici "semplici" (non di
+  /// competenze/trattenute, validate a parte) da controllare al salvataggio —
+  /// vedi [firstInvalidNumericFieldLabel].
+  List<(String, String)> get _campiNumericiSemplici => [
+        ('Ore lavorate', _oreLavorateController.text),
+        ('Ferie (Maturato)', _ferieMaturateController.text),
+        ('Ferie (Goduto)', _ferieGoduteController.text),
+        ('Ferie (Residuo)', _ferieResidueController.text),
+        ('Permessi (Maturato)', _rolMaturatiController.text),
+        ('Permessi (Goduto)', _rolGodutiController.text),
+        ('Permessi (Residuo)', _rolResiduiController.text),
+        ('Ex festività (Maturato)', _exFestivitaMaturateController.text),
+        ('Ex festività (Goduto)', _exFestivitaGoduteController.text),
+        ('Ex festività (Residuo)', _exFestivitaResidueController.text),
+      ];
+
   void _showAlert(String title, String message) {
     final accent =
         CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
@@ -466,6 +513,51 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     // corretto qui, non un'ipotesi.
     if (_saving) return;
     setState(() => _saving = true);
+
+    if (!_periodoConfermato) {
+      setState(() => _saving = false);
+      _showAlert(
+        'Periodo da confermare',
+        'Scegli il mese e l\'anno corretti toccando il periodo in alto '
+            'prima di salvare.',
+      );
+      return;
+    }
+
+    // Validazione "livello 2" (rete di sicurezza oltre agli `inputFormatters`
+    // di `inlineNumberField`), stesso controllo del dettaglio
+    // (`busta_paga_detail_screen.dart._save`): blocca il salvataggio se un
+    // qualunque campo numerico contiene testo non valido, invece di
+    // procedere in silenzio con un valore azzerato/gonfiato — bug reale
+    // corretto qui, non un'ipotesi (vedi CLAUDE.md/istruzioni task).
+    final campoNonValido = firstInvalidNumericFieldLabel(
+      campi: _campiNumericiSemplici,
+      competenze: _competenze,
+      trattenute: _trattenute,
+    );
+    if (campoNonValido != null) {
+      setState(() => _saving = false);
+      _showAlert(
+        'Valore non valido',
+        'Il campo "$campoNonValido" non contiene un numero valido. '
+            'Correggilo prima di salvare.',
+      );
+      return;
+    }
+
+    // Due righe di trattenuta con lo stesso nome collasserebbero
+    // silenziosamente su una sola voce (`_trattenuteCorrenti` costruisce una
+    // `Map` sulla chiave digitata) — bug reale corretto qui, non un'ipotesi.
+    final chiaveDuplicata = firstDuplicateTrattenutaKey(_trattenute);
+    if (chiaveDuplicata != null) {
+      setState(() => _saving = false);
+      _showAlert(
+        'Trattenuta duplicata',
+        'Hai più voci di trattenuta chiamate "$chiaveDuplicata". '
+            'Rinominale o rimuovi quella in più prima di salvare.',
+      );
+      return;
+    }
 
     // Stesso controllo anti-duplicati già usato dal dettaglio
     // (`busta_paga_detail_screen.dart._save()`): per le mensili anno+mese+
@@ -564,6 +656,8 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     final navBarBackground =
         CupertinoDynamicColor.resolve(AppColors.pulseBackground, context)
             .withValues(alpha: 0.55);
+
+    final saveEnabled = !_saving && _periodoConfermato;
 
     // Ricontrolla dopo ogni layout (non solo sullo scroll dell'utente): il
     // contenuto del form può cambiare (aggiunta/rimozione trattenute) e con
@@ -685,6 +779,7 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                           exFestivitaGoduteCtrl: _exFestivitaGoduteController,
                           exFestivitaResidueCtrl: _exFestivitaResidueController,
                         ),
+                        const SizedBox(height: AppSpacing.lg),
                         BustaPagaStatRow(items: [
                           (
                             'Ore lavorate',
@@ -703,24 +798,40 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                         ]),
                         const SizedBox(height: AppSpacing.lg),
                         BustaPagaCompetenzeSection(
-                          isEditing: true,
-                          competenze: const [],
-                          righeEdit: _competenze,
-                          onAggiungi: _addCompetenza,
-                          onRimuovi: _removeCompetenza,
+                          isEditing: !_lordoVerificato,
+                          competenze:
+                              _lordoVerificato ? _competenzeCorrenti : const [],
+                          righeEdit: _lordoVerificato ? null : _competenze,
+                          onAggiungi: _lordoVerificato ? null : _addCompetenza,
+                          onRimuovi:
+                              _lordoVerificato ? null : _removeCompetenza,
                         ),
+                        const SizedBox(height: AppSpacing.lg),
                         PulseSectionCard(
-                          footer:
-                              'Aggiungi le voci di trattenuta indicate in busta '
-                              'paga (es. INPS, IRPEF).',
-                          rows: [
-                            for (var i = 0; i < _trattenute.length; i++)
-                              trattenutaEditRow(
-                                _trattenute[i],
-                                onDismissed: () => _removeTrattenuta(i),
-                              ),
-                            _aggiungiVoceButton(accent),
-                          ],
+                          footer: _trattenuteVerificate
+                              ? null
+                              : 'Aggiungi le voci di trattenuta indicate in '
+                                  'busta paga (es. INPS, IRPEF).',
+                          rows: _trattenuteVerificate
+                              ? (widget.estratti.trattenute.isEmpty
+                                  ? [
+                                      trattenutaReadOnlyRow(
+                                          'Nessuna trattenuta', '—'),
+                                    ]
+                                  : [
+                                      for (final e
+                                          in widget.estratti.trattenute.entries)
+                                        trattenutaReadOnlyRow(
+                                            e.key, formatTrattenuta(e.value)),
+                                    ])
+                              : [
+                                  for (var i = 0; i < _trattenute.length; i++)
+                                    trattenutaEditRow(
+                                      _trattenute[i],
+                                      onDismissed: () => _removeTrattenuta(i),
+                                    ),
+                                  _aggiungiVoceButton(accent),
+                                ],
                         ),
                       ],
                     ),
@@ -736,47 +847,89 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
                   child: StationaryPushBar(
                     child: Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      // Blur di sfondo dietro l'intera fascia della barra (non
-                      // solo dietro ai singoli chip), stesso pattern di
-                      // `_pinnedBackground` nell'Archivio — vedi
-                      // `_floatingBarBackground` più sotto in questo file.
-                      child: Stack(
-                        children: [
-                          Positioned.fill(
-                              child: _floatingBarBackground(context)),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: FlatChipButton(
-                                  icon: CupertinoIcons.checkmark_alt,
-                                  label: 'Salva',
-                                  color: accent,
-                                  // No-op mentre `_saving` è vero: stesso guard di
-                                  // rientranza di `_save()`, vedi la sua doc.
-                                  onPressed: _saving ? () {} : _save,
+                      // Ogni chip porta il proprio sfondo sfocato "chrome",
+                      // clippato con gli STESSI bound del chip che gli sta
+                      // sopra (entrambi figli dello stesso `Expanded`):
+                      // niente più un unico sfondo rettangolare condiviso
+                      // dietro l'intera `Row`, che lasciava scoperti — e
+                      // quindi visibili come una rima/ombra scura — i quattro
+                      // angoli arrotondati di OGNI chip. Tutti e 4 gli
+                      // angoli di ciascun chip sono arrotondati: i due chip
+                      // restano forme indipendenti, separate da un gap
+                      // centrale vuoto (nessuno sfondo) che lascia vedere il
+                      // contenuto sottostante — è il comportamento voluto,
+                      // conferma visivamente che sono due chip distinti.
+                      // Vedi `_floatingBarBackground` più sotto in questo
+                      // file.
+                      child: IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 200),
+                                opacity: saveEnabled ? 1.0 : 0.45,
+                                child: ClipRRect(
+                                  borderRadius: const BorderRadius.all(
+                                    Radius.circular(AppRadius.glassSmall),
+                                  ),
+                                  child: Stack(
+                                    children: [
+                                      Positioned.fill(
+                                          child:
+                                              _floatingBarBackground(context)),
+                                      FlatChipButton(
+                                        icon: CupertinoIcons.checkmark_alt,
+                                        label: 'Salva',
+                                        color: accent,
+                                        primary: true,
+                                        // No-op mentre `_saving` è vero o il periodo
+                                        // non è ancora stato confermato: stesso guard
+                                        // di rientranza di `_save()`, vedi la sua doc,
+                                        // più il blocco esplicito su periodo non
+                                        // confermato (CLAUDE.md/istruzioni task).
+                                        onPressed: saveEnabled ? _save : () {},
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: AppSpacing.sm),
-                              Expanded(
-                                child: FlatChipButton(
-                                  icon: CupertinoIcons.xmark,
-                                  label: 'Annulla',
-                                  color: secondaryAccent,
-                                  // Stesso guard: uscire mentre un salvataggio è
-                                  // in corso, prima che `_saved` diventi vero,
-                                  // farebbe cancellare dal `PopScope` sopra un
-                                  // PDF ormai associato a un salvataggio riuscito
-                                  // (l'insert Drift potrebbe già essere andata a
-                                  // buon fine nella finestra tra il tap e questo
-                                  // controllo).
-                                  onPressed: _saving
-                                      ? () {}
-                                      : () => Navigator.of(context).pop(),
+                            ),
+                            // Spazio vuoto reale tra i due chip: lascia
+                            // vedere lo sfondo della pagina sottostante,
+                            // così i due chip restano visivamente separati
+                            // invece di sembrare un'unica barra cucita.
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: const BorderRadius.all(
+                                  Radius.circular(AppRadius.glassSmall),
+                                ),
+                                child: Stack(
+                                  children: [
+                                    Positioned.fill(
+                                        child: _floatingBarBackground(context)),
+                                    FlatChipButton(
+                                      icon: CupertinoIcons.xmark,
+                                      label: 'Annulla',
+                                      color: secondaryAccent,
+                                      // Stesso guard: uscire mentre un salvataggio è
+                                      // in corso, prima che `_saved` diventi vero,
+                                      // farebbe cancellare dal `PopScope` sopra un
+                                      // PDF ormai associato a un salvataggio riuscito
+                                      // (l'insert Drift potrebbe già essere andata a
+                                      // buon fine nella finestra tra il tap e questo
+                                      // controllo).
+                                      onPressed: _saving
+                                          ? () {}
+                                          : () => Navigator.of(context).pop(),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
-                          ),
-                        ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -808,12 +961,15 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
   }
 }
 
-/// Sfondo "chrome" traslucido/sfocato dietro la barra flottante
-/// "Salva/Annulla": stesso `BackdropFilter` di `_pinnedBackground` in
-/// `buste_paga_archivio_view.dart` (stesso raggio di blur, stesso fill di
+/// Sfondo "chrome" traslucido/sfocato dietro ogni chip della barra
+/// flottante "Salva/Annulla": stesso `BackdropFilter` di `_pinnedBackground`
+/// in `buste_paga_archivio_view.dart` (stesso raggio di blur, stesso fill di
 /// opacità, stesso `ClipRect` come antenato diretto del `BackdropFilter` —
-/// vincolo critico per Impeller su device reale, vedi CLAUDE.md), copre
-/// l'intera fascia della barra.
+/// vincolo critico per Impeller su device reale, vedi CLAUDE.md). Il clip
+/// arrotondato che allinea questo sfondo al chip sovrastante è applicato dal
+/// chiamante (`ClipRRect` attorno a ciascuno slot della `Row`), non qui, per
+/// garantire che sfondo e chip condividano esattamente lo stesso raggio e
+/// gli stessi bound.
 Widget _floatingBarBackground(BuildContext context) {
   final fill =
       CupertinoDynamicColor.resolve(AppColors.pulseBackground, context);

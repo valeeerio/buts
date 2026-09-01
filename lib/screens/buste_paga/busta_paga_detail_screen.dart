@@ -9,6 +9,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/busta_paga_formatting.dart';
+import '../../utils/busta_paga_validation.dart';
 import '../../widgets/app_alert_dialog.dart';
 import '../../widgets/busta_paga_competenze_section.dart';
 import '../../widgets/busta_paga_documento_chip.dart';
@@ -178,7 +179,7 @@ List<String> buildBustaPagaEditDiff(BustaPaga vecchia, BustaPaga nuova) {
     final prima = vecchia.trattenute[chiave];
     final dopo = nuova.trattenute[chiave];
     // `formatTrattenuta`: stesso helper già usato dalla riga di sola
-    // lettura (`_trattenutaRow`) e dal prefisso di `trattenutaEditRow`, così
+    // lettura (`trattenutaReadOnlyRow`) e dal prefisso di `trattenutaEditRow`, così
     // questo popup resta coerente con come lo stesso valore è mostrato
     // ovunque altrove in questa schermata — vedi doc del bug sopra.
     if (prima == null && dopo != null) {
@@ -588,7 +589,55 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
     );
   }
 
+  /// Coppie etichetta/testo dei campi numerici "semplici" (non di
+  /// competenze/trattenute, validate a parte) da controllare al salvataggio —
+  /// vedi [firstInvalidNumericFieldLabel].
+  List<(String, String)> get _campiNumericiSemplici => [
+        ('Ore lavorate', _oreLavorateCtrl.text),
+        ('Ferie (Maturato)', _ferieMaturateCtrl.text),
+        ('Ferie (Goduto)', _ferieGoduteCtrl.text),
+        ('Ferie (Residuo)', _ferieResidueCtrl.text),
+        ('Permessi (Maturato)', _rolMaturatiCtrl.text),
+        ('Permessi (Goduto)', _rolGodutiCtrl.text),
+        ('Permessi (Residuo)', _rolResiduiCtrl.text),
+        ('Ex festività (Maturato)', _exFestivitaMaturateCtrl.text),
+        ('Ex festività (Goduto)', _exFestivitaGoduteCtrl.text),
+        ('Ex festività (Residuo)', _exFestivitaResidueCtrl.text),
+      ];
+
   void _save(BustaPaga corrente) {
+    // Validazione "livello 2" (rete di sicurezza oltre agli `inputFormatters`
+    // di `inlineNumberField`): blocca il salvataggio se un qualunque campo
+    // numerico contiene testo non valido (lettere, formato USA col punto),
+    // invece di procedere in silenzio con un valore azzerato/gonfiato — bug
+    // reale corretto qui, non un'ipotesi (vedi CLAUDE.md/istruzioni task).
+    final campoNonValido = firstInvalidNumericFieldLabel(
+      campi: _campiNumericiSemplici,
+      competenze: _competenzeEdit,
+      trattenute: _trattenuteEdit,
+    );
+    if (campoNonValido != null) {
+      _showAlert(
+        'Valore non valido',
+        'Il campo "$campoNonValido" non contiene un numero valido. '
+            'Correggilo prima di salvare.',
+      );
+      return;
+    }
+
+    // Due righe di trattenuta con lo stesso nome collasserebbero
+    // silenziosamente su una sola voce (`_trattenuteCorrenti` costruisce una
+    // `Map` sulla chiave digitata) — bug reale corretto qui, non un'ipotesi.
+    final chiaveDuplicata = firstDuplicateTrattenutaKey(_trattenuteEdit);
+    if (chiaveDuplicata != null) {
+      _showAlert(
+        'Trattenuta duplicata',
+        'Hai più voci di trattenuta chiamate "$chiaveDuplicata". '
+            'Rinominale o rimuovi quella in più prima di salvare.',
+      );
+      return;
+    }
+
     final trattenute = _trattenuteCorrenti;
     final competenze = _competenzeCorrenti;
     final valori = _valoriDerivatiEditing(corrente);
@@ -836,6 +885,7 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                               exFestivitaResidueCtrl:
                                   _isEditing ? _exFestivitaResidueCtrl : null,
                             ),
+                            const SizedBox(height: AppSpacing.lg),
                             BustaPagaStatRow(items: [
                               (
                                 'Ore lavorate',
@@ -884,11 +934,11 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
                                     ]
                                   : corrente.trattenute.isEmpty
                                       ? [
-                                          _trattenutaRow(
+                                          trattenutaReadOnlyRow(
                                               'Nessuna trattenuta', '—')
                                         ]
                                       : corrente.trattenute.entries
-                                          .map((e) => _trattenutaRow(
+                                          .map((e) => trattenutaReadOnlyRow(
                                               e.key, formatTrattenuta(e.value)))
                                           .toList(),
                             ),
@@ -1010,41 +1060,6 @@ class _BustaPagaDetailScreenState extends ConsumerState<BustaPagaDetailScreen> {
       ),
     );
   }
-
-  Widget _trattenutaRow(String label, String value) {
-    return Builder(
-      builder: (context) {
-        final textPrimary =
-            CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.smPlus),
-          child: Row(
-            children: [
-              Expanded(
-                flex: 3,
-                child: Text(
-                  label,
-                  style: AppTextStyles.pulseBodyEmphasis.copyWith(
-                    color: textPrimary,
-                  ),
-                ),
-              ),
-              Expanded(
-                flex: 2,
-                child: Text(
-                  value,
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.pulseDisplaySmall.copyWith(
-                    color: textPrimary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 }
 
 /// Barra flottante in basso: chip piatti senza superficie di vetro attorno
@@ -1080,85 +1095,133 @@ class _ActionBar extends StatelessWidget {
     final secondaryAccent =
         CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
 
+    // Ogni chip porta il proprio sfondo sfocato "chrome", clippato con gli
+    // STESSI bound del chip che gli sta sopra (entrambi figli dello stesso
+    // `Expanded`): niente più un unico sfondo rettangolare condiviso dietro
+    // l'intera `Row`, che lasciava scoperti — e quindi visibili come una
+    // rima/ombra scura — i quattro angoli arrotondati di OGNI chip. Tutti e 4
+    // gli angoli di ciascun chip sono arrotondati (nessun raggio parziale):
+    // i due chip restano forme indipendenti, separate da un gap centrale
+    // vuoto (nessuno sfondo) che lascia vedere il contenuto sottostante — è
+    // il comportamento voluto, conferma visivamente che sono due chip
+    // distinti. Vedi `_floatingBarBackground` più sotto.
+    Widget slot(
+      Widget chip, {
+      BorderRadius borderRadius = const BorderRadius.all(
+        Radius.circular(AppRadius.glassSmall),
+      ),
+    }) {
+      return ClipRRect(
+        borderRadius: borderRadius,
+        child: Stack(
+          children: [
+            Positioned.fill(child: _floatingBarBackground(context)),
+            chip,
+          ],
+        ),
+      );
+    }
+
+    // Spazio vuoto reale tra i due chip: lascia vedere il contenuto
+    // sottostante, così i due chip restano visivamente separati invece di
+    // sembrare un'unica barra cucita.
+    const gap = SizedBox(width: AppSpacing.sm);
+
     final Widget content;
     if (isEditing) {
-      content = Row(
-        children: [
-          Expanded(
-            child: FlatChipButton(
-              icon: CupertinoIcons.checkmark_alt,
-              label: 'Salva',
-              color: accent,
-              onPressed: onSalva,
+      content = IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: slot(
+                FlatChipButton(
+                  icon: CupertinoIcons.checkmark_alt,
+                  label: 'Salva',
+                  color: accent,
+                  primary: true,
+                  onPressed: onSalva,
+                ),
+              ),
             ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: FlatChipButton(
-              icon: CupertinoIcons.xmark,
-              label: 'Annulla',
-              color: secondaryAccent,
-              onPressed: onAnnulla,
+            gap,
+            Expanded(
+              child: slot(
+                FlatChipButton(
+                  icon: CupertinoIcons.xmark,
+                  label: 'Annulla',
+                  color: secondaryAccent,
+                  onPressed: onAnnulla,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     } else {
       final daConfermare =
           bustaPaga.statoVerifica == StatoVerificaBustaPaga.daConfermare;
 
-      content = Row(
-        children: [
-          if (daConfermare) ...[
-            Expanded(
-              flex: 7,
-              child: FlatChipButton(
-                icon: CupertinoIcons.checkmark_alt,
-                label: 'Conferma',
-                color: greenAccent,
-                onPressed: onConferma,
+      content = IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (daConfermare) ...[
+              Expanded(
+                flex: 7,
+                child: slot(
+                  FlatChipButton(
+                    icon: CupertinoIcons.checkmark_alt,
+                    label: 'Conferma',
+                    color: greenAccent,
+                    onColor: AppColors.pulseOnPositive,
+                    primary: true,
+                    onPressed: onConferma,
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            Expanded(
-              flex: 3,
-              child: FlatChipButton(
-                icon: CupertinoIcons.pencil,
-                label: 'Modifica',
-                color: accent,
-                onPressed: onModifica,
+              gap,
+              Expanded(
+                flex: 3,
+                child: slot(
+                  FlatChipButton(
+                    icon: CupertinoIcons.pencil,
+                    label: 'Modifica',
+                    color: accent,
+                    primary: true,
+                    onPressed: onModifica,
+                  ),
+                ),
               ),
-            ),
-          ] else
-            Expanded(
-              child: FlatChipButton(
-                icon: CupertinoIcons.pencil,
-                label: 'Modifica',
-                color: accent,
-                onPressed: onModifica,
+            ] else
+              Expanded(
+                child: slot(
+                  FlatChipButton(
+                    icon: CupertinoIcons.pencil,
+                    label: 'Modifica',
+                    color: accent,
+                    primary: true,
+                    onPressed: onModifica,
+                  ),
+                ),
               ),
-            ),
-        ],
+          ],
+        ),
       );
     }
 
-    // Blur di sfondo dietro l'intera fascia della barra (non solo dietro ai
-    // singoli chip), stesso pattern di `_pinnedBackground` nell'Archivio —
-    // vedi `_floatingBarBackground` in `buste_paga_section_screen.dart`.
-    return Stack(
-      children: [
-        Positioned.fill(child: _floatingBarBackground(context)),
-        content,
-      ],
-    );
+    return content;
   }
 }
 
-/// Sfondo "chrome" traslucido/sfocato dietro la barra flottante
+/// Sfondo "chrome" traslucido/sfocato dietro ogni chip della barra flottante
 /// "Conferma/Modifica"/"Salva/Annulla": `BackdropFilter` con fill
 /// `pulseBackground` semi-trasparente, `ClipRect` come antenato diretto del
 /// `BackdropFilter` — vincolo critico per Impeller su device reale, vedi
-/// CLAUDE.md — copre l'intera fascia della barra.
+/// CLAUDE.md. Il clip arrotondato che allinea questo sfondo al chip
+/// sovrastante è applicato dal chiamante (`ClipRRect` in `_ActionBar.slot`),
+/// non qui, per garantire che sfondo e chip condividano esattamente lo
+/// stesso raggio e gli stessi bound.
 Widget _floatingBarBackground(BuildContext context) {
   final fill =
       CupertinoDynamicColor.resolve(AppColors.pulseBackground, context);

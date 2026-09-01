@@ -310,7 +310,7 @@ bool _bustaInclusaInRangePeriodo(BustaPaga b) =>
 
 /// Intervallo di periodi coperto dalle buste paga mensili (confermate o
 /// meno, vedi [_bustaInclusaInRangePeriodo]), usato come estremi min/max del
-/// selettore di periodo in Statistiche (`CupertinoRangeSlider`). `null` se
+/// selettore di periodo in Statistiche (`PeriodYearMonthPicker`). `null` se
 /// nessuna busta paga soddisfa il predicato.
 final periodoRangeDisponibileProvider =
     Provider<({DateTime start, DateTime end})?>((ref) {
