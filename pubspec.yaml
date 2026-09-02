@@ -31,6 +31,7 @@ dev_dependencies:
   drift_dev: ^2.20.0
   build_runner: ^2.4.13
   flutter_launcher_icons: ^0.14.3
+  sqlite3: ^3.0.0
 
 # Android non è un target funzionante di questo repo (la cartella android/
 # non è versionata: manca AndroidManifest.xml/build.gradle, è uno stub

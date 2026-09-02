@@ -45,14 +45,18 @@ l'utente li vuole descritti come task pronti da implementare — stesso
 pattern dei 3 grafici esistenti (LineChart/BarChart + tabella
 riepilogativa sotto) — non come mockup preliminari da validare prima.
 
-**Permessi R.O.L. — due righe distinte nel PDF, non chiarite** (emerso il
-2026-08-04 fixando la visualizzazione di Straordinari, non risolto): il PDF
-reale ha sia una riga cumulativa "Permessi (R.O.L.)" nei ratei (oggi letta
-dal parser come `rolGoduti`/`permessiGoduti`) sia una riga distinta
-"Permessi riduz. orario goduti" tra le competenze del mese, mai letta dal
-parser. Relazione tra i due valori non confermata (ipotesi più probabile:
-cumulativo da inizio anno vs goduto del mese) — da chiarire con l'utente
-prima di decidere se serve un fix al parser.
+**Permessi R.O.L. — due righe nel PDF, chiarita il 2026-09-02** (emersa il
+2026-08-04 fixando la visualizzazione di Straordinari): il PDF reale ha sia
+una riga cumulativa "Permessi (R.O.L.)" nei ratei (letta dal parser come
+`rolGoduti`/`permessiGoduti`) sia una riga distinta "Permessi riduz. orario
+goduti" tra le competenze del mese (`permessiGodutiMese`). Verificato su un
+cedolino reale (agosto 2026): sono la stessa categoria letta a granularità
+diversa — residuo inizio periodo + maturato − goduto cumulativo = residuo
+attuale, e il goduto cumulativo meno il valore mensile di agosto è coerente
+col cumulativo di luglio. Non è un bug, nessuna modifica al parser
+necessaria — `permessiGodutiMese` va usato solo per un eventuale trend
+mensile in Statistiche, mai sommato al residuo annuo cumulativo. Non è più
+un blocco per il rilascio.
 
 ## Redesign "Pulse" e lavoro pre-rilascio (sessione 2026-08-28 → 2026-09-01)
 
@@ -94,9 +98,8 @@ merge in `main` via Pull Request (vedi commit su
 - [x] Merge del branch `redesign-schema-busta-paga` in `main` (voci di
       competenza, permessi mensili, ex festività) — mergiato 2026-08-09,
       branch locale e remoto ripuliti dopo il merge
-- [ ] Merge del redesign "Pulse" + lavoro sessione 2026-09-01 in `main`
-      (vedi sezione sopra) — Pull Request aperta, in attesa di revisione/
-      merge dell'utente da GitHub
+- [x] Merge del redesign "Pulse" + lavoro sessione 2026-09-01 in `main`
+      (vedi sezione sopra) — mergiato (PR #4), `main` allineato a `origin/main`
 - [ ] Build e installazione diretta su iPhone via Xcode/cavo (no
       TestFlight/App Store per questa prima versione — decisione utente
       2026-08-09). Serve: iPhone collegato (nessuno rilevato da `flutter
