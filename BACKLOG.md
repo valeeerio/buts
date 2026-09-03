@@ -100,12 +100,16 @@ merge in `main` via Pull Request (vedi commit su
       branch locale e remoto ripuliti dopo il merge
 - [x] Merge del redesign "Pulse" + lavoro sessione 2026-09-01 in `main`
       (vedi sezione sopra) — mergiato (PR #4), `main` allineato a `origin/main`
-- [ ] Build e installazione diretta su iPhone via Xcode/cavo (no
-      TestFlight/App Store per questa prima versione — decisione utente
-      2026-08-09). Serve: iPhone collegato (nessuno rilevato da `flutter
-      devices` in questa sessione, solo simulatore), Apple ID come firma di
-      sviluppo gratuita in Xcode — **resta il blocco principale prima del
-      primo rilascio**
+- [x] Build e installazione diretta su iPhone via Xcode/cavo (no
+      TestFlight/App Store — decisione utente 2026-08-09) — **completata
+      2026-09-03, prima versione (1.0.0+1) installata e funzionante sul
+      device reale**. Nota tecnica per il futuro: il primo run da Xcode in
+      configurazione Debug crashava all'apertura diretta dall'icona
+      (comportamento normale di Flutter su iOS — le build Debug usano JIT,
+      che iOS permette solo col debugger agganciato); risolto passando la
+      build configuration dello scheme "Run" a Release (Product → Scheme →
+      Edit Scheme → Run → Build Configuration → Release), che è AOT e non
+      richiede Xcode collegato per restare aperta
 - [x] Icona app impostata (2026-08-09): sorgente in `assets/icon/app_icon.png`,
       generata su tutte le dimensioni iOS via `flutter_launcher_icons`
       (`dart run flutter_launcher_icons`), sostituisce il placeholder Flutter
