@@ -83,6 +83,3 @@ lib/
   `busta_paga_competenze_section.dart`, `trattenuta_edit_row.dart`,
   `voce_competenza_edit_row.dart`, `period_year_month_picker.dart`).
 
-Vedi `CLAUDE.md` per il contesto di progetto completo (decisioni prese,
-regole di stile non negoziabili, cosa manca) e `BACKLOG.md` per lo stato di
-avanzamento prima di lavorare su nuove schermate con Claude Code.
