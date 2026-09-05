@@ -166,7 +166,6 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
                   buste: filtrati,
                   busteNonConfermate: busteNonConfermate,
                 ),
-                stats: _ferieRolPermessiStats(filtrati),
               ),
             ),
           ),
@@ -184,7 +183,6 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
                   buste: filtrati,
                   busteNonConfermate: busteNonConfermate,
                 ),
-                stats: _straordinarioStats(filtrati),
               ),
             ),
           ),
@@ -552,16 +550,6 @@ double _totale(List<BustaPaga> buste, double Function(BustaPaga) selettore) {
   return buste.map(selettore).reduce((a, b) => a + b);
 }
 
-/// Formatta sempre con 2 decimali fissi e formato italiano (punto per le
-/// migliaia, virgola per i decimali — a differenza di `toStringAsFixed`,
-/// locale-indipendente e quindi sempre col punto) — usato solo nelle
-/// tabelle statistiche sotto i grafici, dove valori nella stessa colonna con
-/// un numero di decimali incoerente (es. "1.487,00" sotto "1.449,25")
-/// rendono più difficile scansionare la colonna a colpo d'occhio. Delega a
-/// [formatNumberFixed] in `busta_paga_formatting.dart` invece di duplicare
-/// la logica di formattazione.
-String _formatStatNumber(double value) => formatNumberFixed(value);
-
 /// Tabella del riepilogo sotto il grafico Netto/Lordo. Opera sulle stesse
 /// [buste] già filtrate (confermate, mensili, nel periodo selezionato) che
 /// alimentano il grafico — nessun ricalcolo parallelo del filtro.
@@ -601,108 +589,6 @@ _StatsTableData? _nettoLordoStats(List<BustaPaga> buste) {
           formatEuroConSegno(_totale(buste, (b) => b.netto)),
           formatEuroConSegno(_totale(buste, (b) => b.lordo)),
         ],
-      ),
-    ],
-  );
-}
-
-/// Tabella del riepilogo sotto il grafico Ferie/Permessi. Ferie residue
-/// e permessi residui (dato `rolResidui`) sono saldi puntuali mese per mese
-/// (non quantità da sommare), quindi la riga "Totale" li mostra come `'—'`
-/// — solo i permessi orario goduti sono una quantità che ha senso cumulare
-/// nel periodo. Stessa convenzione già usata da `_MaturazioniSection` nel
-/// dettaglio busta paga per le celle non applicabili. Contenuto invariato
-/// dal redesign 2026-08-30 (vive dietro "Dettagli"): il blocco visivo
-/// principale sopra è ora uno snapshot dell'ultima busta paga, ma questa
-/// tabella resta il trend su tutto il periodo filtrato, come prima.
-_StatsTableData? _ferieRolPermessiStats(List<BustaPaga> buste) {
-  if (buste.isEmpty) return null;
-  final minFerie = _bustaConMinimo(buste, (b) => b.ferieResidue);
-  final maxFerie = _bustaConMassimo(buste, (b) => b.ferieResidue);
-  final minRol = _bustaConMinimo(buste, (b) => b.rolResidui);
-  final maxRol = _bustaConMassimo(buste, (b) => b.rolResidui);
-  final minExFestivita = _bustaConMinimo(buste, (b) => b.exFestivitaResidue);
-  final maxExFestivita = _bustaConMassimo(buste, (b) => b.exFestivitaResidue);
-  return (
-    // "Perm. orario" (non "Permessi orario"): l'etichetta completa era
-    // l'unica delle 4 intestazioni troppo larga per la colonna, forzando lo
-    // scale-down di `FittedBox` a una dimensione visibilmente più piccola
-    // delle altre 3 — bug reale corretto qui, non un'ipotesi. Accorciare
-    // l'etichetta invece di affidarsi allo scale-down mantiene tutte le
-    // intestazioni alla stessa dimensione di font.
-    colonne: const ['Ferie', 'Permessi', 'Perm. orario', 'Ex festività'],
-    righe: [
-      (
-        'Media',
-        [
-          _formatStatNumber(_media(buste, (b) => b.ferieResidue)),
-          _formatStatNumber(_media(buste, (b) => b.rolResidui)),
-          _formatStatNumber(_media(buste, (b) => b.permessiGodutiMese)),
-          _formatStatNumber(_media(buste, (b) => b.exFestivitaResidue)),
-        ],
-      ),
-      (
-        'Minimo',
-        [
-          '${_formatStatNumber(minFerie.ferieResidue)} (${periodoAxisLabel(minFerie.periodo)})',
-          '${_formatStatNumber(minRol.rolResidui)} (${periodoAxisLabel(minRol.periodo)})',
-          '—',
-          '${_formatStatNumber(minExFestivita.exFestivitaResidue)} (${periodoAxisLabel(minExFestivita.periodo)})',
-        ],
-      ),
-      (
-        'Massimo',
-        [
-          '${_formatStatNumber(maxFerie.ferieResidue)} (${periodoAxisLabel(maxFerie.periodo)})',
-          '${_formatStatNumber(maxRol.rolResidui)} (${periodoAxisLabel(maxRol.periodo)})',
-          '—',
-          '${_formatStatNumber(maxExFestivita.exFestivitaResidue)} (${periodoAxisLabel(maxExFestivita.periodo)})',
-        ],
-      ),
-      (
-        'Totale',
-        [
-          '—',
-          '—',
-          _formatStatNumber(_totale(buste, (b) => b.permessiGodutiMese)),
-          '—',
-        ],
-      ),
-    ],
-  );
-}
-
-/// Tabella del riepilogo sotto il grafico Straordinario. Calcolata sempre
-/// sulle buste mensili non aggregate (non sui bucket trimestrali usati per
-/// disegnare le barre quando l'aggregazione è attiva in
-/// `_StraordinarioChart`): media e mese di picco devono restare a livello
-/// di mese reale.
-_StatsTableData? _straordinarioStats(List<BustaPaga> buste) {
-  if (buste.isEmpty) return null;
-  final min = _bustaConMinimo(buste, (b) => b.straordinari);
-  final max = _bustaConMassimo(buste, (b) => b.straordinari);
-  return (
-    colonne: const ['Ore straordinario'],
-    righe: [
-      (
-        'Media',
-        ['${_formatStatNumber(_media(buste, (b) => b.straordinari))} h/mese']
-      ),
-      (
-        'Minimo',
-        [
-          '${_formatStatNumber(min.straordinari)} h (${periodoAxisLabel(min.periodo)})'
-        ],
-      ),
-      (
-        'Massimo',
-        [
-          '${_formatStatNumber(max.straordinari)} h (${periodoAxisLabel(max.periodo)})'
-        ],
-      ),
-      (
-        'Totale',
-        ['${_formatStatNumber(_totale(buste, (b) => b.straordinari))} h']
       ),
     ],
   );
@@ -1605,12 +1491,23 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
     // lungo — in contrasto con l'intento della soglia (vedi doc su
     // `_quarterlyAggregationThreshold`).
     final aggregato = grigliaMensile.length > _quarterlyAggregationThreshold;
-    final punti = aggregato
-        ? _grigliaTrimestrale(buste)
-        : [
-            for (final g in grigliaMensile)
-              (periodo: g.periodo, totale: g.busta?.straordinari),
-          ];
+    // `.reversed`: l'asse X va dal mese/trimestre più recente del periodo
+    // filtrato (prima barra a sinistra) al più vecchio (verso destra) —
+    // cronologico DECRESCENTE, a differenza degli altri due grafici della
+    // schermata (Netto/Lordo resta crescente). `_grigliaMensile`/
+    // `_grigliaTrimestrale` producono entrambe una griglia continua in
+    // ordine crescente (compresi i buchi), quindi si inverte solo qui,
+    // dopo aver costruito la griglia continua — così l'ampiezza della
+    // finestra temporale (tutti i mesi del periodo filtrato, barre a zero
+    // incluse) resta invariata, cambia solo l'ordine di visualizzazione.
+    final punti = (aggregato
+            ? _grigliaTrimestrale(buste)
+            : [
+                for (final g in grigliaMensile)
+                  (periodo: g.periodo, totale: g.busta?.straordinari),
+              ])
+        .reversed
+        .toList();
     final shortLabelBuilder = aggregato ? _trimestreLabel : meseAxisLabel;
 
     final maxValue = punti.fold<double>(
