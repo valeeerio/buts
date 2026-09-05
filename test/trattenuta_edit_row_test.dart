@@ -190,4 +190,77 @@ void main() {
       expect(row.importo.text, '125,3');
     });
   });
+
+  group(
+      'trattenutaEditRow — nessun overflow su larghezze strette con importi '
+      'a 4 cifre (regressione FittedBox)', () {
+    // Regressione: l'aumento di `pulseDisplaySmall` da 15 a 16px (vedi
+    // CLAUDE.md/app_text_styles.dart) faceva andare in overflow la colonna
+    // importo (prefisso "− €"/"+ €" dentro `IntrinsicWidth`, vedi
+    // `inlineNumberField`) su larghezze di contenuto realistiche di un
+    // iPhone SE-class (~307px: 375pt schermo - 20-20 margine sezione -
+    // 14-14 padding `PulseSectionCard`) — non solo con importi limite, ma
+    // già con un valore a 4 cifre comune (es. un conguaglio/storno da
+    // mille euro). Fix: `inlineNumberField` avvolge il ramo
+    // prefisso/suffisso in un `FittedBox(fit: BoxFit.scaleDown)`, che
+    // riduce il font SOLO quando il contenuto eccede lo spazio disponibile.
+    for (final width in [307.0, 340.0]) {
+      for (final importo in [1500.0, -1500.0]) {
+        testWidgets(
+            'importo ${importo.abs()} (${importo < 0 ? "negativo" : "positivo"}) '
+            'a ${width.toInt()}px: nessun RenderFlex overflow', (tester) async {
+          final row = TrattenutaEditRow(chiave: 'INPS', importo: importo);
+          addTearDown(row.dispose);
+
+          await tester.pumpWidget(
+            CupertinoApp(
+              home: CupertinoPageScaffold(
+                child: Center(
+                  child: SizedBox(
+                    width: width,
+                    child: trattenutaEditRow(row, onDismissed: () {}),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+
+    testWidgets(
+        'il campo importo resta interattivo dentro il FittedBox: tap + '
+        'digitazione aggiornano il controller', (tester) async {
+      final row = TrattenutaEditRow(chiave: 'INPS', importo: 1500.0);
+      addTearDown(row.dispose);
+
+      await tester.pumpWidget(
+        CupertinoApp(
+          home: CupertinoPageScaffold(
+            child: Center(
+              child: SizedBox(
+                width: 307,
+                child: trattenutaEditRow(row, onDismissed: () {}),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final campoImporto = find.byWidgetPredicate(
+        (w) => w is CupertinoTextField && w.controller == row.importo,
+      );
+      await tester.tap(campoImporto);
+      await tester.pumpAndSettle();
+      await tester.enterText(campoImporto, '1750,00');
+      await tester.pumpAndSettle();
+
+      expect(row.importo.text, '1750,00');
+      expect(tester.takeException(), isNull);
+    });
+  });
 }

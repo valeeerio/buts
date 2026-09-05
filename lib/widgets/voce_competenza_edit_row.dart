@@ -107,6 +107,16 @@ Widget voceCompetenzaEditRow(
           child: Row(
             children: [
               Expanded(
+                // Flex 3:1:4 (non più 3:2:2): l'aumento di `pulseDisplaySmall`
+                // da 15 a 16px (vedi CLAUDE.md/app_text_styles.dart) fa
+                // andare in overflow la colonna importo su larghezze strette
+                // già con valori realistici comuni (es. "€ 234,56" o "€
+                // 1.500,00") a causa del prefisso "€ "/"− € " dentro
+                // `IntrinsicWidth` — la quantità (senza prefisso, campo di
+                // testo "nudo") non ha lo stesso rischio, da cui la
+                // redistribuzione a suo sfavore. Stesso rapporto applicato
+                // anche a `BustaPagaCompetenzeSection` per non alterare
+                // l'allineamento tra vista e modifica.
                 flex: 3,
                 // `maxLines: null` (nessun limite, cresce verticalmente)
                 // invece del default di `CupertinoTextField` (1 riga, che
@@ -131,7 +141,7 @@ Widget voceCompetenzaEditRow(
                 ),
               ),
               Expanded(
-                flex: 2,
+                flex: 1,
                 child: Center(
                   child: inlineNumberField(
                     row.quantita,
@@ -140,7 +150,7 @@ Widget voceCompetenzaEditRow(
                 ),
               ),
               Expanded(
-                flex: 2,
+                flex: 4,
                 child: Center(
                   // Prefisso dinamico "€ "/"− € ", non fisso: stessa
                   // convenzione della vista di sola lettura

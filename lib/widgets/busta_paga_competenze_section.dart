@@ -63,6 +63,9 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
       child: Row(
         children: [
+          // Flex 3:1:4 (non più 3:2:2), stesso rapporto di
+          // `voceCompetenzaEditRow` — vedi il commento lì sull'overflow della
+          // colonna importo con `pulseDisplaySmall` a 16px.
           Expanded(
             flex: 3,
             child: Text(
@@ -73,7 +76,7 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
             ),
           ),
           Expanded(
-            flex: 2,
+            flex: 1,
             child: Text(
               'Quantità',
               style: style,
@@ -83,7 +86,7 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
             ),
           ),
           Expanded(
-            flex: 2,
+            flex: 4,
             child: Text(
               'Importo',
               style: style,
@@ -107,6 +110,8 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.smPlus),
       child: Row(
         children: [
+          // Flex 3:1:4, stesso rapporto di `voceCompetenzaEditRow` (vedi il
+          // commento lì): allineamento identico tra vista e modifica.
           Expanded(
             flex: 3,
             child: Text(
@@ -119,7 +124,7 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
             ),
           ),
           Expanded(
-            flex: 2,
+            flex: 1,
             child: Text(
               // `—`: quantità ASSENTE (nessun tag GIORNI/ORE/RATEI sul PDF
               // per questa riga, es. "930 Trattamento integrativo"), distinta
@@ -132,7 +137,7 @@ class BustaPagaCompetenzeSection extends StatelessWidget {
             ),
           ),
           Expanded(
-            flex: 2,
+            flex: 4,
             child: Text(
               voce.importo == 0 ? '—' : formatEuroConSegno(voce.importo),
               style: valueStyle,

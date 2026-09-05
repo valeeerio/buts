@@ -69,7 +69,7 @@ Widget inlineNumberField(
       // lettura che sostituisce. Con `mainAxisSize.min` il blocco
       // "prefisso/suffisso + campo" resta un'unica unità di larghezza nota,
       // sicura da centrare o allineare a destra nella riga ospitante.
-      return Row(
+      final row = Row(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: rowAlignment,
         children: [
@@ -78,6 +78,21 @@ Widget inlineNumberField(
           if (suffix != null) Text(suffix, style: resolvedStyle),
         ],
       );
+      // `FittedBox(fit: scaleDown)` SOLO in questo ramo (prefisso/suffisso +
+      // `IntrinsicWidth`, l'unico che può eccedere la larghezza disponibile):
+      // valori a 4 cifre col prefisso valuta (es. "€ 1.500,00", "− € 1.500,00"
+      // — retribuzione ordinaria di un mese pieno, scenario mainstream, non
+      // un caso limite) possono superare la colonna disponibile su schermi
+      // stretti (iPhone SE-class, ~307px di larghezza di contenuto reale)
+      // anche dopo aver ottimizzato il flex ratio delle colonne ospitanti
+      // (vedi `voce_competenza_edit_row.dart`/`busta_paga_competenze_
+      // section.dart`) — bug reale corretto qui, non un'ipotesi. `scaleDown`
+      // riduce il font SOLO quando il contenuto è realmente più largo dello
+      // spazio disponibile, mai lo ingrandisce: il caso comune (valori a 3
+      // cifre) resta invariato, a piena leggibilità. Il campo dentro
+      // `IntrinsicWidth` resta interattivo (tap/cursore/focus): `FittedBox`
+      // trasforma anche l'hit-testing, non solo il painting.
+      return FittedBox(fit: BoxFit.scaleDown, child: row);
     },
   );
 }
@@ -165,7 +180,13 @@ Widget trattenutaEditRow(TrattenutaEditRow row,
           child: Row(
             children: [
               Expanded(
-                flex: 3,
+                // Flex 5:4 (non più 3:2): l'aumento di `pulseDisplaySmall` da
+                // 15 a 16px (vedi CLAUDE.md/app_text_styles.dart) faceva
+                // andare in overflow di alcuni px la colonna importo su
+                // larghezze strette — stesso rapporto applicato anche in
+                // `trattenutaReadOnlyRow` per non alterare l'allineamento tra
+                // vista e modifica (requisito non negoziabile).
+                flex: 5,
                 // `maxLines: null` (nessun limite, cresce verticalmente) invece
                 // del default di `CupertinoTextField` (1 riga, che TRONCA
                 // orizzontalmente il testo che eccede la larghezza) — la vista
@@ -190,7 +211,7 @@ Widget trattenutaEditRow(TrattenutaEditRow row,
                 ),
               ),
               Expanded(
-                flex: 2,
+                flex: 4,
                 // A differenza delle altre statistiche, l'importo di una
                 // trattenuta NON è sempre positivo: il parser regex può
                 // riconoscere un valore negativo (conguaglio/storno a
@@ -237,7 +258,10 @@ Widget trattenutaReadOnlyRow(String label, String value) {
         child: Row(
           children: [
             Expanded(
-              flex: 3,
+              // Stesso flex 5:4 di `trattenutaEditRow` (vedi commento lì): la
+              // vista di sola lettura deve restare allineata pixel-per-pixel
+              // alla modifica.
+              flex: 5,
               child: Text(
                 label,
                 style: AppTextStyles.pulseBodyEmphasis.copyWith(
@@ -246,7 +270,7 @@ Widget trattenutaReadOnlyRow(String label, String value) {
               ),
             ),
             Expanded(
-              flex: 2,
+              flex: 4,
               child: Text(
                 value,
                 textAlign: TextAlign.center,

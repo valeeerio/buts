@@ -160,4 +160,88 @@ void main() {
       expect(campoQuantita.placeholder, '0');
     });
   });
+
+  group(
+      'voceCompetenzaEditRow — nessun overflow su larghezze strette con '
+      'importi a 4 cifre (regressione FittedBox)', () {
+    // Regressione: l'aumento di `pulseDisplaySmall` da 15 a 16px (vedi
+    // CLAUDE.md/app_text_styles.dart) faceva andare in overflow la colonna
+    // importo (prefisso "€ "/"− € " dentro `IntrinsicWidth`, vedi
+    // `inlineNumberField` in `trattenuta_edit_row.dart`) su larghezze di
+    // contenuto realistiche di un iPhone SE-class (~307px: 375pt schermo -
+    // 20-20 margine sezione - 14-14 padding `PulseSectionCard`) — persino
+    // con un importo POSITIVO comune a 4 cifre (es. la retribuzione
+    // ordinaria di un mese pieno, ≥ 1000 €, scenario mainstream, non un
+    // caso limite), non solo con il flex 3:1:4 ottimizzato
+    // (`voceCompetenzaEditRow`/`BustaPagaCompetenzeSection`). Fix:
+    // `inlineNumberField` avvolge il ramo prefisso/suffisso in un
+    // `FittedBox(fit: BoxFit.scaleDown)`, che riduce il font SOLO quando il
+    // contenuto eccede lo spazio disponibile.
+    for (final width in [307.0, 340.0]) {
+      for (final importo in ['1.500,00', '-1.500,00']) {
+        testWidgets(
+            'importo $importo a ${width.toInt()}px: nessun RenderFlex '
+            'overflow', (tester) async {
+          final row = VoceCompetenzaEditRow(
+            descrizione: 'Retribuzione ordinaria',
+            quantita: '176,00',
+            importo: importo,
+          );
+          addTearDown(row.dispose);
+
+          await tester.pumpWidget(
+            CupertinoApp(
+              home: CupertinoPageScaffold(
+                child: Center(
+                  child: SizedBox(
+                    width: width,
+                    child: voceCompetenzaEditRow(row, onDismissed: () {}),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+
+    testWidgets(
+        'il campo importo resta interattivo dentro il FittedBox: tap + '
+        'digitazione aggiornano il controller', (tester) async {
+      final row = VoceCompetenzaEditRow(
+        descrizione: 'Retribuzione ordinaria',
+        quantita: '176,00',
+        importo: '1.500,00',
+      );
+      addTearDown(row.dispose);
+
+      await tester.pumpWidget(
+        CupertinoApp(
+          home: CupertinoPageScaffold(
+            child: Center(
+              child: SizedBox(
+                width: 307,
+                child: voceCompetenzaEditRow(row, onDismissed: () {}),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final campoImporto = find.byWidgetPredicate(
+        (w) => w is CupertinoTextField && w.controller == row.importo,
+      );
+      await tester.tap(campoImporto);
+      await tester.pumpAndSettle();
+      await tester.enterText(campoImporto, '1750,00');
+      await tester.pumpAndSettle();
+
+      expect(row.importo.text, '1750,00');
+      expect(tester.takeException(), isNull);
+    });
+  });
 }

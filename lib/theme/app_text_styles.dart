@@ -79,7 +79,7 @@ class AppTextStyles {
       '.notoSans',
       'CupertinoSystemDisplay',
     ],
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: FontWeight.w700,
     height: 1.2,
   );
@@ -91,7 +91,7 @@ class AppTextStyles {
       '.notoSans',
       'CupertinoSystemText',
     ],
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: FontWeight.w400,
     height: 1.3,
   );
@@ -103,7 +103,7 @@ class AppTextStyles {
       '.notoSans',
       'CupertinoSystemText',
     ],
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: FontWeight.w500,
     height: 1.3,
   );
@@ -115,7 +115,7 @@ class AppTextStyles {
       '.notoSans',
       'CupertinoSystemText',
     ],
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: FontWeight.w600,
     letterSpacing: 0.1,
     height: 1.2,
