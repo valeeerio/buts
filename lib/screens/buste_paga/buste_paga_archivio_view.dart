@@ -12,7 +12,6 @@ import '../../widgets/app_alert_dialog.dart';
 import '../../widgets/busta_paga_list_item.dart';
 import '../../widgets/busta_paga_summary_hero.dart';
 import '../../widgets/custom_illustration.dart';
-import '../../widgets/progress_ring_tile.dart';
 import '../../widgets/pulse_icon.dart';
 import '../../widgets/pulse_surface.dart';
 import '../../widgets/spring_button.dart';
@@ -760,59 +759,94 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-/// Griglia di anelli di maturazione (Ferie/Permessi/Ex festività residue —
-/// vedi CLAUDE.md, "Voci di competenza": nel modello dati "Permessi"
-/// corrisponde ai campi `rol*`, stessa etichetta già usata da
+/// Riga di 3 tessere piatte con i valori residui di Ferie/Permessi/Ex
+/// festività — vedi CLAUDE.md, "Voci di competenza": nel modello dati
+/// "Permessi" corrisponde ai campi `rol*`, stessa etichetta già usata da
 /// `BustaPagaMaturazioniSection` nel dettaglio, non una quarta categoria
-/// distinta dai ROL) per l'ultima busta paga in archivio. Una riga di 3
-/// tessere `ProgressRingTile`, non un `GridView` 2x2: il dominio dati traccia
-/// solo 3 categorie di ratei (Ferie, Permessi/ROL, Ex festività), non 4 —
-/// vedi CLAUDE.md "Ferie, ROL e permessi" nel dettaglio busta paga, stessa
-/// fonte di verità.
+/// distinta dai ROL — per l'ultima busta paga in archivio. Una riga di 3
+/// tessere `_ValueTile` (solo valore + label, nessun anello di progresso),
+/// non un `GridView` 2x2: il dominio dati traccia solo 3 categorie di ratei
+/// (Ferie, Permessi/ROL, Ex festività), non 4 — vedi CLAUDE.md "Ferie, ROL e
+/// permessi" nel dettaglio busta paga, stessa fonte di verità.
 class _MaturazioniRingsRow extends StatelessWidget {
   final BustaPaga bustaPaga;
 
   const _MaturazioniRingsRow({required this.bustaPaga});
-
-  /// Frazione residuo/maturato, clampata e senza dividere per zero se
-  /// `maturato` è 0 (nessun rateo maturato in questa busta paga).
-  double _progress(double residuo, double maturato) {
-    if (maturato <= 0) return 0;
-    return (residuo / maturato).clamp(0.0, 1.0);
-  }
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
         Expanded(
-          child: ProgressRingTile(
+          child: _ValueTile(
             label: 'Ferie',
             value: formatNumber(bustaPaga.ferieResidue),
-            progress:
-                _progress(bustaPaga.ferieResidue, bustaPaga.ferieMaturate),
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
-          child: ProgressRingTile(
+          child: _ValueTile(
             label: 'Permessi',
             value: formatNumber(bustaPaga.rolResidui),
-            progress: _progress(bustaPaga.rolResidui, bustaPaga.rolMaturati),
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
-          child: ProgressRingTile(
+          child: _ValueTile(
             label: 'Ex festività',
             value: formatNumber(bustaPaga.exFestivitaResidue),
-            progress: _progress(
-              bustaPaga.exFestivitaResidue,
-              bustaPaga.exFestivitaMaturate,
-            ),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Tessera piatta con un valore in evidenza e una label sotto, senza alcun
+/// indicatore di progresso — sostituisce `ProgressRingTile` in
+/// `_MaturazioniRingsRow` (che resta invariato come widget condiviso e
+/// continua a essere usato dal dettaglio busta paga e da Statistiche).
+class _ValueTile extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ValueTile({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final textPrimary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
+    final textSecondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
+
+    return PulseSurface(
+      borderRadius: AppRadius.pulseSmall,
+      padding: const EdgeInsets.symmetric(
+        vertical: AppSpacing.md,
+        horizontal: AppSpacing.sm,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            value,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.pulseDisplaySmall.copyWith(
+              color: textPrimary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.pulseLabel.copyWith(color: textSecondary),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -18,7 +18,6 @@ import '../../widgets/app_alert_dialog.dart';
 import '../../widgets/collapsible_period_picker.dart';
 import '../../widgets/custom_illustration.dart';
 import '../../widgets/pulse_icon.dart';
-import '../../widgets/pulse_mesh_background.dart';
 import '../../widgets/pulse_surface.dart';
 import '../../widgets/spring_button.dart';
 import 'busta_paga_detail_screen.dart';
@@ -561,7 +560,8 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
       return formatted[0].toUpperCase() + formatted.substring(1);
     }();
 
-    return PulseMeshBackground(
+    return ColoredBox(
+      color: CupertinoDynamicColor.resolve(AppColors.pulseBackground, context),
       child: Stack(
         children: [
           Column(

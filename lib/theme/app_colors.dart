@@ -154,12 +154,13 @@ class AppColors {
     darkColor: Color(0xFF97A3B3),
   );
 
-  /// Viola elettrico per macchie/gradienti di sfondo (mesh gradient viola↔
-  /// ciano, direzione "futuristica" derivata dal mockup B — vedi
-  /// CLAUDE.md/piano sessione). Uso ESCLUSIVAMENTE decorativo: sfondi
-  /// (`PulseMeshBackground`), gradiente del blocco netto in
-  /// `BustaPagaSummaryHero`. MAI come colore funzionale di icone/testo/CTA —
-  /// quel ruolo resta interamente a `pulseAccent` (ciano), che non cambia.
+  /// Viola elettrico per accenti/gradienti decorativi (direzione
+  /// "futuristica" derivata dal mockup B — vedi CLAUDE.md/piano sessione).
+  /// Uso ESCLUSIVAMENTE decorativo: seconda serie/colore "Lordo" nei grafici
+  /// Statistiche (`buste_paga_statistiche_screen.dart`), bordo a gradiente
+  /// opzionale (`showGradientBorder`) di `ProgressRingTile`. MAI come colore
+  /// funzionale di icone/testo/CTA — quel ruolo resta interamente a
+  /// `pulseAccent` (ciano), che non cambia.
   static const pulseSecondaryGlow = CupertinoDynamicColor.withBrightness(
     color: Color(0xFF6A3FD1),
     darkColor: Color(0xFF7C5CFF),

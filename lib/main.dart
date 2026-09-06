@@ -72,29 +72,14 @@ class ButsApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ProviderScope(
       overrides: overrides,
-      child: CupertinoApp(
+      child: const CupertinoApp(
         title: 'Buts',
         debugShowCheckedModeBanner: false,
-        theme: const CupertinoThemeData(brightness: Brightness.dark),
-        localizationsDelegates: const [
+        theme: CupertinoThemeData(),
+        localizationsDelegates: [
           DefaultCupertinoLocalizations.delegate,
         ],
-        builder: (context, child) {
-          // L'app è forzata a SOLA dark mode (decisione utente): sovrascrive
-          // sempre `platformBrightness` a `Brightness.dark`, ignorando
-          // l'impostazione di sistema del dispositivo. Necessario perché
-          // alcuni widget (es. `LiquidGlassSurface`, `PulseSurface`,
-          // `busta_paga_summary_hero.dart`) leggono direttamente
-          // `MediaQuery.platformBrightnessOf(context)` invece di affidarsi
-          // solo a `CupertinoTheme`/`CupertinoDynamicColor`.
-          return MediaQuery(
-            data: MediaQuery.of(
-              context,
-            ).copyWith(platformBrightness: Brightness.dark),
-            child: child!,
-          );
-        },
-        home: const CupertinoPageScaffold(
+        home: CupertinoPageScaffold(
           child: BustePagaSectionScreen(),
         ),
       ),

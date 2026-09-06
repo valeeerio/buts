@@ -19,7 +19,6 @@ import '../../widgets/busta_paga_maturazioni_section.dart';
 import '../../widgets/busta_paga_stat_row.dart';
 import '../../widgets/flat_chip_button.dart';
 import '../../widgets/pulse_icon.dart';
-import '../../widgets/pulse_mesh_background.dart';
 import '../../widgets/pulse_section_card.dart';
 import '../../widgets/pulse_surface.dart';
 import '../../widgets/spring_button.dart';
@@ -647,12 +646,9 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
     final secondaryAccent =
         CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
 
-    // La macchia decorativa viola di `PulseMeshBackground` ha il suo punto
-    // di massima opacità proprio nell'angolo in alto a sinistra, dove
-    // `CupertinoNavigationBar` disegna il back-chevron: un fill leggermente
-    // opaco (stesso token `pulseBackground` del "chrome" della barra
-    // flottante in basso, vedi `_pinnedBackground`) ammorbidisce la macchia
-    // sotto la nav bar senza nasconderla nel resto della schermata.
+    // Fill leggermente trasparente (stesso token `pulseBackground` dello
+    // sfondo piatto della schermata, vedi `_pinnedBackground`) per il
+    // "chrome" della nav bar sopra il contenuto scrollabile sottostante.
     final navBarBackground =
         CupertinoDynamicColor.resolve(AppColors.pulseBackground, context)
             .withValues(alpha: 0.55);
@@ -683,7 +679,8 @@ class _BustaPagaFormScreenState extends ConsumerState<BustaPagaFormScreen> {
           _pdfImportService.deleteFile(_fileOrigine);
         }
       },
-      child: PulseMeshBackground(
+      child: ColoredBox(
+        color: CupertinoDynamicColor.resolve(AppColors.pulseBackground, context),
         child: CupertinoPageScaffold(
           backgroundColor: CupertinoColors.transparent,
           navigationBar: CupertinoNavigationBar(

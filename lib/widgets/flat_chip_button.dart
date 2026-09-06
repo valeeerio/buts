@@ -44,10 +44,11 @@ import 'spring_button.dart';
 /// mai mostrato l'artefatto, quindi qui si replica la stessa struttura
 /// invece di continuare a correggere il gradiente.
 ///
-/// Contrasto testo: `pulseOnAccent` risolto in dark (quasi-nero, l'app forza
-/// sempre `Brightness.dark`) regge benissimo (~10:1) contro `pulseAccent`
-/// (ciano chiaro) — stesso estremo già validato per il gradiente, quindi
-/// contrasto già sicuro senza bisogno di ulteriori aggiustamenti.
+/// Contrasto testo: `pulseOnAccent` (quasi-nero in entrambi i temi) regge
+/// benissimo (~10:1) contro `pulseAccent` (ciano chiaro) risolto sia in dark
+/// sia in light — stesso estremo già validato per il gradiente, quindi
+/// contrasto già sicuro in entrambe le modalità senza bisogno di ulteriori
+/// aggiustamenti.
 /// `pulseOnPositive` (quasi-nero in entrambi i temi) regge 10.73:1 in dark e
 /// 5.11:1 in light contro `pulsePositive` (verde), vedi
 /// `lib/theme/app_colors.dart` — usato per il chip "Conferma".

@@ -90,12 +90,16 @@ class _PulseSurfaceState extends State<PulseSurface> {
         AppColors.pulseSurface,
         context,
       );
+      final isDark =
+          MediaQuery.platformBrightnessOf(context) == Brightness.dark;
       decoration = BoxDecoration(
         color: surface,
         borderRadius: radius,
         boxShadow: [
           BoxShadow(
-            color: CupertinoColors.black.withValues(alpha: 0.28),
+            color: CupertinoColors.black.withValues(
+              alpha: isDark ? 0.28 : 0.10,
+            ),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),

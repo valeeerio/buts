@@ -18,12 +18,16 @@ import '../../widgets/pulse_surface.dart';
 ///
 /// Redesign 2026-08-30 (approvato dall'utente su mockup, vedi CLAUDE.md):
 /// 3 card, ciascuna con una vista "protagonista" (numeri grandi + area
-/// chart con glow / anelli di progresso grandi / barre a gradiente) e le
-/// vecchie tabelle Media/Minimo/Massimo/Totale spostate dietro un link
-/// "Dettagli" collassabile — stessa logica di calcolo/aggregazione/filtro
-/// periodo di prima, solo riorganizzazione visiva (eccezione consapevole: il
-/// blocco Ferie/Permessi/Ex festività passa da un trend nel tempo a uno
-/// snapshot dell'ultima busta paga nel periodo filtrato).
+/// chart con glow / anelli di progresso grandi / barre a gradiente) — stessa
+/// logica di calcolo/aggregazione/filtro periodo di prima, solo
+/// riorganizzazione visiva (eccezione consapevole: il blocco
+/// Ferie/Permessi/Ex festività passa da un trend nel tempo a uno snapshot
+/// dell'ultima busta paga nel periodo filtrato). Solo la card Netto/Lordo
+/// mantiene la vecchia tabella Media/Minimo/Massimo/Totale dietro un link
+/// "Dettagli" collassabile; le card Ferie/permessi/ex festività e
+/// Straordinario per mese mostrano solo header/anelli o titolo/grafico,
+/// senza dettagli aggiuntivi (rimossi in una revisione successiva, ridondanti
+/// con la vista protagonista).
 ///
 /// Palette: `pulseAccent` (ciano) resta il colore funzionale primario,
 /// `pulseSecondaryGlow` (viola) è usato qui SOLO come seconda serie/accento
@@ -90,6 +94,27 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
                     !b.periodo.isAfter(filtro.end))))
         .length;
 
+    // Fine a cui estendere i grafici Netto/Lordo e Straordinario oltre
+    // l'ultima busta paga confermata nel periodo filtrato: di norma il mese
+    // corrente reale, ma senza mai superare un filtro periodo più
+    // restrittivo scelto esplicitamente dall'utente (in quel caso la
+    // griglia si ferma comunque a `filtro.end`, comportamento invariato).
+    // Il confronto va fatto contro l'ultima busta paga REALMENTE
+    // disponibile (`sorted`, non filtrata), non contro oggi: il picker di
+    // norma restituisce come estremo massimo proprio l'ultima busta paga
+    // disponibile, non il mese corrente — usare `oggiNormalizzato` come
+    // riferimento romperebbe l'estensione in quel caso comune, che non è
+    // una restrizione deliberata dell'utente.
+    final ultimoConfermato = sorted.isNotEmpty
+        ? DateTime(sorted.last.periodo.year, sorted.last.periodo.month)
+        : null;
+    final oggiNormalizzato = DateTime(DateTime.now().year, DateTime.now().month);
+    final restrizioneEsplicita = filtro != null &&
+        ultimoConfermato != null &&
+        filtro.end.isBefore(ultimoConfermato);
+    final estendiFinoA =
+        restrizioneEsplicita ? filtro.end : oggiNormalizzato;
+
     return ShaderMask(
       blendMode: BlendMode.dstIn,
       shaderCallback: (rect) {
@@ -141,7 +166,10 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
                           const SizedBox(height: AppSpacing.md),
                           SizedBox(
                             height: 180,
-                            child: _NettoLordoChart(buste: filtrati),
+                            child: _NettoLordoChart(
+                              buste: filtrati,
+                              estendiFinoA: estendiFinoA,
+                            ),
                           ),
                         ],
                       ),
@@ -182,6 +210,7 @@ class BustePagaStatisticheScreen extends ConsumerWidget {
                 chart: _StraordinarioChart(
                   buste: filtrati,
                   busteNonConfermate: busteNonConfermate,
+                  estendiFinoA: estendiFinoA,
                 ),
               ),
             ),
@@ -689,13 +718,24 @@ List<int> _yearBoundaryIndices(List<DateTime> periodi) {
 /// segmenti quando incontra uno "spot nullo", meccanismo nativo, non uno
 /// stratagemma: vedi `LineChartBarData.spots`) e l'assenza di una barra per
 /// `_StraordinarioChart` — invece di un'interpolazione silenziosa.
+/// [estendiFinoA], se non nullo e successivo all'ultimo periodo presente in
+/// [buste], estende la griglia con ulteriori slot vuoti (`busta: null`) fino
+/// a quel mese incluso — usato per estendere i grafici fino al mese corrente
+/// reale invece di fermarsi all'ultima busta paga confermata, rispettando
+/// comunque un filtro periodo più restrittivo (in quel caso il chiamante
+/// passa la fine del filtro, non oggi).
 List<({DateTime periodo, BustaPaga? busta})> _grigliaMensile(
-  List<BustaPaga> buste,
-) {
+  List<BustaPaga> buste, {
+  DateTime? estendiFinoA,
+}) {
   if (buste.isEmpty) return const [];
   final risultato = <({DateTime periodo, BustaPaga? busta})>[];
   var cursore = DateTime(buste.first.periodo.year, buste.first.periodo.month);
-  final fine = DateTime(buste.last.periodo.year, buste.last.periodo.month);
+  var fine = DateTime(buste.last.periodo.year, buste.last.periodo.month);
+  if (estendiFinoA != null) {
+    final estensione = DateTime(estendiFinoA.year, estendiFinoA.month);
+    if (estensione.isAfter(fine)) fine = estensione;
+  }
   var indice = 0;
   while (!cursore.isAfter(fine)) {
     final corrisponde = indice < buste.length &&
@@ -718,9 +758,14 @@ List<({DateTime periodo, BustaPaga? busta})> _grigliaMensile(
 /// solo quando l'aggregazione trimestrale è attiva, cioè con 2+ anni di
 /// dati) resta comunque un buco visibile invece di sparire. Richiede
 /// [buste] non vuota.
+/// [estendiFinoA], se non nullo e successivo al trimestre dell'ultimo bucket
+/// aggregato, estende la griglia con trimestri vuoti (`totale: null`) fino al
+/// trimestre che lo contiene — stessa logica di estensione di
+/// [_grigliaMensile], vedi doc lì.
 List<({DateTime periodo, double? totale})> _grigliaTrimestrale(
-  List<BustaPaga> buste,
-) {
+  List<BustaPaga> buste, {
+  DateTime? estendiFinoA,
+}) {
   final aggregati = _aggregaStraordinariPerTrimestre(buste);
   int chiaveTrimestre(DateTime periodo) =>
       periodo.year * 4 + (periodo.month - 1) ~/ 3;
@@ -728,7 +773,11 @@ List<({DateTime periodo, double? totale})> _grigliaTrimestrale(
     for (final punto in aggregati) chiaveTrimestre(punto.periodo): punto.totale,
   };
   final risultato = <({DateTime periodo, double? totale})>[];
-  final chiaveFine = chiaveTrimestre(aggregati.last.periodo);
+  var chiaveFine = chiaveTrimestre(aggregati.last.periodo);
+  if (estendiFinoA != null) {
+    final chiaveEstensione = chiaveTrimestre(estendiFinoA);
+    if (chiaveEstensione > chiaveFine) chiaveFine = chiaveEstensione;
+  }
   for (var chiave = chiaveTrimestre(aggregati.first.periodo);
       chiave <= chiaveFine;
       chiave++) {
@@ -1100,8 +1149,9 @@ class _NettoLordoHeader extends StatelessWidget {
 /// prima del redesign, nessun cambio alla logica di aggregazione dei dati.
 class _NettoLordoChart extends StatelessWidget {
   final List<BustaPaga> buste;
+  final DateTime estendiFinoA;
 
-  const _NettoLordoChart({required this.buste});
+  const _NettoLordoChart({required this.buste, required this.estendiFinoA});
 
   @override
   Widget build(BuildContext context) {
@@ -1121,7 +1171,7 @@ class _NettoLordoChart extends StatelessWidget {
     // visibile nel grafico (`FlSpot.nullSpot`) invece di sparire
     // silenziosamente collegando i due mesi adiacenti come se fossero
     // consecutivi.
-    final griglia = _grigliaMensile(buste);
+    final griglia = _grigliaMensile(buste, estendiFinoA: estendiFinoA);
 
     // Range ristretto ai dati reali (non da 0): Netto e Lordo hanno un
     // divario fisso di alcune centinaia di euro (INPS/IRPEF) che, su un
@@ -1396,10 +1446,12 @@ class _FerieRolPermessiSnapshot extends StatelessWidget {
 class _StraordinarioChart extends StatefulWidget {
   final List<BustaPaga> buste;
   final int busteNonConfermate;
+  final DateTime estendiFinoA;
 
   const _StraordinarioChart({
     required this.buste,
     this.busteNonConfermate = 0,
+    required this.estendiFinoA,
   });
 
   @override
@@ -1482,7 +1534,13 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
     // resta un buco visibile (nessuna barra disegnata per quello slot)
     // invece di sparire silenziosamente avvicinando le barre dei
     // mesi/trimestri adiacenti come se fossero consecutivi.
-    final grigliaMensile = _grigliaMensile(buste);
+    // Decisione basata sull'ampiezza temporale REALE dei dati (senza
+    // l'estensione a `estendiFinoA`), non su quella estesa: estendere la
+    // griglia fino a oggi allunga di uno slot vuoto ogni mese che passa
+    // senza nuove buste paga, e se la decisione di aggregare si basasse su
+    // quella lunghezza estesa l'aggregazione trimestrale scatterebbe da
+    // sola col solo passare del tempo, senza che l'utente importi nulla.
+    final grigliaMensileReale = _grigliaMensile(buste);
     // Decisione basata sull'ampiezza temporale reale coperta dalla griglia
     // (numero di slot mensili, buchi inclusi), non sul numero di buste paga
     // confermate: un archivio con molti mesi mancanti/non confermati ma che
@@ -1490,24 +1548,28 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
     // mensile non aggregata su molti slot, con uno scroll orizzontale molto
     // lungo — in contrasto con l'intento della soglia (vedi doc su
     // `_quarterlyAggregationThreshold`).
-    final aggregato = grigliaMensile.length > _quarterlyAggregationThreshold;
-    // `.reversed`: l'asse X va dal mese/trimestre più recente del periodo
-    // filtrato (prima barra a sinistra) al più vecchio (verso destra) —
-    // cronologico DECRESCENTE, a differenza degli altri due grafici della
-    // schermata (Netto/Lordo resta crescente). `_grigliaMensile`/
-    // `_grigliaTrimestrale` producono entrambe una griglia continua in
-    // ordine crescente (compresi i buchi), quindi si inverte solo qui,
-    // dopo aver costruito la griglia continua — così l'ampiezza della
-    // finestra temporale (tutti i mesi del periodo filtrato, barre a zero
-    // incluse) resta invariata, cambia solo l'ordine di visualizzazione.
-    final punti = (aggregato
-            ? _grigliaTrimestrale(buste)
-            : [
-                for (final g in grigliaMensile)
-                  (periodo: g.periodo, totale: g.busta?.straordinari),
-              ])
-        .reversed
-        .toList();
+    final aggregato =
+        grigliaMensileReale.length > _quarterlyAggregationThreshold;
+    // Griglia effettivamente renderizzata (estesa fino a `estendiFinoA`):
+    // se non serve aggregare per trimestre, riusa quella reale già
+    // calcolata solo quando coincide (nessuna estensione applicabile),
+    // altrimenti ricalcola con l'estensione — evita un ricalcolo superfluo
+    // nel caso comune in cui `estendiFinoA` non estende oltre i dati reali.
+    final grigliaMensile = aggregato
+        ? const <({DateTime periodo, BustaPaga? busta})>[]
+        : _grigliaMensile(buste, estendiFinoA: widget.estendiFinoA);
+    // L'asse X va dal mese/trimestre più vecchio del periodo filtrato (prima
+    // barra a sinistra) al più recente (verso destra) — cronologico
+    // CRESCENTE, come gli altri grafici della schermata (Netto/Lordo).
+    // `_grigliaMensile`/`_grigliaTrimestrale` producono entrambe una
+    // griglia continua in questo stesso ordine (compresi i buchi), quindi
+    // vengono usate direttamente senza ulteriore riordino.
+    final punti = aggregato
+        ? _grigliaTrimestrale(buste, estendiFinoA: widget.estendiFinoA)
+        : [
+            for (final g in grigliaMensile)
+              (periodo: g.periodo, totale: g.busta?.straordinari),
+          ];
     final shortLabelBuilder = aggregato ? _trimestreLabel : meseAxisLabel;
 
     final maxValue = punti.fold<double>(
@@ -1518,6 +1580,16 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
     final step = _niceStep(straordinarioAxisMax, minStep: 1);
     final bounds = _niceAxisBounds(0, straordinarioAxisMax, step: step);
 
+    // Ultimo indice con un dato reale (`totale != null`): i buchi INTERNI
+    // alla storia (mesi mai confermati fra due mesi con dati) restano
+    // "compressi via" come prima, ma tutti gli slot DOPO questo indice (la
+    // coda aggiunta da `estendiFinoA`, sempre priva di dati per definizione)
+    // ricevono comunque uno slot/etichetta — altrimenti l'estensione fino al
+    // mese corrente reale (vedi doc di `_grigliaMensile`) resterebbe invisibile
+    // con `BarChartAlignment.spaceEvenly`. -1 se `punti` non ha alcun dato.
+    final ultimoDatoIndex = punti.lastIndexWhere((p) => p.totale != null);
+    bool includiSlot(int i) => punti[i].totale != null || i > ultimoDatoIndex;
+
     // Posizione X approssimata (centro del gruppo `maxIndex`, layout
     // `BarChartAlignment.spaceEvenly` — il default di fl_chart quando non
     // specificato esplicitamente, vedi `BarChartData.alignment`): con N
@@ -1525,19 +1597,21 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
     // i-esimo è a `(i + 0.5) / N * width`. Un'approssimazione dichiarata,
     // non un valore pixel-perfect letto dal layout interno del chart (fl_
     // chart non lo espone) — sufficiente per un effetto decorativo di glow.
-    // IMPORTANTE: `barGroups` sotto include SOLO le voci con `totale != null`
-    // (`if (punti[i].totale != null)`) — fl_chart spazia equamente solo i
-    // gruppi realmente renderizzati, "comprimendo via" i mesi mancanti invece
-    // di lasciare uno slot vuoto proporzionale. `N` e l'indice del gruppo
-    // massimo vanno quindi calcolati sul sottoinsieme filtrato (numero di
-    // gruppi disegnati), non sull'indice grezzo/lunghezza di `punti` — con
-    // anche un solo mese mancante prima della barra massima, usare l'indice
-    // grezzo disallinea visibilmente l'alone dalla barra reale.
+    // IMPORTANTE: `barGroups` sotto include solo le voci per cui
+    // `includiSlot` è vera — fl_chart spazia equamente solo i gruppi
+    // realmente renderizzati, "comprimendo via" i mesi mancanti interni
+    // invece di lasciare uno slot vuoto proporzionale (gli slot di coda
+    // dopo `ultimoDatoIndex` restano invece sempre inclusi, vedi sopra). `N`
+    // e l'indice del gruppo massimo vanno quindi calcolati sullo stesso
+    // sottoinsieme (numero di gruppi effettivamente disegnati), non
+    // sull'indice grezzo/lunghezza di `punti` — con anche un solo mese
+    // mancante prima della barra massima, usare l'indice grezzo disallinea
+    // visibilmente l'alone dalla barra reale.
     Widget glowDietroBarraMassima(double width) {
       if (maxIndex < 0 || maxValue <= 0) return const SizedBox.shrink();
-      final renderedCount = punti.where((p) => p.totale != null).length;
+      final renderedCount = punti.indexed.where((e) => includiSlot(e.$1)).length;
       final renderedMaxIndex =
-          punti.take(maxIndex).where((p) => p.totale != null).length;
+          punti.take(maxIndex).indexed.where((e) => includiSlot(e.$1)).length;
       final slotWidth = width / renderedCount;
       final centerX = (renderedMaxIndex + 0.5) * slotWidth;
       return Positioned(
@@ -1608,6 +1682,21 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
                     fitInsideVertically: true,
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       final punto = punti[group.x];
+                      // Gli slot di coda dopo `ultimoDatoIndex` (mesi ancora
+                      // senza busta paga confermata, aggiunti solo per
+                      // estendere l'asse fino al mese corrente) hanno sempre
+                      // `totale == null`: un tooltip "0 h" per un mese senza
+                      // alcun dato sarebbe fuorviante, indistinguibile da uno
+                      // straordinario davvero pari a zero.
+                      if (punto.totale == null) {
+                        return BarTooltipItem(
+                          '${shortLabelBuilder(punto.periodo)}\nNessun dato',
+                          AppTextStyles.pulseBody.copyWith(
+                            color: tooltip.text,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        );
+                      }
                       return BarTooltipItem(
                         '${shortLabelBuilder(punto.periodo)}\n'
                         '${formatNumber(rod.toY)} h',
@@ -1621,12 +1710,12 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
                 ),
                 barGroups: [
                   for (var i = 0; i < punti.length; i++)
-                    if (punti[i].totale != null)
+                    if (includiSlot(i))
                       BarChartGroupData(
                         x: i,
                         barRods: [
                           BarChartRodData(
-                            toY: punti[i].totale!,
+                            toY: punti[i].totale ?? 0,
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
