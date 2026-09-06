@@ -1,11 +1,25 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:home_widget/home_widget.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/reminder_scheduler_provider.dart';
 import 'screens/buste_paga/buste_paga_section_screen.dart';
+import 'services/home_widget_launch.dart';
 import 'services/payslip_reminder_service.dart';
 import 'services/reminder_notifications.dart';
+
+/// Subscription dell'ascolto "tap sul widget ad app già in esecuzione"
+/// (`registraAscoltoHomeWidgetClicked`), tenuta viva per l'intera sessione
+/// app in una variabile top-level: senza un riferimento esterno mantenuto
+/// esplicitamente, non c'è garanzia che l'oggetto non venga raccolto dal
+/// garbage collector (lo `StreamSubscription` restituito non viene mai
+/// letto/cancellato altrove). Non serve mai leggerla: esiste solo per
+/// tenere viva la subscription.
+// ignore: unused_element
+late final StreamSubscription<Uri?> _homeWidgetClickSub;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +45,13 @@ void main() async {
     // viene costruita subito dopo e non deve perdersi il segnale.
     await reminderScheduler.init();
     await reminderScheduler.consumaLaunchDetails();
+    // Widget iOS della home screen: stesso spirito del promemoria appena
+    // sopra, un guasto qui (App Group non configurato, plugin nativo
+    // assente) non deve mai impedire l'apertura dell'archivio buste paga —
+    // vedi il commento sul try/catch che avvolge questo intero blocco.
+    await HomeWidget.setAppGroupId('group.com.buts.buts');
+    await consumaHomeWidgetLaunch();
+    _homeWidgetClickSub = registraAscoltoHomeWidgetClicked();
     final preferences = await SharedPreferences.getInstance();
     payslipReminderService = PayslipReminderService(
       scheduler: reminderScheduler,

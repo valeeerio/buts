@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../models/busta_paga.dart';
 import '../../providers/buste_paga_provider.dart';
+import '../../providers/home_widget_provider.dart';
 import '../../providers/reminder_scheduler_provider.dart';
 import '../../services/busta_paga_regex_parser.dart';
+import '../../services/home_widget_launch.dart';
 import '../../services/pdf_import_service.dart';
 import '../../services/reminder_notifications.dart';
 import '../../theme/app_colors.dart';
@@ -79,6 +81,7 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
     // `pendingImportRequest` PRIMA che questa schermata esista, quindi quel
     // caso è coperto sotto, nello stesso `addPostFrameCallback`.
     pendingImportRequest.addListener(_consumaPendingImportRequestSePresente);
+    pendingBustaDetailId.addListener(_consumaPendingBustaDetailIdSePresente);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       // Prima l'eventuale onboarding (spiega il promemoria all'utente),
@@ -90,6 +93,7 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
       await _maybeShowReminderOnboarding();
       if (!mounted) return;
       _consumaPendingImportRequestSePresente();
+      _consumaPendingBustaDetailIdSePresente();
       // Chiamata iniziale di ri-scheduling: copre sia il caso in cui
       // l'archivio sia già stato caricato dal provider prima di questo primo
       // frame, sia il caso — più delicato — di un archivio genuinamente
@@ -101,6 +105,11 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
       // prima tutto, vedi `PayslipReminderService.reschedule`) non appena lo
       // stato reale arriva, quindi non lascia promemoria scorretti.
       unawaited(_rescheduleRemindersSafe());
+      // Stesso ragionamento per il widget iOS della home screen: allinea lo
+      // snapshot allo stato corrente dell'archivio non appena disponibile,
+      // senza aspettare la prima mutazione (`ref.listen` più sotto copre
+      // solo i cambiamenti successivi).
+      unawaited(_updateHomeWidgetSafe());
     });
   }
 
@@ -108,6 +117,8 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     pendingImportRequest.removeListener(_consumaPendingImportRequestSePresente);
+    pendingBustaDetailId
+        .removeListener(_consumaPendingBustaDetailIdSePresente);
     _searchController.dispose();
     super.dispose();
   }
@@ -147,10 +158,43 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
     _startImport();
   }
 
+  /// Se l'utente ha appena toccato il widget iOS della home screen (a
+  /// caldo, osservato qui, o a freddo, già impostato da `main()` prima
+  /// ancora che questa schermata esistesse), riporta il notifier a `null` e
+  /// apre direttamente il dettaglio della busta paga referenziata — se
+  /// esiste ancora in archivio (fallback silenzioso altrimenti: può essere
+  /// stata eliminata nel frattempo).
+  void _consumaPendingBustaDetailIdSePresente() {
+    final id = pendingBustaDetailId.value;
+    if (id == null) return;
+    pendingBustaDetailId.value = null;
+    final bustaPaga = ref
+        .read(busteRepositoryProvider)
+        .cast<BustaPaga?>()
+        .firstWhere((b) => b?.id == id, orElse: () => null);
+    if (bustaPaga == null) return;
+    _openDetail(context, bustaPaga);
+  }
+
   Future<void> _rescheduleReminders() async {
     final service = ref.read(payslipReminderServiceProvider);
     if (service == null) return;
     await service.reschedule(ref.read(busteRepositoryProvider));
+  }
+
+  /// Wrapper di [HomeWidgetService.aggiorna] che intercetta qualunque
+  /// eccezione, stesso spirito di [_rescheduleRemindersSafe]: un guasto nel
+  /// canale nativo del widget (App Group non ancora configurato lato Xcode,
+  /// piattaforma non disponibile) non deve mai propagarsi come eccezione non
+  /// gestita né bloccare l'archivio.
+  Future<void> _updateHomeWidgetSafe() async {
+    try {
+      await ref
+          .read(homeWidgetServiceProvider)
+          .aggiorna(ref.read(busteRepositoryProvider));
+    } catch (error, stackTrace) {
+      debugPrint('Aggiornamento widget home fallito: $error\n$stackTrace');
+    }
   }
 
   /// Gancio di debug invisibile in una build di release: attivato dal
@@ -548,11 +592,19 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
     // ancora vuota (vedi `initState`/`_rescheduleReminders`).
     ref.listen<List<BustaPaga>>(busteRepositoryProvider, (previous, next) {
       final service = ref.read(payslipReminderServiceProvider);
-      if (service == null) return;
+      if (service != null) {
+        unawaited(
+          service.reschedule(next).catchError((Object error, StackTrace st) {
+            debugPrint('Reschedule promemoria fallito: $error\n$st');
+          }),
+        );
+      }
       unawaited(
-        service.reschedule(next).catchError((Object error, StackTrace st) {
-          debugPrint('Reschedule promemoria fallito: $error\n$st');
-        }),
+        ref.read(homeWidgetServiceProvider).aggiorna(next).catchError(
+          (Object error, StackTrace st) {
+            debugPrint('Aggiornamento widget home fallito: $error\n$st');
+          },
+        ),
       );
     });
     final periodoRangeDisponibile = ref.watch(periodoRangeDisponibileProvider);
