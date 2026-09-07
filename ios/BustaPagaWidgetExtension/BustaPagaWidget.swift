@@ -21,8 +21,8 @@ struct BustaPagaWidgetSnapshot: Decodable {
     let netto: String?
     let statoConfermato: Bool?
     let ferieResidue: String?
+    let permessiResidue: String?
     let exFestivitaResidue: String?
-    let daImportare: Bool?
 
     /// Snapshot vuoto/placeholder, usato quando non è ancora stato scritto
     /// nulla dall'app (prima esecuzione, oppure App Group non ancora
@@ -33,8 +33,8 @@ struct BustaPagaWidgetSnapshot: Decodable {
         netto: nil,
         statoConfermato: nil,
         ferieResidue: nil,
-        exFestivitaResidue: nil,
-        daImportare: false
+        permessiResidue: nil,
+        exFestivitaResidue: nil
     )
 }
 

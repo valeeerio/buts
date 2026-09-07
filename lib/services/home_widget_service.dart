@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:home_widget/home_widget.dart';
 
 import '../models/busta_paga.dart';
-import '../services/reminder_schedule.dart';
 import '../utils/busta_paga_formatting.dart';
 
 /// Chiave sotto cui viene scritto lo snapshot JSON consumato dal widget
@@ -19,10 +18,10 @@ const String homeWidgetSnapshotKey = 'buta_widget_snapshot';
 /// stesso identico criterio di `ultimaBustaPagaProvider`
 /// (`lib/providers/buste_paga_provider.dart`, non importato direttamente per
 /// non introdurre una dipendenza da Riverpod in questo servizio plain-Dart —
-/// le tre righe di filtro/ordinamento sono duplicate qui deliberatamente),
-/// e il "mese da importare" riusa le funzioni pure di
-/// `lib/services/reminder_schedule.dart` (`periodiMensiliImportati`,
-/// `targetPerCiclo`), senza ricalcolare quella logica.
+/// le tre righe di filtro/ordinamento sono duplicate qui deliberatamente). Il
+/// widget mostra sempre i dati dell'ultima busta paga presente in archivio,
+/// indipendentemente da quanto tempo è passato dall'ultimo import: non esiste
+/// uno stato "da importare".
 class HomeWidgetService {
   const HomeWidgetService({
     this.appGroupId = 'group.com.buts.buts',
@@ -39,10 +38,6 @@ class HomeWidgetService {
         ? null
         : (mensili..sort((a, b) => b.periodo.compareTo(a.periodo))).first;
 
-    final target = targetPerCiclo(DateTime.now());
-    final importati = periodiMensiliImportati(buste);
-    final daImportare = !importati.contains(target);
-
     final snapshot = <String, Object?>{
       'bustaId': ultima?.id,
       'mese': ultima == null ? null : periodoLabel(ultima),
@@ -51,9 +46,10 @@ class HomeWidgetService {
           ultima?.statoVerifica == StatoVerificaBustaPaga.confermato,
       'ferieResidue':
           ultima == null ? null : formatNumber(ultima.ferieResidue),
+      'permessiResidue':
+          ultima == null ? null : formatNumber(ultima.rolResidui),
       'exFestivitaResidue':
           ultima == null ? null : formatNumber(ultima.exFestivitaResidue),
-      'daImportare': daImportare,
     };
 
     // L'App Group è impostato una sola volta in `main()` (bootstrap, prima di

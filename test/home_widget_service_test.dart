@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:buts/models/busta_paga.dart';
 import 'package:buts/services/home_widget_service.dart';
-import 'package:buts/services/reminder_schedule.dart';
 import 'package:buts/utils/busta_paga_formatting.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -88,9 +87,8 @@ void main() {
   group('HomeWidgetService.aggiorna', () {
     const service = HomeWidgetService();
 
-    test(
-        'nessuna busta mensile produce uno snapshot vuoto coerente e '
-        'daImportare true', () async {
+    test('nessuna busta mensile produce uno snapshot vuoto coerente',
+        () async {
       await service.aggiorna(const []);
 
       final snapshot = ultimoSnapshot();
@@ -100,7 +98,6 @@ void main() {
       expect(snapshot['statoConfermato'], isFalse);
       expect(snapshot['ferieResidue'], isNull);
       expect(snapshot['exFestivitaResidue'], isNull);
-      expect(snapshot['daImportare'], isTrue);
     });
 
     test('chiama saveWidgetData e poi updateWidget con i parametri attesi',
@@ -121,33 +118,6 @@ void main() {
     });
 
     test(
-        'il mese immediatamente precedente NON importato produce '
-        'daImportare true', () async {
-      final target = targetPerCiclo(DateTime.now());
-      // Una busta di un mese diverso da quello cercato: il target resta non
-      // importato.
-      final meseAltro = target.mese == 1 ? 2 : target.mese - 1;
-      final buste = [
-        _busta(periodo: DateTime(target.anno, meseAltro, 20)),
-      ];
-
-      await service.aggiorna(buste);
-
-      expect(ultimoSnapshot()['daImportare'], isTrue);
-    });
-
-    test('tutti i mesi attesi importati produce daImportare false', () async {
-      final target = targetPerCiclo(DateTime.now());
-      final buste = [
-        _busta(periodo: DateTime(target.anno, target.mese, 20)),
-      ];
-
-      await service.aggiorna(buste);
-
-      expect(ultimoSnapshot()['daImportare'], isFalse);
-    });
-
-    test(
         'usa la busta mensile più recente come "ultima", scartando quelle '
         'più vecchie', () async {
       final buste = [
@@ -164,9 +134,8 @@ void main() {
     });
 
     test(
-        'una 13a/14a più recente della mensile non diventa "ultima busta", '
-        'né conta come mese importato', () async {
-      final target = targetPerCiclo(DateTime.now());
+        'una 13a/14a più recente della mensile non diventa "ultima busta"',
+        () async {
       final buste = [
         _busta(
           periodo: DateTime(2026, 3, 27),
@@ -174,7 +143,7 @@ void main() {
           id: 'mensile-marzo',
         ),
         _busta(
-          periodo: DateTime(target.anno, target.mese, 20),
+          periodo: DateTime(2026, 7, 20),
           tipo: TipoBustaPaga.tredicesima,
           netto: 9999,
           id: 'tredicesima',
@@ -187,9 +156,6 @@ void main() {
       // L'ultima busta resta quella mensile di marzo, non la tredicesima.
       expect(snapshot['bustaId'], 'mensile-marzo');
       expect(snapshot['netto'], formatEuroConSegno(100));
-      // La tredicesima non copre il ciclo del mese target: resta da
-      // importare anche se una busta con lo stesso periodo esiste.
-      expect(snapshot['daImportare'], isTrue);
     });
 
     test('propaga statoConfermato/ferieResidue/exFestivitaResidue',
