@@ -99,27 +99,35 @@ decisa in questa spec.
   token (`AppColors.pulse*`, `AppTextStyles.pulseLabel`/`pulseDisplaySmall`),
   quindi eredita automaticamente i nuovi colori/font della Fase 1 senza
   bisogno di modifiche proprie in questa fase.
-- Verifica se i 3 file `LiquidGlassSurface`/`LiquidGlassButton`/
-  `GlassFormSection` rimasti sono davvero dead code (nessuna schermata li usa
-  più): se sì, rimuoverli; se qualche punto residuo li usa ancora, migrarlo a
-  `PulseSurface` in questa fase.
+- Verificato con grep che i 3 file `liquid_glass_surface.dart`/
+  `liquid_glass_button.dart`/`glass_form_section.dart` non hanno più nessun
+  uso esterno (solo riferimenti interni fra loro) — dead code confermato,
+  da rimuovere in questa fase.
 - Verifica: `flutter analyze`/`flutter test`.
 
-### Fase 3 — Schermate
+### Fase 3 — Schermate (verifica, non refactor)
 
-Ogni schermata passata singolarmente (delega dev1/dev2 + `revisore` sullo
-stesso scope, come da workflow standard) per: assorbire i nuovi
-token/font (in gran parte automatico), sostituire i `CupertinoIcons` residui
-con `PulseIcon`, adottare il componente condiviso della Fase 2 dove
-pertinente. Ordine proposto (dal più semplice al più complesso, per validare
-il pattern presto):
+**Correzione rispetto alla bozza iniziale**: verificato con grep mirato che
+nessuna schermata migrata a Pulse ha colori/font hardcoded al di fuori dei
+token (`AppColors.pulse*`/`AppTextStyles.pulse*`) — la Fase 1 da sola
+propaga quindi il nuovo aspetto ovunque senza bisogno di modifiche di codice
+per schermata. Questa fase diventa perciò una checklist di **verifica visiva**
+tua, schermata per schermata, sia light sia dark, non un insieme di task di
+sviluppo:
 1. `busta_paga_detail_screen.dart` / `busta_paga_form_screen.dart`
 2. `buste_paga_archivio_view.dart`
 3. `buste_paga_statistiche_screen.dart`
 4. `buste_paga_section_screen.dart` (contenitore radice, sidecar di
    navigazione)
-5. Widget condivisi rimanenti non ancora coperti (`app_alert_dialog.dart`,
-   `flat_chip_button.dart`, ecc.) se emergono stili hardcoded da sistemare.
+
+**Migrazione icone `CupertinoIcons` → `PulseIcon` esclusa da questo piano**:
+verificato che 6 dei ~10 tipi di icona ancora usati (`arrow_up_right`/
+`arrow_down_right`, `info_circle`, `exclamationmark_triangle`, `bell`/
+`bell_slash`) non hanno un glifo `PulseIconGlyph` equivalente già disegnato —
+completarla richiederebbe progettare e implementare da zero nuova geometria
+vettoriale per questi 6 glifi, un lavoro di design/implementazione a sé
+stante, indipendente dal restyling colori/font oggetto di questa spec.
+Rimane un impegno aperto in CLAUDE.md, da trattare come iniziativa separata.
 
 ### Fase 4 — Verifica finale
 
@@ -137,6 +145,9 @@ tua istruzione esplicita, come da convenzione già in uso in questo progetto).
   stesso (già completato e mergiato in `main` prima di questo lavoro).
 - Introduzione di font diversi da quello di sistema (nessuna sperimentazione
   con altri font brandizzati in questa fase).
+- Completamento della migrazione icone `CupertinoIcons` → `PulseIcon`
+  (richiede progettare 6 nuovi glifi vettoriali non ancora disegnati —
+  iniziativa separata, vedi Fase 3).
 
 ## Rischi noti
 
