@@ -57,11 +57,19 @@ struct BustaPagaWidgetView: View {
 /// Applica `.widgetURL` solo se [bustaId] non è `nil`, evitando di costruire
 /// un `URL` non valido/superfluo quando il widget non deve essere
 /// tappabile.
+///
+/// Il parametro di query `?homeWidget` in fondo all'URL è obbligatorio: il
+/// plugin `home_widget` lato iOS (`HomeWidgetPlugin.isWidgetUrl(url:)`)
+/// riconosce un URL come proprio solo se contiene un query item chiamato
+/// `homeWidget`, altrimenti lo scarta silenziosamente e
+/// `HomeWidget.widgetClicked`/`initiallyLaunchedFromHomeWidget()` non si
+/// attivano mai — senza questo parametro il tap sul widget non apre mai il
+/// dettaglio della busta paga (vedi esempio ufficiale del pacchetto).
 private struct WidgetURLModifier: ViewModifier {
     let bustaId: String?
 
     func body(content: Content) -> some View {
-        if let bustaId, let url = URL(string: "buts://busta/\(bustaId)") {
+        if let bustaId, let url = URL(string: "buts://busta/\(bustaId)?homeWidget") {
             content.widgetURL(url)
         } else {
             content

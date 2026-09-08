@@ -38,21 +38,15 @@ class AppTextStyles {
   );
 
   // --- Pulse ---
-  // Ruoli tipografici della nuova direzione "Pulse" (vedi CLAUDE.md, "Stile
-  // visivo"): Space Grotesk per titoli/numeri/valori ("tipografia da
-  // protagonista"), Inter per corpo/label/UI. Entrambi bundlati offline
-  // (`assets/fonts/`, dichiarati in `pubspec.yaml`), con fallback esplicito
-  // al font di sistema/`.notoSans` così l'app non crasha mai se un peso
-  // dovesse mancare a runtime. Migrazione schermata per schermata — i ruoli
-  // sopra restano finché tutte le schermate non sono state migrate.
+  // Ruoli tipografici della direzione "Pulse" (vedi CLAUDE.md, "Stile
+  // visivo"): font di sistema ovunque (nessun `fontFamily` esplicito — su
+  // iOS risolve a SF Pro Text/Display tramite CupertinoTheme). Fino al
+  // 2026-09-08 questi ruoli usavano Space Grotesk/Inter bundlati offline;
+  // rimossi su richiesta esplicita dell'utente dopo aver visto lo stile del
+  // widget home screen (che usa già solo il font di sistema).
 
   /// Titoli/numeri di massimo rilievo (es. netto del mese in evidenza).
   static const pulseDisplayLarge = TextStyle(
-    fontFamily: 'Space Grotesk',
-    fontFamilyFallback: [
-      '.notoSans',
-      'CupertinoSystemDisplay',
-    ],
     fontSize: 34,
     fontWeight: FontWeight.w800,
     letterSpacing: -0.2,
@@ -61,11 +55,6 @@ class AppTextStyles {
 
   /// Titoli di sezione e valori numerici secondari (es. importi in tessere).
   static const pulseDisplay = TextStyle(
-    fontFamily: 'Space Grotesk',
-    fontFamilyFallback: [
-      '.notoSans',
-      'CupertinoSystemDisplay',
-    ],
     fontSize: 20,
     fontWeight: FontWeight.w700,
     letterSpacing: -0.1,
@@ -74,35 +63,20 @@ class AppTextStyles {
 
   /// Valori numerici compatti (es. celle di tabella, badge di variazione).
   static const pulseDisplaySmall = TextStyle(
-    fontFamily: 'Space Grotesk',
-    fontFamilyFallback: [
-      '.notoSans',
-      'CupertinoSystemDisplay',
-    ],
     fontSize: 16,
     fontWeight: FontWeight.w700,
     height: 1.2,
   );
 
-  /// Corpo testo standard (Inter, peso regular).
+  /// Corpo testo standard.
   static const pulseBody = TextStyle(
-    fontFamily: 'Inter',
-    fontFamilyFallback: [
-      '.notoSans',
-      'CupertinoSystemText',
-    ],
     fontSize: 16,
     fontWeight: FontWeight.w400,
     height: 1.3,
   );
 
-  /// Corpo testo enfatizzato (Inter, peso medium).
+  /// Corpo testo enfatizzato (peso medium).
   static const pulseBodyEmphasis = TextStyle(
-    fontFamily: 'Inter',
-    fontFamilyFallback: [
-      '.notoSans',
-      'CupertinoSystemText',
-    ],
     fontSize: 16,
     fontWeight: FontWeight.w500,
     height: 1.3,
@@ -110,11 +84,6 @@ class AppTextStyles {
 
   /// Label/UI compatta (es. etichette sopra i valori nelle tessere).
   static const pulseLabel = TextStyle(
-    fontFamily: 'Inter',
-    fontFamilyFallback: [
-      '.notoSans',
-      'CupertinoSystemText',
-    ],
     fontSize: 13,
     fontWeight: FontWeight.w600,
     letterSpacing: 0.1,

@@ -98,60 +98,65 @@ class AppColors {
 
   // --- Pulse ---
   // Nuova direzione visiva (vedi CLAUDE.md, "Stile visivo"): superfici piatte
-  // a colore pieno, dark-first, accento ciano/cobalto elettrico. Migrazione
-  // schermata per schermata da Liquid Glass — i token sopra restano finché
-  // tutte le schermate non sono state migrate.
+  // a colore pieno, dark-first, accento ciano/cobalto elettrico. Dal
+  // 2026-09-08 i valori dark sono quelli esatti già validati nel widget home
+  // screen iOS (`ios/BustaPagaWidgetExtension/BustaPagaWidgetView.swift`,
+  // `BustaPagaWidgetColors`) su richiesta esplicita dell'utente; i valori
+  // light sono stati ricalcolati per preservare la stessa gerarchia e gli
+  // stessi rapporti di contrasto minimi già in uso (vedi commenti di
+  // ciascun token, rapporti calcolati con la formula di luminanza relativa
+  // WCAG, non stimati).
 
-  /// Sfondo pagina. Light: bianco/grigio molto chiaro e freddo. Dark:
-  /// quasi-nero freddo, la base più scura della palette.
+  /// Sfondo pagina. Light: bianco/grigio molto chiaro e freddo (invariato).
+  /// Dark: quasi-nero freddo — valore esatto del widget home screen.
   static const pulseBackground = CupertinoDynamicColor.withBrightness(
     color: Color(0xFFF4F6F8),
-    darkColor: Color(0xFF0B1016),
+    darkColor: Color(0xFF0A0F17),
   );
 
   /// Superficie "tessera" (card, tile, riga di elenco): un grado più chiara
-  /// dello sfondo in entrambi i temi, per dare profondità senza blur.
+  /// dello sfondo in entrambi i temi. Dark derivato mantenendo lo stesso
+  /// scarto per canale (+7,+8,+9) già usato prima di questo aggiornamento
+  /// tra sfondo e superficie, applicato al nuovo `pulseBackground` dark (il
+  /// widget non ha un concetto di superficie separata dallo sfondo).
   static const pulseSurface = CupertinoDynamicColor.withBrightness(
     color: Color(0xFFFFFFFF),
-    darkColor: Color(0xFF12181F),
+    darkColor: Color(0xFF111720),
   );
 
   /// Accento primario ciano/cobalto elettrico: CTA, valori di rilievo,
   /// riempimento pieno del blocco netto del mese, stati attivi in
-  /// navigazione. Il valore light è più scuro/saturato del dark per
-  /// garantire contrasto ≥3:1 come testo/icona su `pulseSurface` chiara; il
-  /// valore dark è quello validato nei mockup, pensato anche per reggere da
-  /// riempimento pieno con testo scuro sopra.
+  /// navigazione. Dark: valore esatto del widget (#00B8F0). Light:
+  /// ricalcolato per la stessa hue, contrasto 4.06:1 su `pulseSurface`
+  /// chiara — soglia testo grande/icone (WCAG), non corpo testo piccolo.
   static const pulseAccent = CupertinoDynamicColor.withBrightness(
-    color: Color(0xFF0A8FB0),
-    darkColor: Color(0xFF3DDBFF),
+    color: Color(0xFF0089AC),
+    darkColor: Color(0xFF00B8F0),
   );
 
-  /// Testo/icone sopra un riempimento pieno di `pulseAccent` (es.
-  /// `PulseSurface(filled: true)`). Polarità invertita rispetto al testo
-  /// primario: `pulseAccent` dark è un ciano chiaro/luminoso (serve testo
-  /// scuro sopra, ~10:1), `pulseAccent` light è un teal più scuro (serve
-  /// testo chiaro sopra, ~3.7:1) — entrambi ≥3:1, soglia per testo
-  /// grande/numeri di rilievo (es. netto del mese), non per corpo testo
-  /// piccolo.
+  /// Testo/icone sopra un riempimento pieno di `pulseAccent`. Invariato:
+  /// contrasto riverificato contro i nuovi valori di `pulseAccent` — 7.15:1
+  /// dark, ≈4:1 light — entrambi confermati sopra soglia.
   static const pulseOnAccent = CupertinoDynamicColor.withBrightness(
     color: Color(0xFFFBFEFF),
     darkColor: Color(0xFF00232B),
   );
 
-  /// Testo primario sopra le superfici Pulse (`pulseBackground`/
-  /// `pulseSurface`). Quasi-nero in light, bianco quasi puro in dark.
+  /// Testo primario sopra le superfici Pulse. Light invariato (quasi-nero).
+  /// Dark: bianco puro, valore esatto del widget (era un bianco leggermente
+  /// sporcato, #F5F8FA).
   static const pulseTextPrimary = CupertinoDynamicColor.withBrightness(
     color: Color(0xFF0E1420),
-    darkColor: Color(0xFFF5F8FA),
+    darkColor: Color(0xFFFFFFFF),
   );
 
-  /// Testo secondario/label sopra le superfici Pulse. Grigio scuro in
-  /// light, grigio-blu chiaro (non bianco puro) in dark, per gerarchia
-  /// rispetto al testo primario.
+  /// Testo secondario/label sopra le superfici Pulse. Dark: grigio neutro,
+  /// valore esatto del widget (#B3B3B3, non più grigio-bluastro). Light:
+  /// ricalcolato come grigio neutro equivalente (stessa desaturazione),
+  /// contrasto 5.74:1 su `pulseSurface` chiara.
   static const pulseTextSecondary = CupertinoDynamicColor.withBrightness(
-    color: Color(0xFF5B6472),
-    darkColor: Color(0xFF97A3B3),
+    color: Color(0xFF666666),
+    darkColor: Color(0xFFB3B3B3),
   );
 
   /// Viola elettrico per accenti/gradienti decorativi (direzione
