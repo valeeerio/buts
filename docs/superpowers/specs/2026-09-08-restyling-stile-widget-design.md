@@ -87,14 +87,18 @@ decisa in questa spec.
 
 ### Fase 2 — Componenti condivisi (`lib/widgets/`)
 
-- Estrarre il pattern "etichetta sopra (caption), valore bold sotto, colonne
-  separate da un divisore verticale sottile" in un widget pubblico condiviso
-  (nome indicativo `FlatStatRow`/`FlatStatColumn`, da rifinire in fase di
-  implementazione), basato sia su `_StatTrio` (`busta_paga_summary_hero.dart`)
-  sia sull'analogo Swift nel widget (`SmallStatColumn`/`RateoValore`, solo
-  come riferimento visivo, non da importare/dipendere).
-  `_StatTrio` migra a usare il nuovo componente condiviso invece della propria
-  implementazione privata.
+- **Correzione rispetto alla bozza iniziale**: il pattern "etichetta sopra,
+  valore bold sotto, colonne separate da divisore verticale sottile" **esiste
+  già** come componente condiviso, `BustaPagaStatRow`
+  (`lib/widgets/busta_paga_stat_row.dart`, usato oggi in
+  `busta_paga_detail_screen.dart`/`busta_paga_form_screen.dart` per Ore
+  lavorate/Straordinari) — non va estratto da zero (il riferimento a
+  `_StatTrio` nella bozza iniziale era basato su una parte di CLAUDE.md non
+  più aggiornata rispetto al codice attuale: quella classe privata non esiste
+  più in `busta_paga_summary_hero.dart`). `BustaPagaStatRow` usa già solo
+  token (`AppColors.pulse*`, `AppTextStyles.pulseLabel`/`pulseDisplaySmall`),
+  quindi eredita automaticamente i nuovi colori/font della Fase 1 senza
+  bisogno di modifiche proprie in questa fase.
 - Verifica se i 3 file `LiquidGlassSurface`/`LiquidGlassButton`/
   `GlassFormSection` rimasti sono davvero dead code (nessuna schermata li usa
   più): se sì, rimuoverli; se qualche punto residuo li usa ancora, migrarlo a
