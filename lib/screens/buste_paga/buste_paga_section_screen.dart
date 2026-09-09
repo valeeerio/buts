@@ -17,8 +17,8 @@ import '../../theme/app_spacing.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/busta_paga_formatting.dart';
 import '../../widgets/app_alert_dialog.dart';
-import '../../widgets/collapsible_period_picker.dart';
 import '../../widgets/custom_illustration.dart';
+import '../../widgets/period_preset_picker.dart';
 import '../../widgets/pulse_icon.dart';
 import '../../widgets/pulse_surface.dart';
 import '../../widgets/spring_button.dart';
@@ -692,7 +692,7 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
                           AppSpacing.screenHorizontal,
                           0,
                         ),
-                        child: CollapsiblePeriodPicker(
+                        child: PeriodPresetPicker(
                           minDate: periodoRangeDisponibile.start,
                           maxDate: periodoRangeDisponibile.end,
                           startValue: _periodoFiltro?.start ??
