@@ -68,8 +68,14 @@ class _PeriodYearMonthPickerState extends State<PeriodYearMonthPicker> {
 
   // Larghezza fissa delle schede anno (+ separatore), usata per calcolare
   // l'offset di scroll esatto verso la scheda dell'anno attivo — evita di
-  // dover misurare i `RenderBox` a runtime.
-  static const double _yearChipWidth = 64;
+  // dover misurare i `RenderBox` a runtime. Deve restare abbastanza larga da
+  // contenere un anno a 4 cifre (es. "2026") con il padding orizzontale di
+  // `_YearChip` sottratto, usando il font di sistema (vedi
+  // `AppTextStyles.pulseBodyEmphasis`, w500 16px) — con un padding più
+  // generoso il testo andava a capo su due righe e la seconda riga veniva
+  // ritagliata dall'altezza fissa di 40, mostrando solo "202" invece di
+  // "2026" (bug corretto 2026-09-09).
+  static const double _yearChipWidth = 72;
   static const double _yearChipSpacing = AppSpacing.sm;
 
   final ScrollController _yearScrollController = ScrollController();
@@ -328,12 +334,15 @@ class _YearChip extends StatelessWidget {
       filledGradientColors: active ? [accent, accent] : null,
       onTap: onTap,
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
+        horizontal: AppSpacing.sm,
         vertical: AppSpacing.sm,
       ),
       child: Center(
         child: Text(
           '$year',
+          maxLines: 1,
+          softWrap: false,
+          overflow: TextOverflow.visible,
           style: AppTextStyles.pulseBodyEmphasis.copyWith(
             color: active ? onAccent : textSecondary,
           ),

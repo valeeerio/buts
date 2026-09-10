@@ -18,7 +18,7 @@ import '../../theme/app_text_styles.dart';
 import '../../utils/busta_paga_formatting.dart';
 import '../../widgets/app_alert_dialog.dart';
 import '../../widgets/custom_illustration.dart';
-import '../../widgets/period_preset_picker.dart';
+import '../../widgets/period_filter_button.dart';
 import '../../widgets/pulse_icon.dart';
 import '../../widgets/pulse_surface.dart';
 import '../../widgets/spring_button.dart';
@@ -642,19 +642,33 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    greetingFor(now),
-                                    style: AppTextStyles.pulseDisplay
-                                        .copyWith(color: textPrimary),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    dataLabel,
-                                    style: AppTextStyles.pulseBody
-                                        .copyWith(color: textSecondary),
-                                  ),
-                                ],
+                                children: _tab == _BustePagaTab.statistiche
+                                    ? [
+                                        Text(
+                                          'Statistiche',
+                                          style: AppTextStyles.pulseDisplay
+                                              .copyWith(color: textPrimary),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Netto, ferie, straordinari',
+                                          style: AppTextStyles.pulseBody
+                                              .copyWith(color: textSecondary),
+                                        ),
+                                      ]
+                                    : [
+                                        Text(
+                                          greetingFor(now),
+                                          style: AppTextStyles.pulseDisplay
+                                              .copyWith(color: textPrimary),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          dataLabel,
+                                          style: AppTextStyles.pulseBody
+                                              .copyWith(color: textSecondary),
+                                        ),
+                                      ],
                               ),
                             ),
                             if (_tab == _BustePagaTab.archivio)
@@ -675,6 +689,18 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
                                     ),
                                   ),
                                 ),
+                              )
+                            else if (_tab == _BustePagaTab.statistiche &&
+                                periodoRangeDisponibile != null)
+                              PeriodFilterButton(
+                                minDate: periodoRangeDisponibile.start,
+                                maxDate: periodoRangeDisponibile.end,
+                                startValue: _periodoFiltro?.start ??
+                                    periodoRangeDisponibile.start,
+                                endValue: _periodoFiltro?.end ??
+                                    periodoRangeDisponibile.end,
+                                onChanged: (range) =>
+                                    setState(() => _periodoFiltro = range),
                               ),
                           ],
                         ),
@@ -683,26 +709,6 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
               Expanded(
                 child: Column(
                   children: [
-                    if (_tab == _BustePagaTab.statistiche &&
-                        periodoRangeDisponibile != null)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.screenHorizontal,
-                          AppSpacing.sm,
-                          AppSpacing.screenHorizontal,
-                          0,
-                        ),
-                        child: PeriodPresetPicker(
-                          minDate: periodoRangeDisponibile.start,
-                          maxDate: periodoRangeDisponibile.end,
-                          startValue: _periodoFiltro?.start ??
-                              periodoRangeDisponibile.start,
-                          endValue: _periodoFiltro?.end ??
-                              periodoRangeDisponibile.end,
-                          onChanged: (range) =>
-                              setState(() => _periodoFiltro = range),
-                        ),
-                      ),
                     if (_tab == _BustePagaTab.statistiche &&
                         periodoRangeDisponibile != null)
                       Padding(

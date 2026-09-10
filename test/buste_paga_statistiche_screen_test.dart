@@ -19,7 +19,7 @@ import 'package:buts/screens/buste_paga/buste_paga_statistiche_screen.dart';
 import 'package:buts/services/pdf_import_service.dart';
 import 'package:buts/theme/app_colors.dart';
 import 'package:buts/utils/busta_paga_formatting.dart';
-import 'package:buts/widgets/progress_ring_tile.dart';
+import 'package:buts/widgets/value_tile.dart';
 import 'package:drift/native.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/cupertino.dart';
@@ -126,12 +126,12 @@ void main() {
     await _pumpStatistiche(tester, repo.notifier);
 
     expect(tester.takeException(), isNull);
-    // Il toggle "Confronta con l'anno precedente" aggiunto in cima dal Task
-    // 5 (redesign Statistiche 2026-09-08) spinge la card Straordinario oltre
-    // il cache extent iniziale della `CustomScrollView` — stesso motivo per
-    // cui gli altri test su quella card già scorrono esplicitamente prima di
-    // cercarne i widget interni (vedi `buste_paga_statistiche_screen_repro_
-    // test.dart`).
+
+    // La card Straordinario potrebbe restare oltre il cache extent iniziale
+    // della `CustomScrollView` a seconda del viewport di test — stesso
+    // motivo per cui gli altri test su quella card già scorrono
+    // esplicitamente prima di cercarne i widget interni (vedi
+    // `buste_paga_statistiche_screen_repro_test.dart`).
     await tester.scrollUntilVisible(
       find.text('Straordinario per mese'),
       200,
@@ -202,22 +202,21 @@ void main() {
 
     expect(tester.takeException(), isNull);
 
-    final rings =
-        tester.widgetList<ProgressRingTile>(find.byType(ProgressRingTile));
-    final permessiRing = rings.singleWhere((r) => r.label == 'Permessi');
+    final tiles = tester.widgetList<ValueTile>(find.byType(ValueTile));
+    final permessiTile = tiles.singleWhere((t) => t.label == 'Permessi');
 
     // Valore atteso: SOLO `rolResidui` dell'ultima busta paga (5), formattato
     // come le altre quantità della schermata. Se il codice sommasse
     // indebitamente `permessiGodutiMese` (12), il valore mostrato sarebbe
     // "17" invece di "5" — doppio conteggio della stessa categoria di dato.
-    expect(permessiRing.value, formatNumber(5));
-    expect(permessiRing.value, isNot(formatNumber(5 + 12)));
+    expect(permessiTile.value, formatNumber(5));
+    expect(permessiTile.value, isNot(formatNumber(5 + 12)));
 
     await tester.runAsync(() => repo.db.close());
   });
 
   testWidgets(
-      'card Ferie/Permessi/Ex festività: il tap su un anello apre il '
+      'card Ferie/Permessi/Ex festività: il tap su una tessera apre il '
       'drill-down con i dati dell\'ultima busta paga (Task 3 redesign '
       'Statistiche 2026-09-08)', (tester) async {
     final buste = [
@@ -232,22 +231,21 @@ void main() {
     await _pumpStatistiche(tester, repo.notifier);
     expect(tester.takeException(), isNull);
 
-    // Il toggle "Confronta con l'anno precedente" aggiunto in cima dal Task
-    // 5 (redesign Statistiche 2026-09-08) spinge la card Ferie/Permessi/Ex
-    // festività fuori dall'area visibile iniziale della `CustomScrollView` —
-    // stesso motivo per cui gli altri test in questo file scorrono
+    // La card Ferie/Permessi/Ex festività può restare fuori dall'area
+    // visibile iniziale della `CustomScrollView` a seconda del viewport di
+    // test — stesso motivo per cui gli altri test in questo file scorrono
     // esplicitamente prima di interagire con i widget interni.
-    final ferieRingFinder = find.byWidgetPredicate(
-      (w) => w is ProgressRingTile && w.label == 'Ferie',
+    final ferieTileFinder = find.byWidgetPredicate(
+      (w) => w is ValueTile && w.label == 'Ferie',
     );
     await tester.scrollUntilVisible(
-      ferieRingFinder,
+      ferieTileFinder,
       200,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pump();
 
-    await tester.tap(ferieRingFinder);
+    await tester.tap(ferieTileFinder);
     await tester.pumpAndSettle();
 
     // "Chiudi" segnala l'apertura del sheet di drill-down (Task 1). Il
@@ -260,9 +258,10 @@ void main() {
   });
 
   testWidgets(
-      'card Netto: il tap secco su un punto della linea apre il '
-      'drill-down con la busta paga corrispondente (Task 2 redesign '
-      'Statistiche 2026-09-08)', (tester) async {
+      'card Netto: un tocco/scrub su un punto della linea mostra il '
+      'tooltip custom con la busta paga corrispondente, SENZA aprire il '
+      'drill-down (2026-09-10: il tap secco sul grafico non apre più '
+      'direttamente il dettaglio, solo il tooltip)', (tester) async {
     final buste = [
       _busta(id: 'bp-gen', periodo: DateTime(2026, 1), netto: 1400),
       _busta(id: 'bp-feb', periodo: DateTime(2026, 2), netto: 1600),
@@ -290,16 +289,24 @@ void main() {
     final touchedSpot = TouchLineBarSpot(bar, 0, spot, 0);
 
     touchCallback!(
-      FlTapUpEvent(TapUpDetails(kind: PointerDeviceKind.touch)),
+      FlTapUpEvent(TapUpDetails(
+          kind: PointerDeviceKind.touch, localPosition: const Offset(80, 90))),
       LineTouchResponse([touchedSpot]),
     );
     await tester.pumpAndSettle();
 
-    // "Chiudi" è il bottone del bottom sheet di drill-down
-    // (`showBustaPagaDrilldown`, Task 1): la sua presenza è il segnale
-    // affidabile che il sheet si sia aperto, a differenza del testo
-    // "Febbraio 2026" già presente altrove nella schermata (es. sottotitolo
-    // "Ultima busta paga" della card Ferie/Permessi/Ex festività).
+    // Il tooltip custom mostra il periodo e il netto della busta toccata,
+    // ma nessun drill-down si apre da solo: "Chiudi" (bottone del bottom
+    // sheet) non deve comparire.
+    expect(find.text('Chiudi'), findsNothing);
+    expect(find.text('Vedi dettaglio'), findsOneWidget);
+    expect(find.textContaining(formatEuroConSegno(1600)), findsWidgets);
+
+    // Solo il tap sulla riga "Vedi dettaglio" dentro il tooltip apre il
+    // drill-down.
+    await tester.tap(find.text('Vedi dettaglio'));
+    await tester.pumpAndSettle();
+
     expect(find.text('Chiudi'), findsOneWidget);
     expect(find.textContaining(formatEuroConSegno(1600)), findsWidgets);
 
@@ -307,8 +314,8 @@ void main() {
   });
 
   testWidgets(
-      'card Netto: eventi diversi dal tap secco (es. FlPanUpdateEvent) non '
-      'aprono il drill-down, per non interferire con hover/scrubbing',
+      'card Netto: eventi di scrubbing (es. FlPanUpdateEvent) aggiornano '
+      'anch\'essi il tooltip custom, senza mai aprire il drill-down da soli',
       (tester) async {
     final buste = [
       _busta(id: 'bp-gen', periodo: DateTime(2026, 1), netto: 1400),
@@ -325,12 +332,68 @@ void main() {
     final touchedSpot = TouchLineBarSpot(bar, 0, spot, 0);
 
     touchCallback!(
-      FlPanUpdateEvent(DragUpdateDetails(globalPosition: Offset.zero)),
+      FlPanUpdateEvent(DragUpdateDetails(
+          globalPosition: Offset.zero, localPosition: const Offset(80, 90))),
       LineTouchResponse([touchedSpot]),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Chiudi'), findsNothing);
+    expect(find.text('Vedi dettaglio'), findsOneWidget);
+
+    await tester.runAsync(() => repo.db.close());
+  });
+
+  testWidgets(
+      'card Netto: se `buste` cambia (es. filtro periodo più stretto) '
+      'mentre il tooltip custom è aperto su un punto che non esiste più '
+      'nella griglia ricalcolata, il tooltip si chiude senza lanciare '
+      'eccezioni (bug fix: `_spotIndex` della griglia vecchia non deve '
+      'essere riusato su una griglia più corta)', (tester) async {
+    final buste = [
+      _busta(id: 'bp-gen', periodo: DateTime(2026, 1), netto: 1400),
+      _busta(id: 'bp-feb', periodo: DateTime(2026, 2), netto: 1600),
+      _busta(id: 'bp-mar', periodo: DateTime(2026, 3), netto: 1800),
+    ];
+    final repo = await _setUpRepository(tester, buste: buste);
+
+    // Nessun filtro: la griglia copre gen/feb/mar (+ eventuale estensione).
+    await _pumpStatistiche(tester, repo.notifier);
+    expect(tester.takeException(), isNull);
+
+    final lineChart = tester.widget<LineChart>(find.byType(LineChart));
+    final touchCallback = lineChart.data.lineTouchData.touchCallback;
+    final bar = lineChart.data.lineBarsData.single;
+    // Tocca l'ultimo spot (marzo, indice 2), fuori dai limiti di una
+    // griglia più corta come quella prodotta dal filtro sotto.
+    final spot = bar.spots[2];
+    final touchedSpot = TouchLineBarSpot(bar, 0, spot, 0);
+
+    touchCallback!(
+      FlTapUpEvent(TapUpDetails(
+          kind: PointerDeviceKind.touch, localPosition: const Offset(80, 90))),
+      LineTouchResponse([touchedSpot]),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Vedi dettaglio'), findsOneWidget);
+    expect(find.textContaining(formatEuroConSegno(1800)), findsWidgets);
+
+    // L'utente restringe il filtro periodo a solo gennaio: `filtrati` (e
+    // quindi la griglia ricalcolata) diventa più corta dell'`spotIndex` 2
+    // rimasto in `_spotAttivo` dallo stato precedente.
+    await _pumpStatistiche(
+      tester,
+      repo.notifier,
+      periodoFiltro: (start: DateTime(2026, 1), end: DateTime(2026, 1)),
+    );
+    await tester.pumpAndSettle();
+
+    // Nessuna eccezione (in particolare nessun `RangeError` sull'indicizzazione
+    // della griglia) e il tooltip obsoleto non è più mostrato.
+    expect(tester.takeException(), isNull);
+    expect(find.text('Vedi dettaglio'), findsNothing);
+    expect(find.textContaining(formatEuroConSegno(1800)), findsNothing);
 
     await tester.runAsync(() => repo.db.close());
   });
@@ -490,216 +553,4 @@ void main() {
     await tester.runAsync(() => repo.db.close());
   });
 
-  group('confronto anno su anno (Task 5 redesign Statistiche 2026-09-08)', () {
-    // Un'ancora ben oltre `periodoFiltro` (2030) fa sì che l'ultima busta
-    // paga REALMENTE disponibile (`sorted.last`, usata per calcolare
-    // `estendiFinoA`) sia successiva alla fine del filtro esplicito: così
-    // `estendiFinoA` coincide esattamente con `filtro.end` (nessuno slot
-    // vuoto aggiunto in coda), e gli indici della griglia mensile
-    // corrispondono 1:1 ai 2 mesi del filtro senza calcoli aggiuntivi legati
-    // alla data odierna reale in cui gira il test.
-    List<BustaPaga> buste() => [
-          _busta(
-              id: 'bp-2025-gen',
-              periodo: DateTime(2025, 1),
-              netto: 1000,
-              straordinari: 2),
-          _busta(
-              id: 'bp-2025-feb',
-              periodo: DateTime(2025, 2),
-              netto: 1100,
-              straordinari: 3),
-          _busta(
-              id: 'bp-2026-gen',
-              periodo: DateTime(2026, 1),
-              netto: 1400,
-              straordinari: 5),
-          _busta(
-              id: 'bp-2026-feb',
-              periodo: DateTime(2026, 2),
-              netto: 1600,
-              straordinari: 10),
-          _busta(id: 'bp-ancora', periodo: DateTime(2030, 1), netto: 9999),
-        ];
-
-    final periodoFiltro = (start: DateTime(2026, 1), end: DateTime(2026, 2));
-
-    testWidgets(
-        'con periodoFiltro == null il toggle è presente ma non '
-        'interagibile', (tester) async {
-      final repo = await _setUpRepository(tester, buste: buste());
-
-      await _pumpStatistiche(tester, repo.notifier);
-      expect(tester.takeException(), isNull);
-
-      expect(find.text('Confronta con l\'anno precedente'), findsOneWidget);
-      final toggle = tester.widget<CupertinoSwitch>(
-        find.byType(CupertinoSwitch),
-      );
-      expect(toggle.onChanged, isNull);
-
-      await tester.runAsync(() => repo.db.close());
-    });
-
-    testWidgets(
-        'con periodoFiltro non-null il toggle è interagibile ma di default '
-        'spento: nessuna seconda serie nei grafici', (tester) async {
-      final repo = await _setUpRepository(tester, buste: buste());
-
-      await _pumpStatistiche(tester, repo.notifier,
-          periodoFiltro: periodoFiltro);
-      expect(tester.takeException(), isNull);
-
-      final toggle = tester.widget<CupertinoSwitch>(
-        find.byType(CupertinoSwitch),
-      );
-      expect(toggle.onChanged, isNotNull);
-      expect(toggle.value, isFalse);
-
-      final lineChart = tester.widget<LineChart>(find.byType(LineChart));
-      expect(lineChart.data.lineBarsData, hasLength(1));
-
-      await tester.runAsync(() => repo.db.close());
-    });
-
-    testWidgets(
-        'attivando il toggle compare la linea tratteggiata Netto con i dati '
-        'dello stesso range un anno prima', (tester) async {
-      final repo = await _setUpRepository(tester, buste: buste());
-
-      await _pumpStatistiche(tester, repo.notifier,
-          periodoFiltro: periodoFiltro);
-
-      await tester.tap(find.byType(CupertinoSwitch));
-      await tester.pumpAndSettle();
-      expect(tester.takeException(), isNull);
-
-      final lineChart = tester.widget<LineChart>(find.byType(LineChart));
-      expect(lineChart.data.lineBarsData, hasLength(2));
-
-      final mainLine = lineChart.data.lineBarsData[0];
-      final ghostLine = lineChart.data.lineBarsData[1];
-
-      // La linea fantasma non ha area riempita ed è tratteggiata.
-      expect(ghostLine.dashArray, [6, 4]);
-      expect(ghostLine.belowBarData.show, isFalse);
-      // Stesso ciano della linea principale, opacità ridotta.
-      expect(ghostLine.color, mainLine.color!.withValues(alpha: 0.35));
-
-      // Allineata indice per indice con la griglia principale (gen/feb
-      // 2026 → gen/feb 2025).
-      expect(ghostLine.spots[0].y, 1000);
-      expect(ghostLine.spots[1].y, 1100);
-
-      await tester.runAsync(() => repo.db.close());
-    });
-
-    testWidgets(
-        'il tap sulla linea fantasma dell\'anno precedente non apre il '
-        'drill-down', (tester) async {
-      final repo = await _setUpRepository(tester, buste: buste());
-
-      await _pumpStatistiche(tester, repo.notifier,
-          periodoFiltro: periodoFiltro);
-      await tester.tap(find.byType(CupertinoSwitch));
-      await tester.pumpAndSettle();
-
-      final lineChart = tester.widget<LineChart>(find.byType(LineChart));
-      final touchCallback = lineChart.data.lineTouchData.touchCallback;
-      final ghostBar = lineChart.data.lineBarsData[1];
-      final ghostSpot = ghostBar.spots[0];
-      final touchedGhostSpot = TouchLineBarSpot(ghostBar, 1, ghostSpot, 0);
-
-      touchCallback!(
-        FlTapUpEvent(TapUpDetails(kind: PointerDeviceKind.touch)),
-        LineTouchResponse([touchedGhostSpot]),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Chiudi'), findsNothing);
-
-      await tester.runAsync(() => repo.db.close());
-    });
-
-    testWidgets(
-        'attivando il toggle compaiono le barre a contorno Straordinario con '
-        'i dati dello stesso range un anno prima', (tester) async {
-      final repo = await _setUpRepository(tester, buste: buste());
-
-      await _pumpStatistiche(tester, repo.notifier,
-          periodoFiltro: periodoFiltro);
-      await tester.tap(find.byType(CupertinoSwitch));
-      await tester.pumpAndSettle();
-
-      await tester.scrollUntilVisible(
-        find.text('Straordinario per mese'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pump();
-
-      final barChart = tester.widget<BarChart>(find.byType(BarChart));
-      final gruppoGennaio =
-          barChart.data.barGroups.firstWhere((g) => g.x == 0);
-      final gruppoFebbraio =
-          barChart.data.barGroups.firstWhere((g) => g.x == 1);
-
-      expect(gruppoGennaio.barRods, hasLength(2));
-      expect(gruppoFebbraio.barRods, hasLength(2));
-
-      final ghostGennaio = gruppoGennaio.barRods[1];
-      final ghostFebbraio = gruppoFebbraio.barRods[1];
-
-      // Nessun riempimento, solo contorno ciano.
-      expect(ghostGennaio.color, CupertinoColors.transparent);
-      expect(ghostGennaio.borderSide.width, greaterThan(0));
-      expect(ghostGennaio.toY, 2);
-      expect(ghostFebbraio.toY, 3);
-
-      await tester.runAsync(() => repo.db.close());
-    });
-
-    testWidgets(
-        'il tap su una barra fantasma dell\'anno precedente non apre il '
-        'drill-down', (tester) async {
-      final repo = await _setUpRepository(tester, buste: buste());
-
-      await _pumpStatistiche(tester, repo.notifier,
-          periodoFiltro: periodoFiltro);
-      await tester.tap(find.byType(CupertinoSwitch));
-      await tester.pumpAndSettle();
-
-      await tester.scrollUntilVisible(
-        find.text('Straordinario per mese'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pump();
-
-      final barChart = tester.widget<BarChart>(find.byType(BarChart));
-      final touchCallback = barChart.data.barTouchData.touchCallback;
-      final group = barChart.data.barGroups.firstWhere((g) => g.x == 1);
-      final ghostRod = group.barRods[1];
-      final touchedSpot = BarTouchedSpot(
-        group,
-        1,
-        ghostRod,
-        1,
-        null,
-        -1,
-        FlSpot(group.x.toDouble(), ghostRod.toY),
-        Offset.zero,
-      );
-
-      touchCallback!(
-        FlTapUpEvent(TapUpDetails(kind: PointerDeviceKind.touch)),
-        BarTouchResponse(touchedSpot),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('Chiudi'), findsNothing);
-
-      await tester.runAsync(() => repo.db.close());
-    });
-  });
 }

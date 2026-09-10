@@ -17,6 +17,7 @@ import '../../widgets/pulse_surface.dart';
 import '../../widgets/spring_button.dart';
 import '../../widgets/staggered_fade_slide_in.dart';
 import '../../widgets/swipe_delete_background.dart';
+import '../../widgets/value_tile.dart';
 
 /// Filtra le buste paga per periodo (nome mese, anno e/o etichetta di tipo,
 /// case-insensitive). Query vuota (dopo trim) restituisce l'elenco
@@ -764,10 +765,12 @@ class _EmptyState extends StatelessWidget {
 /// "Permessi" corrisponde ai campi `rol*`, stessa etichetta già usata da
 /// `BustaPagaMaturazioniSection` nel dettaglio, non una quarta categoria
 /// distinta dai ROL — per l'ultima busta paga in archivio. Una riga di 3
-/// tessere `_ValueTile` (solo valore + label, nessun anello di progresso),
-/// non un `GridView` 2x2: il dominio dati traccia solo 3 categorie di ratei
-/// (Ferie, Permessi/ROL, Ex festività), non 4 — vedi CLAUDE.md "Ferie, ROL e
-/// permessi" nel dettaglio busta paga, stessa fonte di verità.
+/// tessere `ValueTile` (`lib/widgets/value_tile.dart`, solo valore + label,
+/// nessun anello di progresso), non un `GridView` 2x2: il dominio dati
+/// traccia solo 3 categorie di ratei (Ferie, Permessi/ROL, Ex festività), non
+/// 4 — vedi CLAUDE.md "Ferie, ROL e permessi" nel dettaglio busta paga,
+/// stessa fonte di verità. `ValueTile` è condiviso anche con la card "Ferie,
+/// Permessi, Ex festività" in Statistiche.
 class _MaturazioniRingsRow extends StatelessWidget {
   final BustaPaga bustaPaga;
 
@@ -778,75 +781,26 @@ class _MaturazioniRingsRow extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: _ValueTile(
+          child: ValueTile(
             label: 'Ferie',
             value: formatNumber(bustaPaga.ferieResidue),
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
-          child: _ValueTile(
+          child: ValueTile(
             label: 'Permessi',
             value: formatNumber(bustaPaga.rolResidui),
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
-          child: _ValueTile(
+          child: ValueTile(
             label: 'Ex festività',
             value: formatNumber(bustaPaga.exFestivitaResidue),
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Tessera piatta con un valore in evidenza e una label sotto, senza alcun
-/// indicatore di progresso — sostituisce `ProgressRingTile` in
-/// `_MaturazioniRingsRow` (che resta invariato come widget condiviso e
-/// continua a essere usato dal dettaglio busta paga e da Statistiche).
-class _ValueTile extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _ValueTile({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final textPrimary =
-        CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
-    final textSecondary =
-        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
-
-    return PulseSurface(
-      borderRadius: AppRadius.pulseSmall,
-      padding: const EdgeInsets.symmetric(
-        vertical: AppSpacing.md,
-        horizontal: AppSpacing.sm,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            value,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.pulseDisplaySmall.copyWith(
-              color: textPrimary,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.pulseLabel.copyWith(color: textSecondary),
-          ),
-        ],
-      ),
     );
   }
 }

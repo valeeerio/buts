@@ -23,6 +23,8 @@ enum PulseIconGlyph {
   settings,
   archive,
   chart,
+  filter,
+  cycle,
 }
 
 /// Icona vettoriale custom, disegnata con `CustomPainter` invece che con
@@ -271,6 +273,73 @@ class _PulseIconPainter extends CustomPainter {
           Offset(w * 0.6, h * 0.58),
           stroke,
         );
+        break;
+
+      case PulseIconGlyph.filter:
+        // Tre linee orizzontali di larghezza decrescente, centrate, stile
+        // "sliders/filtro" — coordinate normalizzate su una griglia 16x16
+        // (mockup: M2 3h12 / M4.5 8h7 / M7 13h2).
+        canvas.drawLine(
+          Offset(w * (2 / 16), h * (3 / 16)),
+          Offset(w * (14 / 16), h * (3 / 16)),
+          stroke,
+        );
+        canvas.drawLine(
+          Offset(w * (4.5 / 16), h * (8 / 16)),
+          Offset(w * (11.5 / 16), h * (8 / 16)),
+          stroke,
+        );
+        canvas.drawLine(
+          Offset(w * (7 / 16), h * (13 / 16)),
+          Offset(w * (9 / 16), h * (13 / 16)),
+          stroke,
+        );
+        break;
+
+      case PulseIconGlyph.cycle:
+        // Due archi opposti con freccia in punta — stile "cicla/confronta"
+        // (sostituisce `CupertinoIcons.arrow_2_circlepath`), stessa tecnica
+        // trigonometrica di `settings` sopra.
+        final center = Offset(w * 0.5, h * 0.5);
+        final radius = w * 0.26;
+        final rect = Rect.fromCircle(center: center, radius: radius);
+        const degToRad = math.pi / 180;
+        final arcs = [
+          (-160.0 * degToRad, 140.0 * degToRad),
+          (20.0 * degToRad, 140.0 * degToRad),
+        ];
+        final arrowLen = w * 0.16;
+        for (final arc in arcs) {
+          final startAngle = arc.$1;
+          final sweepAngle = arc.$2;
+          canvas.drawArc(rect, startAngle, sweepAngle, false, stroke);
+
+          final endAngle = startAngle + sweepAngle;
+          final tip = Offset(
+            center.dx + radius * math.cos(endAngle),
+            center.dy + radius * math.sin(endAngle),
+          );
+          // Direzione di percorrenza dell'arco nel punto finale: puntando
+          // avanti disegniamo una freccia che comunica il "ciclo" continuo.
+          final tangentAngle = endAngle + math.pi / 2;
+          final backAngle = tangentAngle + math.pi;
+          canvas.drawLine(
+            tip,
+            Offset(
+              tip.dx + arrowLen * math.cos(backAngle - 0.5),
+              tip.dy + arrowLen * math.sin(backAngle - 0.5),
+            ),
+            stroke,
+          );
+          canvas.drawLine(
+            tip,
+            Offset(
+              tip.dx + arrowLen * math.cos(backAngle + 0.5),
+              tip.dy + arrowLen * math.sin(backAngle + 0.5),
+            ),
+            stroke,
+          );
+        }
         break;
 
       case PulseIconGlyph.chart:

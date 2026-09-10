@@ -1,5 +1,7 @@
+import 'package:buts/theme/app_text_styles.dart';
 import 'package:buts/widgets/period_year_month_picker.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
@@ -359,6 +361,48 @@ void main() {
       );
       expect(disabledCells, findsNWidgets(11));
       expect(enabledCells, findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'il testo della scheda anno non va a capo su due righe (bug '
+    'corretto 2026-09-09: con un chip troppo stretto rispetto al font di '
+    'sistema, "2026" andava a capo e la seconda riga veniva ritagliata, '
+    'mostrando solo "202")',
+    (tester) async {
+      final minDate = DateTime(2024, 1);
+      final maxDate = DateTime(2024, 12);
+      await tester.pumpWidget(
+        buildApp(
+          minDate: minDate,
+          maxDate: maxDate,
+          startValue: DateTime(2024, 1),
+          endValue: DateTime(2024, 1),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final paragraph = tester.renderObject<RenderParagraph>(
+        find.text('2024'),
+      );
+
+      // Un layout a riga singola (nessun a-capo) misura al massimo una
+      // line-height: costruiamo un paragrafo di riferimento illimitato in
+      // larghezza con lo stesso testo/stile per ottenere l'altezza di una
+      // singola riga, e verifichiamo che l'altezza renderizzata coincida
+      // (con qualche tolleranza) — se il testo fosse andato a capo su due
+      // righe (bug corretto), l'altezza renderizzata sarebbe quasi doppia.
+      final reference = TextPainter(
+        text: const TextSpan(
+          text: '2024',
+          style: AppTextStyles.pulseBodyEmphasis,
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final singleLineHeight = reference.height;
+
+      expect(paragraph.size.height, lessThan(singleLineHeight * 1.5));
+      expect(tester.takeException(), isNull);
     },
   );
 }

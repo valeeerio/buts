@@ -1,10 +1,8 @@
-// Smoke test di stabilità (NON golden/pixel): dopo la rimozione del forcing
-// della dark mode (`lib/main.dart`, `ios/Runner/Info.plist`), l'app segue il
-// `platformBrightness` reale del sistema — queste schermate vanno quindi
-// esercitate esplicitamente sia in `Brightness.light` sia in
-// `Brightness.dark` per verificare che nessuna delle due producano
-// un'eccezione/overflow. Nessuna asserzione sull'aspetto visivo: solo
-// `tester.takeException()` nullo.
+// Smoke test di stabilità (NON golden/pixel): l'app è solo dark mode
+// (`lib/main.dart` forza `CupertinoThemeData(brightness: Brightness.dark)`),
+// queste schermate vengono quindi esercitate in `Brightness.dark` per
+// verificare che non producano eccezioni/overflow. Nessuna asserzione
+// sull'aspetto visivo: solo `tester.takeException()` nullo.
 import 'package:buts/data/database.dart';
 import 'package:buts/models/busta_paga.dart';
 import 'package:buts/providers/buste_paga_provider.dart';
@@ -79,8 +77,7 @@ Future<
   return (db: db, notifier: notifier);
 }
 
-Widget _wrapWithBrightness({
-  required Brightness brightness,
+Widget _wrapForTest({
   required BustePagaNotifier notifier,
   required Widget child,
 }) {
@@ -88,12 +85,10 @@ Widget _wrapWithBrightness({
     overrides: [
       busteRepositoryProvider.overrideWith((ref) => notifier),
     ],
-    child: MediaQuery(
-      data: MediaQueryData(platformBrightness: brightness),
-      child: CupertinoApp(
-        debugShowCheckedModeBanner: false,
-        home: child,
-      ),
+    child: CupertinoApp(
+      debugShowCheckedModeBanner: false,
+      theme: const CupertinoThemeData(brightness: Brightness.dark),
+      home: child,
     ),
   );
 }
@@ -103,79 +98,70 @@ void main() {
     await initializeDateFormatting('it_IT');
   });
 
-  for (final brightness in [Brightness.light, Brightness.dark]) {
-    final label = brightness == Brightness.light ? 'light' : 'dark';
+  testWidgets('Archivio (BustePagaSectionScreen) - nessuna eccezione',
+      (tester) async {
+    final repo = await _makeRepo(tester);
 
-    testWidgets('Archivio (BustePagaSectionScreen) - nessuna eccezione in $label',
-        (tester) async {
-      final repo = await _makeRepo(tester);
+    await tester.pumpWidget(_wrapForTest(
+      notifier: repo.notifier,
+      child: const BustePagaSectionScreen(),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-      await tester.pumpWidget(_wrapWithBrightness(
-        brightness: brightness,
-        notifier: repo.notifier,
-        child: const BustePagaSectionScreen(),
-      ));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
 
-      expect(tester.takeException(), isNull);
+    await tester.runAsync(() => repo.db.close());
+  });
 
-      await tester.runAsync(() => repo.db.close());
-    });
+  testWidgets('Dettaglio busta paga - nessuna eccezione', (tester) async {
+    final repo = await _makeRepo(tester);
+    final busta = _busta(id: 'bp-gen', periodo: DateTime(2026, 1));
 
-    testWidgets('Dettaglio busta paga - nessuna eccezione in $label',
-        (tester) async {
-      final repo = await _makeRepo(tester);
-      final busta = _busta(id: 'bp-gen', periodo: DateTime(2026, 1));
+    await tester.pumpWidget(_wrapForTest(
+      notifier: repo.notifier,
+      child: BustaPagaDetailScreen(bustaPaga: busta),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-      await tester.pumpWidget(_wrapWithBrightness(
-        brightness: brightness,
-        notifier: repo.notifier,
-        child: BustaPagaDetailScreen(bustaPaga: busta),
-      ));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
 
-      expect(tester.takeException(), isNull);
+    await tester.runAsync(() => repo.db.close());
+  });
 
-      await tester.runAsync(() => repo.db.close());
-    });
+  testWidgets('Form di import - nessuna eccezione', (tester) async {
+    final repo = await _makeRepo(tester);
 
-    testWidgets('Form di import - nessuna eccezione in $label', (tester) async {
-      final repo = await _makeRepo(tester);
+    await tester.pumpWidget(_wrapForTest(
+      notifier: repo.notifier,
+      child: const BustaPagaFormScreen.daImport(
+        fileOrigine: '/tmp/finto.pdf',
+        estratti: _estrattiImport,
+      ),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-      await tester.pumpWidget(_wrapWithBrightness(
-        brightness: brightness,
-        notifier: repo.notifier,
-        child: const BustaPagaFormScreen.daImport(
-          fileOrigine: '/tmp/finto.pdf',
-          estratti: _estrattiImport,
-        ),
-      ));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
 
-      expect(tester.takeException(), isNull);
+    await tester.runAsync(() => repo.db.close());
+  });
 
-      await tester.runAsync(() => repo.db.close());
-    });
+  testWidgets('Statistiche - nessuna eccezione', (tester) async {
+    final repo = await _makeRepo(tester);
 
-    testWidgets('Statistiche - nessuna eccezione in $label', (tester) async {
-      final repo = await _makeRepo(tester);
+    await tester.pumpWidget(_wrapForTest(
+      notifier: repo.notifier,
+      child: BustePagaStatisticheScreen(
+        periodoFiltro: (start: DateTime(2026, 1), end: DateTime(2026, 1)),
+      ),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
 
-      await tester.pumpWidget(_wrapWithBrightness(
-        brightness: brightness,
-        notifier: repo.notifier,
-        child: BustePagaStatisticheScreen(
-          periodoFiltro: (start: DateTime(2026, 1), end: DateTime(2026, 1)),
-        ),
-      ));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+    expect(tester.takeException(), isNull);
 
-      expect(tester.takeException(), isNull);
-
-      await tester.runAsync(() => repo.db.close());
-    });
-  }
+    await tester.runAsync(() => repo.db.close());
+  });
 }

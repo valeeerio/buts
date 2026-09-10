@@ -12,9 +12,10 @@ import '../../theme/app_text_styles.dart';
 import '../../utils/busta_paga_formatting.dart';
 import '../../widgets/busta_paga_drilldown_sheet.dart';
 import '../../widgets/period_year_month_picker.dart';
-import '../../widgets/progress_ring_tile.dart';
 import '../../widgets/pulse_icon.dart';
 import '../../widgets/pulse_surface.dart';
+import '../../widgets/spring_button.dart';
+import '../../widgets/value_tile.dart';
 
 /// Contenuto della tab "Statistiche" della sezione Buste Paga.
 ///
@@ -44,14 +45,11 @@ import '../../widgets/pulse_surface.dart';
 /// Le barre Straordinario (Task 4, 2026-09-08) sono un riempimento pieno
 /// ciano (niente più gradiente viola→ciano né glow dietro la barra massima),
 /// tappabili con lo stesso drill-down. Il confronto anno su anno (Task 5,
-/// 2026-09-08) aggiunge, quando l'utente attiva il toggle "Confronta con
-/// l'anno precedente" (stato locale `_confrontaAnnoPrecedente`, unico a
-/// livello di schermata, richiede un `periodoFiltro` esplicito) una seconda
-/// serie "fantasma" — stesso ciano a opacità ridotta e tratteggiata per la
-/// linea Netto, una barra a solo contorno ciano accanto a quella piena per
-/// lo Straordinario — con i dati dello stesso range di mesi un anno prima,
-/// esclusa dal drill-down su entrambi i grafici.
-class BustePagaStatisticheScreen extends ConsumerStatefulWidget {
+/// 2026-09-08) è stato rimosso il 2026-09-09 su richiesta esplicita
+/// dell'utente: ridondante col preset dedicato "Anno precedente" del filtro
+/// periodo (`PeriodFilterButton`), che permette già di guardare l'anno
+/// scorso filtrando direttamente.
+class BustePagaStatisticheScreen extends ConsumerWidget {
   final ({DateTime start, DateTime end})? periodoFiltro;
 
   const BustePagaStatisticheScreen({super.key, this.periodoFiltro});
@@ -66,39 +64,17 @@ class BustePagaStatisticheScreen extends ConsumerStatefulWidget {
   // dell'app (`pulseAccent`, ciano) — niente più una seconda serie Lordo
   // (Task 2 del redesign 2026-09-08, vedi CLAUDE.md).
   static const _nettoColor = AppColors.pulseAccent;
-  // Anelli dello snapshot Ferie/Permessi/Ex festività: stessa tinta
-  // funzionale primaria dell'app per tutti e 3 (Task 3 del redesign
-  // 2026-09-08, vedi CLAUDE.md) — nessun hue diverso per anello, solo
-  // opacità decrescente per distinguere i 3 cerchi affiancati a colpo
-  // d'occhio senza reintrodurre una palette multicolore.
-  static const _ferieColor = AppColors.pulseAccent;
-  static const _permessiRolColor = AppColors.pulseAccent;
-  static const _exFestivitaColor = AppColors.pulseAccent;
   // Barre Straordinario: riempimento pieno ciano (Task 4 del redesign
   // 2026-09-08, vedi CLAUDE.md) — niente più gradiente viola→ciano né glow
   // dietro la barra massima, solo opacità ridotta per le barre non massime.
   static const _straordinarioColor = AppColors.pulseAccent;
 
   @override
-  ConsumerState<BustePagaStatisticheScreen> createState() =>
-      _BustePagaStatisticheScreenState();
-}
-
-class _BustePagaStatisticheScreenState
-    extends ConsumerState<BustePagaStatisticheScreen> {
-  // Stato locale del toggle "Confronta con l'anno precedente" (Task 5 del
-  // redesign 2026-09-08, vedi CLAUDE.md): unico a livello di schermata,
-  // applicato sia a Netto sia a Straordinario, non persistito tra
-  // sessioni/aperture. Richiede un `periodoFiltro` esplicito (vedi `build`)
-  // — con "Da sempre" non esiste un "anno prima" ben definito.
-  bool _confrontaAnnoPrecedente = false;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tutte = ref.watch(busteRepositoryProvider);
     final buste = tutte.where(bustaInclusaInStatistiche).toList();
     final sorted = [...buste]..sort((a, b) => a.periodo.compareTo(b.periodo));
-    final filtro = widget.periodoFiltro;
+    final filtro = periodoFiltro;
     final filtrati = filtro == null
         ? sorted
         : sorted
@@ -106,18 +82,6 @@ class _BustePagaStatisticheScreenState
                 !b.periodo.isBefore(filtro.start) &&
                 !b.periodo.isAfter(filtro.end))
             .toList();
-
-    // Dati dell'anno precedente per il confronto anno su anno (Netto e
-    // Straordinario): solo quando il toggle è attivo E c'è un range
-    // esplicito selezionato — con "Da sempre" (`filtro == null`) non c'è un
-    // "anno prima" ben definito, vedi doc di [_busteAnnoPrecedente].
-    final busteAnnoPrecedente = _confrontaAnnoPrecedente && filtro != null
-        ? _busteAnnoPrecedente(
-            tutte: sorted,
-            start: filtro.start,
-            end: filtro.end,
-          )
-        : null;
 
     // Buste mensili "Da confermare" nel periodo selezionato (stesso filtro
     // di `filtrati`, criterio permissivo di [_bustaInclusaInRangePeriodo]
@@ -190,22 +154,6 @@ class _BustePagaStatisticheScreenState
               AppSpacing.screenHorizontal,
               AppSpacing.lg,
               AppSpacing.screenHorizontal,
-              0,
-            ),
-            sliver: SliverToBoxAdapter(
-              child: _ConfrontaAnnoPrecedenteToggle(
-                value: _confrontaAnnoPrecedente,
-                enabled: filtro != null,
-                onChanged: (value) =>
-                    setState(() => _confrontaAnnoPrecedente = value),
-              ),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.screenHorizontal,
-              AppSpacing.md,
-              AppSpacing.screenHorizontal,
               AppSpacing.md,
             ),
             sliver: SliverToBoxAdapter(
@@ -228,7 +176,6 @@ class _BustePagaStatisticheScreenState
                             child: _NettoChart(
                               buste: filtrati,
                               estendiFinoA: estendiFinoA,
-                              busteAnnoPrecedente: busteAnnoPrecedente,
                             ),
                           ),
                         ],
@@ -273,7 +220,6 @@ class _BustePagaStatisticheScreenState
                   buste: filtrati,
                   busteNonConfermate: busteNonConfermate,
                   estendiFinoA: estendiFinoA,
-                  busteAnnoPrecedente: busteAnnoPrecedente,
                 ),
               ),
             ),
@@ -333,54 +279,6 @@ class _NoDataMessage extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Toggle unico a livello di schermata (non duplicato per card, vedi CLAUDE.
-/// md) per il confronto anno su anno di Netto e Straordinario (Task 5 del
-/// redesign 2026-09-08). Disabilitato quando [enabled] è `false`, cioè
-/// quando `periodoFiltro == null` ("Da sempre": non esiste un "anno prima"
-/// ben definito, vedi [_busteAnnoPrecedente]) — resta visibile ma non
-/// interagibile, invece di sparire, così l'utente capisce che la funzione
-/// esiste ma richiede un periodo selezionato.
-class _ConfrontaAnnoPrecedenteToggle extends StatelessWidget {
-  final bool value;
-  final bool enabled;
-  final ValueChanged<bool> onChanged;
-
-  const _ConfrontaAnnoPrecedenteToggle({
-    required this.value,
-    required this.enabled,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final primary =
-        CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context);
-    final secondary =
-        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
-    final accent = CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
-    final textColor = enabled ? primary : secondary;
-
-    return Opacity(
-      opacity: enabled ? 1.0 : 0.5,
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              'Confronta con l\'anno precedente',
-              style: AppTextStyles.pulseBody.copyWith(color: textColor),
-            ),
-          ),
-          CupertinoSwitch(
-            value: value && enabled,
-            activeTrackColor: accent,
-            onChanged: enabled ? onChanged : null,
-          ),
-        ],
       ),
     );
   }
@@ -766,27 +664,6 @@ List<int> _yearBoundaryIndices(List<DateTime> periodi) {
   return indices;
 }
 
-/// Sottoinsieme di [tutte] che cade nello stesso range di mesi di
-/// [start]/[end] ma un anno prima — stesso identico criterio di inclusione
-/// di `filtrati` nella schermata (nessun filtro aggiuntivo, in particolare
-/// nessun requisito di conferma extra oltre a quello già applicato a
-/// [tutte] dal chiamante), usato per il confronto anno su anno opzionale di
-/// Netto/Straordinario (Task 5 del redesign 2026-09-08).
-List<BustaPaga> _busteAnnoPrecedente({
-  required List<BustaPaga> tutte,
-  required DateTime start,
-  required DateTime end,
-}) {
-  final startAnnoPrima = DateTime(start.year - 1, start.month);
-  final endAnnoPrima = DateTime(end.year - 1, end.month);
-  return tutte
-      .where((b) =>
-          !b.periodo.isBefore(startAnnoPrima) &&
-          !b.periodo.isAfter(endAnnoPrima))
-      .toList()
-    ..sort((a, b) => a.periodo.compareTo(b.periodo));
-}
-
 /// Espande [buste] (assunta ordinata per periodo crescente, un solo
 /// elemento per mese solare — garantito da [bustaInclusaInStatistiche], che
 /// filtra solo mensili confermate: l'app impedisce comunque due mensili
@@ -1114,12 +991,26 @@ double _niceStep(
 const _euroCompactAxisReservedSize = 52.0;
 
 /// Colori condivisi per lo sfondo/testo dei tooltip al tocco, usati da tutti
-/// e tre i grafici — estratti per non avere tre calcoli divergenti.
+/// e tre i grafici — estratti per non avere tre calcoli divergenti. Stesso
+/// materiale/colori del resto dell'app (Opzione A del mockup 2026-09-10:
+/// `pulseSurface`/`pulseTextPrimary`, la stessa coppia usata da ogni altra
+/// card) invece dell'inversione di default di fl_chart, con un bordo
+/// sottile in accento (vedi `_tooltipBorder`) per farlo comunque risaltare
+/// dal grafico sottostante.
 ({Color background, Color text}) _tooltipColors(BuildContext context) {
   return (
-    background:
-        CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context),
-    text: CupertinoDynamicColor.resolve(AppColors.pulseBackground, context),
+    background: CupertinoDynamicColor.resolve(AppColors.pulseSurface, context),
+    text: CupertinoDynamicColor.resolve(AppColors.pulseTextPrimary, context),
+  );
+}
+
+/// Bordo sottile in accento condiviso dai tooltip dei grafici Netto e
+/// Straordinario — vedi doc di [_tooltipColors].
+BorderSide _tooltipBorder(BuildContext context) {
+  return BorderSide(
+    color: CupertinoDynamicColor.resolve(AppColors.pulseAccent, context)
+        .withValues(alpha: 0.4),
+    width: 1,
   );
 }
 
@@ -1220,32 +1111,125 @@ class _NettoHeader extends StatelessWidget {
 /// serie Lordo né un glow dietro il tracciato (Task 2 del redesign
 /// 2026-09-08, vedi CLAUDE.md — vincolo "nessun glow/bagliore diffuso nei
 /// grafici"; l'area sotto la linea resta perché è un riempimento pieno a
-/// bassa opacità, non un bagliore). Il tap secco (`FlTapUpEvent`, non
-/// hover/drag) su un punto apre il drill-down (`showBustaPagaDrilldown`)
-/// sulla busta paga corrispondente — lo scrubbing/hover continua a mostrare
-/// il tooltip nativo di fl_chart senza aprire nulla. Stessa griglia mensile
-/// continua/bound "nice" di prima del redesign, nessun cambio alla logica di
-/// aggregazione dei dati.
+/// bassa opacità, non un bagliore). Stessa griglia mensile continua/bound
+/// "nice" di prima del redesign, nessun cambio alla logica di aggregazione
+/// dei dati.
 ///
-/// [busteAnnoPrecedente], se non nullo/non vuoto (confronto anno su anno
-/// attivo, Task 5 del redesign 2026-09-08), aggiunge una seconda linea
-/// "fantasma" allineata sullo stesso asse X (indice i ↔ stesso mese un anno
-/// prima): stesso ciano a opacità ridotta, tratteggiata, senza area
-/// riempita — esclusa dal drill-down al tap, che continua a riferirsi solo
-/// alla serie principale (identificata da `LineBarSpot.barIndex == 0`).
-class _NettoChart extends StatelessWidget {
+/// Tooltip custom con "Vedi dettaglio" tappabile (2026-09-10, da mockup):
+/// il tooltip nativo di fl_chart (`LineTouchTooltipData`) è disegnato su
+/// canvas come testo formattato — non può contenere un elemento realmente
+/// tappabile al suo interno, quindi il tap secco sul grafico non apre più
+/// direttamente il drill-down. Il tooltip nativo resta disattivato
+/// (`getTooltipItems` ritorna sempre `null`: con tutti gli item `null` il
+/// painter di fl_chart non disegna nulla, vedi `LineChartPainter.
+/// drawTouchTooltip`) e sostituito da un overlay Flutter reale
+/// (`_NettoTooltipOverlay`, `Positioned` dentro uno `Stack` che avvolge il
+/// `LineChart`), aggiornato ad ogni evento di touch/hover/drag
+/// (`touchCallback`, senza più distinguere tap secco da scrubbing: entrambi
+/// ora si limitano a mostrare/aggiornare il tooltip, l'apertura del
+/// drill-down avviene SOLO toccando la riga "Vedi dettaglio →" al suo
+/// interno). Il pallino sul punto attivo (`getTouchedSpotIndicator`) resta
+/// invariato, disegnato nativamente da fl_chart tramite
+/// `handleBuiltInTouches` (default `true`, mai disattivato qui).
+///
+/// Posizione dell'overlay: calcolata da `event.localPosition` (offset in
+/// pixel del tocco, esposto da ogni `FlTouchEvent` — vedi
+/// `fl_touch_event.dart`), non da una conversione manuale dei valori dati in
+/// coordinate schermo (richiederebbe replicare la logica interna di
+/// `LineChartPainter.getPixelX/getPixelY`, non esposta pubblicamente): la
+/// posizione del tocco coincide già, con buona approssimazione, con la
+/// posizione del punto sulla curva sotto il dito/cursore. L'altezza della
+/// card è stimata con una costante (`_NettoTooltipOverlay._alturaStimata`)
+/// per il solo calcolo di clamping verticale, dato che `Positioned` richiede
+/// un `top` esplicito prima che la card sia disegnata — un possibile
+/// scostamento di pochi pixel fra stima e altezza reale è accettabile qui
+/// (scelta esplicita, vedi richiesta), il contenuto resta comunque leggibile
+/// e non tagliato.
+class _NettoChart extends StatefulWidget {
   final List<BustaPaga> buste;
   final DateTime estendiFinoA;
-  final List<BustaPaga>? busteAnnoPrecedente;
 
   const _NettoChart({
     required this.buste,
     required this.estendiFinoA,
-    this.busteAnnoPrecedente,
   });
 
   @override
+  State<_NettoChart> createState() => _NettoChartState();
+}
+
+class _NettoChartState extends State<_NettoChart> {
+  // Spot attualmente "attivo" (ultimo punto toccato/scrubbato): alimenta sia
+  // il pallino indicatore nativo di fl_chart sia il tooltip custom con la
+  // riga "Vedi dettaglio" tappabile. `null` = nessun tooltip visibile.
+  LineBarSpot? _spotAttivo;
+  Offset? _posizioneAttiva;
+
+  void _chiudiTooltip() {
+    setState(() {
+      _spotAttivo = null;
+      _posizioneAttiva = null;
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _NettoChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // `widget.buste` è quasi sempre una lista fresca ad ogni build del
+    // genitore (filtrata dal provider), quindi un confronto per identità di
+    // riferimento chiuderebbe il tooltip ad ogni rebuild innocuo — si
+    // confronta invece un identificatore di contenuto economico: lunghezza +
+    // sequenza degli `id` (stabili, assegnati al salvataggio) e
+    // `estendiFinoA`. Se cambia una qualunque di queste tre cose, lo
+    // `spotIndex` calcolato sulla vecchia `griglia` non è più garantito
+    // valido/corretto sulla griglia nuova, quindi il tooltip va chiuso
+    // invece di rischiare un indice fuori bound o disallineato dal dato
+    // realmente toccato (vedi bug fix di libreria).
+    final busteCambiate = oldWidget.buste.length != widget.buste.length ||
+        !_stessiId(oldWidget.buste, widget.buste);
+    if (busteCambiate || oldWidget.estendiFinoA != widget.estendiFinoA) {
+      if (_spotAttivo != null || _posizioneAttiva != null) {
+        _chiudiTooltip();
+      }
+    }
+  }
+
+  bool _stessiId(List<BustaPaga> a, List<BustaPaga> b) {
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id) return false;
+    }
+    return true;
+  }
+
+  void _aggiornaSpot(
+    FlTouchEvent event,
+    LineTouchResponse? response,
+    List<({DateTime periodo, BustaPaga? busta})> griglia,
+  ) {
+    // Eventi senza spot toccati (fuori dall'area dati, o eventi "di uscita"
+    // come `FlTapCancelEvent`/`FlPanCancelEvent`/`FlPointerExitEvent`, privi
+    // di `localPosition`) non aggiornano nulla: il tooltip resta visibile
+    // com'era finché l'utente non tocca un altro punto valido o la riga
+    // "Vedi dettaglio" (che lo richiude esplicitamente) — più naturale per
+    // uno scrubbing a singolo dito che farlo sparire ad ogni sollevamento.
+    final spots = response?.lineBarSpots;
+    if (spots == null || spots.isEmpty) return;
+    final spot = spots.first;
+    final index = spot.spotIndex;
+    if (index < 0 || index >= griglia.length) return;
+    if (griglia[index].busta == null) return;
+    final posizione = event.localPosition;
+    if (posizione == null) return;
+    setState(() {
+      _spotAttivo = spot;
+      _posizioneAttiva = posizione;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final buste = widget.buste;
+    final estendiFinoA = widget.estendiFinoA;
     final nettoColor = CupertinoDynamicColor.resolve(
         BustePagaStatisticheScreen._nettoColor, context);
     final gridColor =
@@ -1261,16 +1245,6 @@ class _NettoChart extends StatelessWidget {
     // silenziosamente collegando i due mesi adiacenti come se fossero
     // consecutivi.
     final griglia = _grigliaMensile(buste, estendiFinoA: estendiFinoA);
-
-    // Griglia "fantasma" dell'anno precedente, allineata indice per indice
-    // con [griglia] (stesso mese, anno-1) — non una griglia mensile
-    // indipendente, per garantire che ogni punto della linea tratteggiata
-    // cada esattamente sotto/sopra il punto corrispondente della linea
-    // principale sull'asse X condiviso.
-    final annoPrecedente = busteAnnoPrecedente;
-    final grigliaAnnoPrecedente = (annoPrecedente == null || annoPrecedente.isEmpty)
-        ? null
-        : _grigliaAnnoPrecedenteAllineata(griglia, annoPrecedente);
 
     // Range ristretto ai dati reali (non da 0), margine 8% sopra e sotto il
     // range osservato, poi arrotondato a centinaia "pulite".
@@ -1294,116 +1268,116 @@ class _NettoChart extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        return LineChart(
-          LineChartData(
-            minY: bounds.min,
-            maxY: bounds.max,
-            gridData: FlGridData(
-              show: true,
-              drawVerticalLine: false,
-              horizontalInterval: null,
-              getDrawingHorizontalLine: (_) =>
-                  FlLine(color: gridColor, strokeWidth: 0.5),
-            ),
-            borderData: FlBorderData(show: false),
-            titlesData: FlTitlesData(
-              topTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              leftTitles: _valueLeftAxisTitles(
-                labelColor: labelColor,
-                interval: step,
-                // Formato compatto SOLO per l'etichetta dell'asse (spazio
-                // ristretto): `formatEuroConSegno` resta usato per tooltip e
-                // tabella riepilogativa, dove serve precisione a 2 decimali
-                // — vedi doc di `formatEuroConSegnoCompatto`.
-                formatValue: formatEuroConSegnoCompatto,
-                reservedSize: _euroCompactAxisReservedSize,
+        final spotAttivo = _spotAttivo;
+        final posizioneAttiva = _posizioneAttiva;
+        // Bounds-check di difesa in profondità: `didUpdateWidget` sopra
+        // dovrebbe già chiudere il tooltip ad ogni cambio di `buste`/
+        // `estendiFinoA`, ma se in futuro un cambiamento sfuggisse a quel
+        // lifecycle, uno `spotIndex` calcolato su una `griglia` precedente
+        // più lunga andrebbe qui fuori bound sulla `griglia` corrente più
+        // corta — vedi bug fix di libreria.
+        final bustaAttiva = spotAttivo == null ||
+                spotAttivo.spotIndex < 0 ||
+                spotAttivo.spotIndex >= griglia.length
+            ? null
+            : griglia[spotAttivo.spotIndex].busta;
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            LineChart(
+              LineChartData(
+                minY: bounds.min,
+                maxY: bounds.max,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: null,
+                  getDrawingHorizontalLine: (_) =>
+                      FlLine(color: gridColor, strokeWidth: 0.5),
+                ),
+                borderData: FlBorderData(show: false),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  leftTitles: _valueLeftAxisTitles(
+                    labelColor: labelColor,
+                    interval: step,
+                    // Formato compatto SOLO per l'etichetta dell'asse (spazio
+                    // ristretto): `formatEuroConSegno` resta usato per
+                    // tooltip e tabella riepilogativa, dove serve precisione
+                    // a 2 decimali — vedi doc di `formatEuroConSegnoCompatto`.
+                    formatValue: formatEuroConSegnoCompatto,
+                    reservedSize: _euroCompactAxisReservedSize,
+                  ),
+                  bottomTitles: _periodoBottomAxisTitles(
+                    periodi: [for (final g in griglia) g.periodo],
+                    availableWidth: constraints.maxWidth,
+                    labelColor: labelColor,
+                  ),
+                ),
+                lineTouchData: LineTouchData(
+                  // Tooltip nativo disattivato (vedi doc di libreria su
+                  // `_NettoChart`): ogni item `null` fa sì che
+                  // `LineChartPainter.drawTouchTooltip` non disegni nulla,
+                  // sostituito dall'overlay `_NettoTooltipOverlay` sotto.
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipItems: (touchedSpots) =>
+                        [for (final _ in touchedSpots) null],
+                  ),
+                  // Ogni evento di touch/hover/drag aggiorna il tooltip
+                  // custom (nessuna distinzione fra tap secco e scrubbing:
+                  // l'apertura del drill-down avviene solo dalla riga "Vedi
+                  // dettaglio" dentro il tooltip, non più dal tocco sul
+                  // grafico).
+                  touchCallback: (event, response) =>
+                      _aggiornaSpot(event, response, griglia),
+                  // Pallino pieno in accento sopra il punto esatto della
+                  // linea, oltre alla linea verticale tratteggiata già
+                  // disegnata di default — nessuna indicazione equivalente
+                  // serve al grafico Straordinario, dove le barre indicano
+                  // già visivamente il valore toccato.
+                  getTouchedSpotIndicator: (barData, spotIndexes) {
+                    return spotIndexes.map((index) {
+                      return TouchedSpotIndicatorData(
+                        FlLine(color: nettoColor, strokeWidth: 2),
+                        FlDotData(
+                          getDotPainter: (spot, percent, bar, i) =>
+                              FlDotCirclePainter(
+                            radius: 5,
+                            color: nettoColor,
+                            strokeWidth: 0,
+                          ),
+                        ),
+                      );
+                    }).toList();
+                  },
+                ),
+                lineBarsData: [
+                  _nettoLine(griglia, nettoColor),
+                ],
               ),
-              bottomTitles: _periodoBottomAxisTitles(
-                periodi: [for (final g in griglia) g.periodo],
-                availableWidth: constraints.maxWidth,
-                labelColor: labelColor,
-              ),
             ),
-            lineTouchData: LineTouchData(
-              touchTooltipData: LineTouchTooltipData(
-                getTooltipColor: (_) => tooltip.background,
-                fitInsideHorizontally: true,
-                fitInsideVertically: true,
-                getTooltipItems: (touchedSpots) {
-                  return [
-                    for (var i = 0; i < touchedSpots.length; i++)
-                      _tooltipItem(
-                        touchedSpots[i].barIndex == 0
-                            ? griglia
-                            : grigliaAnnoPrecedente ?? griglia,
-                        touchedSpots[i],
-                        showPeriodo: i == 0,
-                        textColor: tooltip.text,
-                        annoPrecedente: touchedSpots[i].barIndex != 0,
-                      ),
-                  ];
+            if (spotAttivo != null &&
+                posizioneAttiva != null &&
+                bustaAttiva != null)
+              _NettoTooltipOverlay(
+                busta: bustaAttiva,
+                netto: spotAttivo.y,
+                posizione: posizioneAttiva,
+                areaWidth: constraints.maxWidth,
+                areaHeight: constraints.maxHeight,
+                colori: tooltip,
+                onVediDettaglio: () {
+                  _chiudiTooltip();
+                  showBustaPagaDrilldown(context, bustaAttiva);
                 },
               ),
-              // Solo il tap secco apre il drill-down, e solo sulla serie
-              // principale (`barIndex == 0`): la linea fantasma dell'anno
-              // precedente resta esclusa dal drill-down, vedi doc di
-              // classe.
-              touchCallback: (event, response) {
-                if (event is! FlTapUpEvent) return;
-                final spots = response?.lineBarSpots;
-                if (spots == null || spots.isEmpty) return;
-                LineBarSpot? mainSpot;
-                for (final spot in spots) {
-                  if (spot.barIndex == 0) {
-                    mainSpot = spot;
-                    break;
-                  }
-                }
-                if (mainSpot == null) return;
-                final index = mainSpot.spotIndex;
-                if (index < 0 || index >= griglia.length) return;
-                final busta = griglia[index].busta;
-                if (busta == null) return;
-                showBustaPagaDrilldown(context, busta);
-              },
-            ),
-            lineBarsData: [
-              _nettoLine(griglia, nettoColor),
-              if (grigliaAnnoPrecedente != null)
-                _nettoLineAnnoPrecedente(grigliaAnnoPrecedente, nettoColor),
-            ],
-          ),
+          ],
         );
       },
-    );
-  }
-
-  LineTooltipItem? _tooltipItem(
-    List<({DateTime periodo, BustaPaga? busta})> griglia,
-    LineBarSpot spot, {
-    required bool showPeriodo,
-    required Color textColor,
-    bool annoPrecedente = false,
-  }) {
-    final busta = griglia[spot.x.toInt()].busta;
-    // Guardia difensiva: fl_chart esclude gli spot nulli dal touch
-    // detection (`getNearestTouchedSpot`), quindi in pratica `busta` non è
-    // mai `null` qui — ma un tooltip mancante è comunque preferibile a un
-    // crash se questa garanzia dovesse mai cambiare.
-    if (busta == null) return null;
-    final etichetta = annoPrecedente ? 'Netto (anno prec.)' : 'Netto';
-    final text = showPeriodo
-        ? '${periodoAxisLabel(busta.periodo)}\n$etichetta: ${formatEuroConSegno(spot.y)}'
-        : '$etichetta: ${formatEuroConSegno(spot.y)}';
-    return LineTooltipItem(
-      text,
-      AppTextStyles.pulseBody.copyWith(
-        color: textColor,
-        fontWeight: FontWeight.w600,
-      ),
     );
   }
 
@@ -1443,63 +1417,138 @@ class _NettoChart extends StatelessWidget {
       ),
     );
   }
+}
 
-  /// Griglia allineata all'indice della griglia principale (indice i ↔
-  /// stesso mese di [griglia], anno-1), costruita a partire dalle
-  /// [annoPrecedente] (già filtrate sullo stesso range di mesi un anno
-  /// prima, vedi [_busteAnnoPrecedente]) — non una griglia mensile
-  /// indipendente, per garantire che ogni punto della linea fantasma cada
-  /// esattamente sullo stesso indice X del punto corrispondente dell'anno
-  /// corrente.
-  List<({DateTime periodo, BustaPaga? busta})> _grigliaAnnoPrecedenteAllineata(
-    List<({DateTime periodo, BustaPaga? busta})> griglia,
-    List<BustaPaga> annoPrecedente,
-  ) {
-    final mappa = <DateTime, BustaPaga>{
-      for (final b in annoPrecedente) DateTime(b.periodo.year, b.periodo.month): b,
-    };
-    return [
-      for (final g in griglia)
-        (
-          periodo: DateTime(g.periodo.year - 1, g.periodo.month),
-          busta: mappa[DateTime(g.periodo.year - 1, g.periodo.month)],
+/// Overlay Flutter reale (non disegnato su canvas) del tooltip custom del
+/// grafico Netto: sostituisce `LineTouchTooltipData` per poter contenere una
+/// riga "Vedi dettaglio →" realmente tappabile — vedi doc di libreria su
+/// `_NettoChart`. Stesso materiale/bordo/raggio già usati dal vecchio
+/// tooltip nativo (`_tooltipColors`/`_tooltipBorder`), solo con contenuto
+/// esteso da un `Column` di widget veri invece che da testo formattato.
+class _NettoTooltipOverlay extends StatelessWidget {
+  final BustaPaga busta;
+  final double netto;
+  // Posizione del tocco (`event.localPosition`) nel sistema di coordinate
+  // del `LineChart`/`Stack` che lo contiene — vedi doc di libreria su
+  // `_NettoChart` per il perché di questa scelta invece di una conversione
+  // manuale dei valori dati in pixel.
+  final Offset posizione;
+  final double areaWidth;
+  final double areaHeight;
+  final ({Color background, Color text}) colori;
+  final VoidCallback onVediDettaglio;
+
+  const _NettoTooltipOverlay({
+    required this.busta,
+    required this.netto,
+    required this.posizione,
+    required this.areaWidth,
+    required this.areaHeight,
+    required this.colori,
+    required this.onVediDettaglio,
+  });
+
+  static const _larghezza = 216.0;
+  // Altezza stimata della card, usata SOLO per il clamping verticale della
+  // posizione (vedi doc di libreria su `_NettoChart`): un `Positioned`
+  // richiede un `top` esplicito prima ancora che la card sia disegnata e
+  // la sua altezza reale sia nota.
+  static const _altezzaStimata = 92.0;
+  static const _margineDalPunto = 14.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final secondary =
+        CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
+    final accent =
+        CupertinoDynamicColor.resolve(AppColors.pulseAccent, context);
+    final dividerColor = secondary.withValues(alpha: 0.3);
+
+    // Orizzontalmente centrata sul punto toccato, con clamp per restare
+    // dentro l'area del grafico (stesso intento di `fitInsideHorizontally`
+    // del vecchio tooltip nativo).
+    final left = (posizione.dx - _larghezza / 2)
+        .clamp(0.0, math.max(0.0, areaWidth - _larghezza))
+        .toDouble();
+    // Sopra il punto per default (come il tooltip nativo), sotto se non c'è
+    // spazio sufficiente sopra.
+    final top = posizione.dy - _altezzaStimata - _margineDalPunto >= 0
+        ? posizione.dy - _altezzaStimata - _margineDalPunto
+        : (posizione.dy + _margineDalPunto)
+            .clamp(0.0, math.max(0.0, areaHeight - _altezzaStimata))
+            .toDouble();
+
+    return Positioned(
+      left: left,
+      top: top,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colori.background,
+          borderRadius: BorderRadius.circular(AppRadius.pulseSmall),
+          border: Border.fromBorderSide(_tooltipBorder(context)),
         ),
-    ];
-  }
-
-  /// Linea "fantasma" del confronto anno su anno: stesso ciano di
-  /// [_nettoLine] a opacità ridotta e tratteggiata, nessuna area riempita
-  /// (per non competere visivamente con l'area della serie principale) —
-  /// vedi doc di classe e [Task 5 del redesign 2026-09-08].
-  LineChartBarData _nettoLineAnnoPrecedente(
-    List<({DateTime periodo, BustaPaga? busta})> griglia,
-    Color color,
-  ) {
-    return LineChartBarData(
-      spots: _spots(griglia, (b) => b.netto),
-      isCurved: true,
-      curveSmoothness: 0.2,
-      color: color.withValues(alpha: 0.35),
-      barWidth: 2.5,
-      dashArray: const [6, 4],
-      dotData: const FlDotData(show: false),
-      belowBarData: BarAreaData(show: false),
+        child: SizedBox(
+          width: _larghezza,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.xs,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  periodoAxisLabel(busta.periodo),
+                  style: AppTextStyles.pulseLabel.copyWith(color: secondary),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Netto: ${formatEuroConSegno(netto)}',
+                  style: AppTextStyles.pulseBody.copyWith(
+                    color: colori.text,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Container(height: 0.5, color: dividerColor),
+                const SizedBox(height: AppSpacing.xs),
+                SpringButton(
+                  onPressed: onVediDettaglio,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Vedi dettaglio',
+                        style: AppTextStyles.pulseLabel.copyWith(
+                          color: accent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      PulseIcon(
+                        glyph: PulseIconGlyph.chevronForward,
+                        size: 12,
+                        color: accent,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
 
-/// Frazione residuo/maturato, clampata e senza dividere per zero se
-/// `maturato` è 0 (nessun rateo maturato in questa busta paga) — stesso
-/// pattern di `_MaturazioniRingsRow._progress` in `buste_paga_archivio_view.
-/// dart`.
-double _progressoResiduo(double residuo, double maturato) {
-  if (maturato <= 0) return 0;
-  return (residuo / maturato).clamp(0.0, 1.0);
-}
-
-/// Snapshot Ferie/Permessi/Ex festività residui: 3 anelli di progresso
-/// grandi sull'ULTIMA busta paga del periodo filtrato (non più un trend nel
-/// tempo, unica eccezione consapevole di questo redesign — vedi CLAUDE.md).
+/// Snapshot Ferie/Permessi/Ex festività residui: 3 tessere piatte
+/// `ValueTile` (solo valore + label, nessun anello di progresso — stesso
+/// stile già usato dall'Archivio, vedi `_MaturazioniRingsRow` in
+/// `buste_paga_archivio_view.dart`) sull'ULTIMA busta paga del periodo
+/// filtrato (non più un trend nel tempo, unica eccezione consapevole di
+/// questo redesign — vedi CLAUDE.md).
 class _FerieRolPermessiSnapshot extends StatelessWidget {
   final List<BustaPaga> buste;
   final int busteNonConfermate;
@@ -1508,8 +1557,6 @@ class _FerieRolPermessiSnapshot extends StatelessWidget {
     required this.buste,
     this.busteNonConfermate = 0,
   });
-
-  static const _diameter = 60.0;
 
   @override
   Widget build(BuildContext context) {
@@ -1521,17 +1568,6 @@ class _FerieRolPermessiSnapshot extends StatelessWidget {
     }
 
     final ultima = buste.last;
-    // Stessa tinta `pulseAccent` per i 3 anelli (Task 3 del redesign
-    // 2026-09-08, vedi CLAUDE.md): opacità decrescente solo per distinguere
-    // a colpo d'occhio i 3 cerchi affiancati, mai un hue diverso.
-    final ferieColor = CupertinoDynamicColor.resolve(
-        BustePagaStatisticheScreen._ferieColor, context);
-    final permessiRolColor = CupertinoDynamicColor.resolve(
-        BustePagaStatisticheScreen._permessiRolColor, context)
-        .withValues(alpha: 0.8);
-    final exFestivitaColor = CupertinoDynamicColor.resolve(
-        BustePagaStatisticheScreen._exFestivitaColor, context)
-        .withValues(alpha: 0.6);
 
     void apriDrilldown() => showBustaPagaDrilldown(context, ultima);
 
@@ -1541,14 +1577,9 @@ class _FerieRolPermessiSnapshot extends StatelessWidget {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: apriDrilldown,
-            child: ProgressRingTile(
+            child: ValueTile(
               label: 'Ferie',
               value: formatNumber(ultima.ferieResidue),
-              progress: _progressoResiduo(
-                  ultima.ferieResidue, ultima.ferieMaturate),
-              accentColor: ferieColor,
-              diameter: _diameter,
-              showGradientBorder: true,
             ),
           ),
         ),
@@ -1557,14 +1588,9 @@ class _FerieRolPermessiSnapshot extends StatelessWidget {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: apriDrilldown,
-            child: ProgressRingTile(
+            child: ValueTile(
               label: 'Permessi',
               value: formatNumber(ultima.rolResidui),
-              progress:
-                  _progressoResiduo(ultima.rolResidui, ultima.rolMaturati),
-              accentColor: permessiRolColor,
-              diameter: _diameter,
-              showGradientBorder: true,
             ),
           ),
         ),
@@ -1573,16 +1599,9 @@ class _FerieRolPermessiSnapshot extends StatelessWidget {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: apriDrilldown,
-            child: ProgressRingTile(
+            child: ValueTile(
               label: 'Ex festività',
               value: formatNumber(ultima.exFestivitaResidue),
-              progress: _progressoResiduo(
-                ultima.exFestivitaResidue,
-                ultima.exFestivitaMaturate,
-              ),
-              accentColor: exFestivitaColor,
-              diameter: _diameter,
-              showGradientBorder: true,
             ),
           ),
         ),
@@ -1606,27 +1625,15 @@ class _FerieRolPermessiSnapshot extends StatelessWidget {
 /// il drill-down (`showBustaPagaDrilldown`) sulla busta paga corrispondente
 /// (l'ultima del trimestre, se le barre sono aggregate) — nessuna azione al
 /// tap su uno slot senza dati.
-///
-/// [busteAnnoPrecedente], se non nullo/non vuoto (confronto anno su anno
-/// attivo, Task 5 del redesign 2026-09-08), aggiunge per ogni gruppo con
-/// dati un secondo `BarChartRodData` "fantasma" (mese/trimestre corrispondente
-/// un anno prima): nessun riempimento, solo contorno ciano (`color:
-/// transparent` + `borderSide`, l'unico modo nativo in questa versione di
-/// fl_chart di ottenere una barra "a contorno" senza dover simulare l'effetto
-/// con un `BackgroundBarChartRodData`) — esclusa dal drill-down al tap, che
-/// continua a riferirsi solo al rod principale (`BarTouchedSpot.
-/// touchedRodDataIndex == 0`).
 class _StraordinarioChart extends StatefulWidget {
   final List<BustaPaga> buste;
   final int busteNonConfermate;
   final DateTime estendiFinoA;
-  final List<BustaPaga>? busteAnnoPrecedente;
 
   const _StraordinarioChart({
     required this.buste,
     this.busteNonConfermate = 0,
     required this.estendiFinoA,
-    this.busteAnnoPrecedente,
   });
 
   @override
@@ -1637,9 +1644,6 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
   static const _barWidth = 16.0;
   static const _groupsSpace = 20.0;
   static const _minGroupSlotWidth = _barWidth + _groupsSpace;
-  // Spazio tra la barra principale e quella fantasma dell'anno precedente
-  // dentro lo stesso gruppo, quando il confronto anno su anno è attivo.
-  static const _ghostBarsSpace = 6.0;
   // Larghezza della colonna fissa dell'asse Y in `buildAxisOnly()` (modalità
   // scroll orizzontale): deve corrispondere esattamente al `reservedSize`
   // passato a `_valueLeftAxisTitles` in ENTRAMBI i percorsi di rendering
@@ -1741,47 +1745,11 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
           ];
     final shortLabelBuilder = aggregato ? _trimestreLabel : meseAxisLabel;
 
-    // Valori "fantasma" del confronto anno su anno (Task 5 del redesign
-    // 2026-09-08), allineati indice per indice con [punti] (stesso
-    // mese/trimestre, anno-1) — non una griglia/aggregazione indipendente,
-    // per garantire che ogni barra a contorno cada esattamente accanto alla
-    // barra piena corrispondente sull'asse X condiviso.
-    final annoPrecedente = widget.busteAnnoPrecedente;
-    final hasGhost = annoPrecedente != null && annoPrecedente.isNotEmpty;
-    final ghostValues = List<double?>.filled(punti.length, null);
-    if (hasGhost) {
-      if (!aggregato) {
-        final mappaMensile = <int, double>{
-          for (final b in annoPrecedente) b.periodo.year * 12 + b.periodo.month: b.straordinari,
-        };
-        for (var i = 0; i < punti.length; i++) {
-          final p = punti[i].periodo;
-          ghostValues[i] = mappaMensile[(p.year - 1) * 12 + p.month];
-        }
-      } else {
-        final mappaTrimestrale = <int, double>{
-          for (final punto in _aggregaStraordinariPerTrimestre(annoPrecedente))
-            punto.periodo.year * 4 + (punto.periodo.month - 1) ~/ 3: punto.totale,
-        };
-        for (var i = 0; i < punti.length; i++) {
-          final p = punti[i].periodo;
-          final trimestre = (p.month - 1) ~/ 3;
-          ghostValues[i] = mappaTrimestrale[(p.year - 1) * 4 + trimestre];
-        }
-      }
-    }
-
     final maxValue = punti.fold<double>(
         0, (max, p) => (p.totale ?? 0) > max ? p.totale! : max);
     final maxIndex =
         punti.indexWhere((p) => p.totale != null && p.totale == maxValue);
-    // Il massimo dell'asse tiene conto anche dei valori fantasma, altrimenti
-    // una barra a contorno dell'anno precedente più alta di ogni barra piena
-    // dell'anno corrente verrebbe tagliata fuori dal grafico.
-    final maxValueConGhost = ghostValues.fold<double>(
-        maxValue, (max, v) => (v ?? 0) > max ? v! : max);
-    final straordinarioAxisMax =
-        maxValueConGhost <= 0 ? 1.0 : maxValueConGhost * 1.2;
+    final straordinarioAxisMax = maxValue <= 0 ? 1.0 : maxValue * 1.2;
     final step = _niceStep(straordinarioAxisMax, minStep: 1);
     final bounds = _niceAxisBounds(0, straordinarioAxisMax, step: step);
 
@@ -1865,15 +1833,11 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
                   // tooltip nativo sopra. `touchedBarGroup.x` (non l'indice
                   // nell'array `barGroups`, che esclude gli slot compressi)
                   // è l'indice reale in `punti`, coerente con `group.x` già
-                  // usato in `getTooltipItem` sotto. `touchedRodDataIndex !=
-                  // 0` significa che è stata toccata la barra fantasma
-                  // dell'anno precedente: esclusa dal drill-down, vedi doc di
-                  // classe.
+                  // usato in `getTooltipItem` sotto.
                   touchCallback: (event, response) {
                     if (event is! FlTapUpEvent) return;
                     final spot = response?.spot;
                     if (spot == null) return;
-                    if (spot.touchedRodDataIndex != 0) return;
                     final index = spot.touchedBarGroup.x;
                     if (index < 0 || index >= punti.length) return;
                     final busta = bustaAlIndice(index);
@@ -1882,19 +1846,19 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
                   },
                   touchTooltipData: BarTouchTooltipData(
                     getTooltipColor: (_) => tooltip.background,
+                    tooltipBorder: _tooltipBorder(context),
+                    tooltipRoundedRadius: AppRadius.pulseSmall,
                     fitInsideHorizontally: true,
                     fitInsideVertically: true,
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       final punto = punti[group.x];
-                      final isGhost = hasGhost && rodIndex != 0;
-                      final valore = isGhost ? ghostValues[group.x] : punto.totale;
                       // Gli slot di coda dopo `ultimoDatoIndex` (mesi ancora
                       // senza busta paga confermata, aggiunti solo per
                       // estendere l'asse fino al mese corrente) hanno sempre
                       // `totale == null`: un tooltip "0 h" per un mese senza
                       // alcun dato sarebbe fuorviante, indistinguibile da uno
                       // straordinario davvero pari a zero.
-                      if (valore == null) {
+                      if (punto.totale == null) {
                         return BarTooltipItem(
                           '${shortLabelBuilder(punto.periodo)}\nNessun dato',
                           AppTextStyles.pulseBody.copyWith(
@@ -1903,10 +1867,8 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
                           ),
                         );
                       }
-                      final etichetta =
-                          isGhost ? 'Anno prec.' : shortLabelBuilder(punto.periodo);
                       return BarTooltipItem(
-                        '$etichetta\n'
+                        '${shortLabelBuilder(punto.periodo)}\n'
                         '${formatNumber(rod.toY)} h',
                         AppTextStyles.pulseBody.copyWith(
                           color: tooltip.text,
@@ -1921,7 +1883,7 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
                     if (includiSlot(i))
                       BarChartGroupData(
                         x: i,
-                        barsSpace: hasGhost ? _ghostBarsSpace : 2,
+                        barsSpace: 2,
                         barRods: [
                           BarChartRodData(
                             toY: punti[i].totale ?? 0,
@@ -1932,18 +1894,6 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
                             borderRadius:
                                 BorderRadius.circular(AppRadius.small / 2),
                           ),
-                          if (hasGhost && ghostValues[i] != null)
-                            BarChartRodData(
-                              toY: ghostValues[i]!,
-                              color: CupertinoColors.transparent,
-                              borderSide: BorderSide(
-                                color: barColor.withValues(alpha: 0.7),
-                                width: 1.5,
-                              ),
-                              width: _barWidth,
-                              borderRadius:
-                                  BorderRadius.circular(AppRadius.small / 2),
-                            ),
                         ],
                       ),
                 ],
@@ -2007,14 +1957,7 @@ class _StraordinarioChartState extends State<_StraordinarioChart> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final viewportWidth = constraints.maxWidth;
-          // Con il confronto anno su anno attivo ogni gruppo è più largo (due
-          // barre affiancate anziché una), lo slot minimo per gruppo cresce
-          // di conseguenza — altrimenti la barra fantasma finirebbe
-          // parzialmente sovrapposta al gruppo successivo.
-          final groupSlotWidth = hasGhost
-              ? _barWidth * 2 + _ghostBarsSpace + _groupsSpace
-              : _minGroupSlotWidth;
-          final contentWidth = punti.length * groupSlotWidth;
+          final contentWidth = punti.length * _minGroupSlotWidth;
           final needsScroll = contentWidth > viewportWidth - _leftAxisWidth;
 
           if (!needsScroll) {
