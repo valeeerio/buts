@@ -96,7 +96,7 @@ class ButsApp extends StatelessWidget {
       child: const CupertinoApp(
         title: 'Buts',
         debugShowCheckedModeBanner: false,
-        theme: CupertinoThemeData(),
+        theme: CupertinoThemeData(brightness: Brightness.dark),
         localizationsDelegates: [
           DefaultCupertinoLocalizations.delegate,
         ],

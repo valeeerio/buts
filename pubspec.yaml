@@ -49,24 +49,3 @@ flutter_launcher_icons:
   adaptive_icon_foreground: "assets/icon/icon_foreground.png"
 
 flutter:
-  # Font bundlati offline per lo stile "Pulse" (vedi CLAUDE.md, "Stile
-  # visivo"): Space Grotesk (titoli/numeri/valori) + Inter (corpo/label).
-  # Licenza SIL Open Font License, file in assets/fonts/ (vedi
-  # assets/fonts/README.md per provenienza e come rigenerarli).
-  fonts:
-    - family: Space Grotesk
-      fonts:
-        - asset: assets/fonts/SpaceGrotesk-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/SpaceGrotesk-Bold.ttf
-          weight: 700
-        - asset: assets/fonts/SpaceGrotesk-ExtraBold.ttf
-          weight: 800
-    - family: Inter
-      fonts:
-        - asset: assets/fonts/Inter-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/Inter-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/Inter-SemiBold.ttf
-          weight: 600

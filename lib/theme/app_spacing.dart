@@ -1,8 +1,7 @@
 /// Scala di spaziature e corner radius coerente in tutta l'app.
 /// I raggi piccoli (`small`/`medium`/`large`/`card`) restano per dettagli
 /// minuti (badge, barre di grafici); le superfici/card usano invece i
-/// raggi "squircle" più generosi in `AppRadius.glass`/`AppRadius.glassSmall`
-/// — vedi `lib/widgets/liquid_glass_surface.dart`.
+/// raggi "squircle" più generosi in `AppRadius.glass`/`AppRadius.glassSmall`.
 class AppSpacing {
   AppSpacing._();
 

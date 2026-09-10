@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../theme/app_text_styles.dart';
+import 'pulse_icon.dart';
 import 'spring_button.dart';
 
 /// Chip piatto (icona + etichetta), senza superficie di vetro: componente
@@ -54,6 +55,15 @@ import 'spring_button.dart';
 /// `lib/theme/app_colors.dart` — usato per il chip "Conferma".
 class FlatChipButton extends StatelessWidget {
   final IconData? icon;
+
+  /// Alternativa a [icon] per usare un glifo del set custom Pulse
+  /// (`PulseIcon`/`PulseIconGlyph`) al posto di un `IconData`
+  /// (`CupertinoIcons`/Material) — coerente con la regola di stile "niente
+  /// `CupertinoIcons`, ogni icona è un `CustomPainter`" (vedi CLAUDE.md).
+  /// Se presente ha priorità su [icon]. Il colore è sempre quello risolto
+  /// del chip (stato pieno/non pieno, primario/secondario), non quello
+  /// eventualmente passato al costruttore di [PulseIconGlyph].
+  final PulseIconGlyph? pulseGlyph;
   final String label;
   final Color color;
   final Color? onColor;
@@ -74,6 +84,7 @@ class FlatChipButton extends StatelessWidget {
   const FlatChipButton({
     super.key,
     this.icon,
+    this.pulseGlyph,
     required this.label,
     required this.color,
     required this.onPressed,
@@ -141,7 +152,10 @@ class FlatChipButton extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        if (icon != null) ...[
+        if (pulseGlyph != null) ...[
+          PulseIcon(glyph: pulseGlyph!, size: 18, color: contentColor),
+          const SizedBox(width: AppSpacing.xs),
+        ] else if (icon != null) ...[
           Icon(icon, size: 18, color: contentColor),
           const SizedBox(width: AppSpacing.xs),
         ],

@@ -61,8 +61,6 @@ class AppAlertDialog extends StatelessWidget {
         CupertinoDynamicColor.resolve(AppColors.pulseTextSecondary, context);
     final surface =
         CupertinoDynamicColor.resolve(AppColors.pulseSurface, context);
-    final isDark =
-        MediaQuery.platformBrightnessOf(context) == Brightness.dark;
 
     return Center(
       child: Padding(
@@ -75,9 +73,7 @@ class AppAlertDialog extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppRadius.pulse),
               boxShadow: [
                 BoxShadow(
-                  color: CupertinoColors.black.withValues(
-                    alpha: isDark ? 0.5 : 0.18,
-                  ),
+                  color: CupertinoColors.black.withValues(alpha: 0.5),
                   blurRadius: 24,
                   offset: const Offset(0, 8),
                 ),

@@ -5,15 +5,17 @@ import 'package:flutter/cupertino.dart';
 /// Approssimazione a mano (nessuna dipendenza pub esterna) di una curva
 /// "continua" in stile Apple — la superellisse dietro le "squircle" usate
 /// da icone e controlli iOS — al posto del doppio arco di
-/// `BorderRadius.circular`. Usata dal pilota Liquid Glass della schermata
-/// Archivio Buste Paga (`lib/widgets/liquid_glass_surface.dart`).
+/// `BorderRadius.circular`. Usata dal pilota Liquid Glass (rimosso) della
+/// schermata Archivio Buste Paga.
 ///
 /// Genera il perimetro campionando, per ciascun angolo, la curva
 /// |x/r|^n + |y/r|^n = 1 (superellisse), con `n` che controlla quanto la
 /// curva è "continua" tra i due lati retti (2 = cerchio pieno, valori più
 /// alti si avvicinano a uno spigolo vivo). 4–5 è il range che approssima
-/// meglio le curve continue di iOS. Usato da `LiquidGlassSurface`, il
-/// materiale in vetro standard di tutta l'app.
+/// meglio le curve continue di iOS. Non è più usato dal materiale
+/// standard dell'app (`PulseSurface`, che usa `BorderRadius.circular`):
+/// oggi l'unico consumatore è `SwipeDeleteBackground`
+/// (`lib/widgets/swipe_delete_background.dart`).
 class SquirclePath {
   SquirclePath._();
 
