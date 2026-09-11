@@ -42,6 +42,16 @@ class BustePagaNotifier extends StateNotifier<List<BustaPaga>> {
   final AppDatabase _db;
   final PdfImportService _pdfImportService;
 
+  /// `true` solo dopo che la SELECT iniziale di [_initialize] ha popolato
+  /// [state] con i dati reali dal DB. Finché è `false`, uno `state` vuoto è
+  /// indistinguibile da "l'utente non ha ancora nessuna busta paga" —
+  /// la UI (`buste_paga_archivio_view.dart`) usa questo flag (esposto anche
+  /// tramite [busteCaricamentoCompletatoProvider]) per non mostrare lo stato
+  /// vuoto durante il breve intervallo di caricamento all'avvio dell'app.
+  bool _caricamentoCompletato = false;
+
+  bool get caricamentoCompletato => _caricamentoCompletato;
+
   /// Id rimossi con [remove] mentre la SELECT iniziale di [_initialize] è
   /// (potenzialmente) ancora in volo — vedi doc su [_initialize] per il
   /// perché serve, oltre al guard "già presente in `state`" che copre solo
@@ -78,6 +88,10 @@ class BustePagaNotifier extends StateNotifier<List<BustaPaga>> {
       (b) => !idGiaInStato.contains(b.id) && !_idsRimossi.contains(b.id),
     );
     state = [...state, ...mancantiDaDb];
+    // Da qui in poi uno `state` vuoto è davvero "nessuna busta paga
+    // presente", non più "caricamento in corso": vedi doc di
+    // [_caricamentoCompletato].
+    _caricamentoCompletato = true;
     // Fire-and-forget, e SOLO dopo che lo stato è già stato riconciliato col
     // DB qui sopra (`state` a questo punto contiene già tutte le righe
     // esistenti, non è più uno stato "in caricamento"): pulizia best-effort,
@@ -274,6 +288,20 @@ final busteRepositoryProvider =
     const PdfImportService(),
   ),
 );
+
+/// `true` solo dopo che il caricamento iniziale dal DB
+/// (`BustePagaNotifier._initialize`) è completato — permette alla UI di
+/// distinguere "sto ancora caricando dal DB" da "ho caricato ed è davvero
+/// vuoto", due stati altrimenti identici (`state == []`) se si osservasse
+/// solo `busteRepositoryProvider`. Non è un `StateNotifierProvider` a sé: si
+/// appoggia allo stesso ciclo di vita di [busteRepositoryProvider]
+/// (`ref.watch` per essere ricalcolato ad ogni cambio di `state`, incluso il
+/// passaggio da lista vuota "in caricamento" a lista popolata) leggendo poi
+/// il flag esposto dal notifier.
+final busteCaricamentoCompletatoProvider = Provider<bool>((ref) {
+  ref.watch(busteRepositoryProvider);
+  return ref.read(busteRepositoryProvider.notifier).caricamentoCompletato;
+});
 
 /// Busta paga più recente per periodo — unico punto di lettura del netto
 /// dell'ultimo periodo disponibile. Solo mensili: una 13esima/14esima più

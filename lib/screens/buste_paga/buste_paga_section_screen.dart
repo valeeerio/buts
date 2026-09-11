@@ -59,6 +59,14 @@ class BustePagaSectionScreen extends ConsumerStatefulWidget {
 class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
     with WidgetsBindingObserver {
   _BustePagaTab _tab = _BustePagaTab.archivio;
+  // Sincronizza tap sulla nav bar e swipe orizzontale sul corpo pagina: un
+  // solo `PageController` guida entrambi. Il tap chiama `_changeTab`, che
+  // anima il controller verso la pagina corrispondente; lo swipe manuale
+  // dell'utente aggiorna direttamente il controller e `onPageChanged` è
+  // l'unico punto che scrive `_tab` — così le due modalità non possono mai
+  // disallinearsi (nessuno stato duplicato, `_tab` riflette sempre la pagina
+  // effettivamente mostrata, anche a metà di un'animazione indotta dal tap).
+  final _pageController = PageController();
   final _pdfImportService = const PdfImportService();
   final _regexParser = const BustaPagaRegexParser();
   bool _importingPdf = false;
@@ -119,6 +127,7 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
     pendingBustaDetailId
         .removeListener(_consumaPendingBustaDetailIdSePresente);
     _searchController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -306,10 +315,25 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
     );
   }
 
+  /// Tap su un tab della nav bar: anima il `PageController` verso la pagina
+  /// corrispondente (durata/curva coerenti con `AnimatedContainer` di
+  /// `FlatChipButton`, vedi CLAUDE.md). Non scrive `_tab` direttamente —
+  /// `_onPageChanged` lo fa già durante l'animazione, unico punto di verità
+  /// condiviso con lo swipe manuale.
   void _changeTab(_BustePagaTab tab) {
+    _pageController.animateToPage(
+      tab.index,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+    );
+  }
+
+  /// Unico punto che aggiorna `_tab`: chiamato sia da uno swipe manuale
+  /// dell'utente sia (indirettamente) da `animateToPage` in `_changeTab`.
+  void _onPageChanged(int index) {
     setState(() {
-      _tab = tab;
-      if (tab != _BustePagaTab.archivio) _closeSearch();
+      _tab = _BustePagaTab.values[index];
+      if (_tab != _BustePagaTab.archivio) _closeSearch();
     });
   }
 
@@ -726,19 +750,35 @@ class _BustePagaSectionScreenState extends ConsumerState<BustePagaSectionScreen>
                         padding: const EdgeInsets.only(
                           bottom: _sidecarReservedHeight,
                         ),
-                        child: switch (_tab) {
-                          _BustePagaTab.archivio => BustePagaArchivioView(
+                        // Swipe orizzontale <-> tab della nav bar, vedi
+                        // `_changeTab`/`_onPageChanged`. Asse ortogonale allo
+                        // scroll verticale interno di entrambe le pagine
+                        // (`CustomScrollView`), nessun conflitto di gesture:
+                        // gli unici gesti orizzontali già presenti nelle due
+                        // viste (swipe-to-delete `Dismissible` in Archivio,
+                        // scroll orizzontale dei chip periodo in Statistiche)
+                        // sono più annidati del `PageView` e vincono
+                        // l'arena quando hanno effettivamente spazio per
+                        // scorrere/essere trascinati, comportamento standard
+                        // di Flutter per scroll/drag orizzontali annidati
+                        // (stesso principio di un `ListView` orizzontale
+                        // dentro una `TabBarView`).
+                        child: PageView(
+                          controller: _pageController,
+                          onPageChanged: _onPageChanged,
+                          children: [
+                            BustePagaArchivioView(
                               onOpenDetail: (bustaPaga) =>
                                   _openDetail(context, bustaPaga),
                               onAdd: () => _startImport(),
                               searchActive: _searchActive,
                               query: _searchController.text,
                             ),
-                          _BustePagaTab.statistiche =>
                             BustePagaStatisticheScreen(
                               periodoFiltro: _periodoFiltro,
                             ),
-                        },
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -815,29 +855,61 @@ class _BustePagaNavBar extends StatelessWidget {
               horizontal: AppSpacing.sm,
               vertical: AppSpacing.sm,
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _NavBarTab(
-                    glyph: PulseIconGlyph.archive,
-                    label: 'Archivio',
-                    active: tab == _BustePagaTab.archivio,
-                    accent: accent,
-                    inactive: textSecondary,
-                    onPressed: () => onTabChanged(_BustePagaTab.archivio),
+            child: IntrinsicHeight(
+              child: Stack(
+                children: [
+                  // Pillola di sfondo del tab attivo: stessa durata/curva di
+                  // `AnimatedContainer` in `FlatChipButton._buildFlat`
+                  // (200ms/`Curves.easeOut`), coerente col resto della UI.
+                  // Colore `pulseAccent` a bassa opacità, non un riempimento
+                  // pieno (stesso principio dello stato "filled" di
+                  // `FlatChipButton`).
+                  AnimatedAlign(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                    alignment: tab == _BustePagaTab.archivio
+                        ? Alignment.centerLeft
+                        : Alignment.centerRight,
+                    child: FractionallySizedBox(
+                      widthFactor: 0.5,
+                      heightFactor: 1,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.12),
+                          borderRadius:
+                              BorderRadius.circular(AppRadius.pulseSmall),
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: _NavBarTab(
-                    glyph: PulseIconGlyph.chart,
-                    label: 'Statistiche',
-                    active: tab == _BustePagaTab.statistiche,
-                    accent: accent,
-                    inactive: textSecondary,
-                    onPressed: () => onTabChanged(_BustePagaTab.statistiche),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _NavBarTab(
+                          glyph: PulseIconGlyph.archive,
+                          label: 'Archivio',
+                          active: tab == _BustePagaTab.archivio,
+                          accent: accent,
+                          inactive: textSecondary,
+                          onPressed: () =>
+                              onTabChanged(_BustePagaTab.archivio),
+                        ),
+                      ),
+                      Expanded(
+                        child: _NavBarTab(
+                          glyph: PulseIconGlyph.chart,
+                          label: 'Statistiche',
+                          active: tab == _BustePagaTab.statistiche,
+                          accent: accent,
+                          inactive: textSecondary,
+                          onPressed: () =>
+                              onTabChanged(_BustePagaTab.statistiche),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -881,10 +953,10 @@ class _BustePagaNavBar extends StatelessWidget {
 }
 
 /// Singolo tab della barra di navigazione: icona+label, colorati con
-/// `accent` quando attivo, `inactive` altrimenti — nessun riempimento di
-/// sfondo per il tab attivo (a differenza dei vecchi `FlatChipButton`), solo
-/// il colore cambia, coerente con la superficie `PulseSurface` unica che li
-/// contiene entrambi.
+/// `accent` quando attivo, `inactive` altrimenti. L'indicatore di sfondo del
+/// tab attivo (pillola animata) vive un livello sopra, in `_BustePagaNavBar`
+/// (`AnimatedAlign` dietro questa `Row`), non qui: questo widget si limita al
+/// colore di icona/testo.
 class _NavBarTab extends StatelessWidget {
   final PulseIconGlyph glyph;
   final String label;

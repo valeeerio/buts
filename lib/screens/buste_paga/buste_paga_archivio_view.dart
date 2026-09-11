@@ -113,14 +113,59 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
   /// dedotto dall'ordine di chiamata dei builder).
   Map<String, int> _globalRowIndex = const {};
 
+  /// Id delle buste paga la cui animazione di ingresso ([StaggeredFadeSlideIn]
+  /// in [_bustaPagaRow]) è già stata giocata almeno una volta in questa
+  /// istanza dello `State`. `SliverList.separated`/`itemBuilder` costruiscono
+  /// le righe in modo lazy: quando una riga esce dal viewport durante lo
+  /// scroll e vi rientra, Flutter distrugge e ricrea il suo `State` (anche
+  /// con una `Key` stabile, che protegge solo dal riordino/dalla rimozione
+  /// nello stesso frame, non dalla ricostruzione lazy legata al viewport) —
+  /// senza questo tracking, [StaggeredFadeSlideIn] rigiocherebbe da capo
+  /// fade+slide ad ogni rientro, dando l'impressione che i dati "arrivino"
+  /// di nuovo durante lo scroll — anche se in realtà erano già arrivate
+  /// nello stesso build (il caricamento iniziale dal DB, quello vero, è
+  /// asincrono: vedi `BustePagaNotifier._initialize`/
+  /// `busteCaricamentoCompletatoProvider` in `busteRepositoryProvider`, e il
+  /// guard su quel flag in [_buildBody]/`_EmptyState` più sotto in questo
+  /// file). Passato direttamente a
+  /// [StaggeredFadeSlideIn] (`playId`/`playedIds`), che decide/marca in
+  /// `initState` — non qui in `_bustaPagaRow`/`build`: `SliverList`/
+  /// `SliverStickyHeader` possono invocare l'`itemBuilder` più di una volta
+  /// per la stessa riga durante un singolo ciclo di layout/misurazione senza
+  /// creare una nuova `Element`/`State`, quindi marcare "già animato" a
+  /// livello di chiamata dell'`itemBuilder` lo farebbe apparire "già visto"
+  /// prima ancora che la riga sia stata effettivamente disegnata la prima
+  /// volta (bug reale osservato scrivendo il test di questo fix, non
+  /// un'ipotesi) — `initState` gira invece esattamente una volta per ogni
+  /// vera istanza dello `State`, la granularità corretta.
+  final Set<String> _idGiaAnimati = {};
+
+  /// `playId` sintetici (non id di buste paga reali) per far rientrare
+  /// l'hero dell'ultima busta paga e la riga di tessere
+  /// Ferie/Permessi/Ex festività nella stessa cascata/nello stesso
+  /// [_idGiaAnimati] delle righe elenco (vedi [build]): stringhe che non
+  /// collidono mai con un id reale (`uuid`), così l'intera sequenza
+  /// header→elenco gioca una sola volta per sessione app, con la stessa
+  /// logica "già animato" già corretta in `initState` di
+  /// [StaggeredFadeSlideIn].
+  static const _headerHeroPlayId = 'header-hero';
+  static const _headerRingsPlayId = 'header-rings';
+
   /// Calcola [_globalRowIndex] per la build corrente: stesso ordine con cui
   /// [_yearSliver] disegna le righe (per ogni anno decrescente, prima
   /// "Extra" ordinata per tipo poi le mensili in ordine cronologico
   /// decrescente già garantito da `sorted`).
+  ///
+  /// `startIndex` fa proseguire la numerazione dopo gli elementi
+  /// dell'header/hero (vedi [_headerHeroIndex]/[_headerRingsIndex] in
+  /// [build]), così l'intera cascata — header poi elenco — è un'unica
+  /// sequenza continua dall'alto verso il basso invece di due animazioni
+  /// scollegate: `0` quando l'header non è mostrato (ricerca attiva), così
+  /// l'elenco riparte da zero senza un ritardo iniziale ingiustificato.
   void _computeGlobalRowIndex(
-      List<int> anni, Map<int, List<BustaPaga>> byYear) {
+      List<int> anni, Map<int, List<BustaPaga>> byYear, int startIndex) {
     final index = <String, int>{};
-    var i = 0;
+    var i = startIndex;
     for (final anno in anni) {
       final buste = byYear[anno]!;
       final extra = buste.where((b) => b.tipo != TipoBustaPaga.mensile).toList()
@@ -252,20 +297,29 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
   /// in entrambi i casi.
   Widget _bustaPagaRow(
       BuildContext context, WidgetRef ref, BustaPaga bustaPaga) {
+    final riga = Dismissible(
+      key: ValueKey('row-${bustaPaga.id}'),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) => _confermaEElimina(context, ref, bustaPaga),
+      background: const SwipeDeleteBackground(radius: AppRadius.pulseSmall),
+      child: BustaPagaListItem(
+        bustaPaga: bustaPaga,
+        onTap: () => widget.onOpenDetail(bustaPaga),
+      ),
+    );
+
+    // Vedi doc di [_idGiaAnimati]: solo la primissima volta che lo `State`
+    // di questo `StaggeredFadeSlideIn` viene creato per questo id gioca
+    // l'animazione di ingresso (deciso in `initState`, non qui) — le
+    // ricostruzioni successive dello stesso `State` mostrano subito la riga
+    // nella sua posizione/opacità finale.
     final globalIndex = _globalRowIndex[bustaPaga.id] ?? 0;
     return StaggeredFadeSlideIn(
       key: ValueKey('stagger-${bustaPaga.id}'),
       index: globalIndex,
-      child: Dismissible(
-        key: ValueKey('row-${bustaPaga.id}'),
-        direction: DismissDirection.endToStart,
-        confirmDismiss: (_) => _confermaEElimina(context, ref, bustaPaga),
-        background: const SwipeDeleteBackground(radius: AppRadius.pulseSmall),
-        child: BustaPagaListItem(
-          bustaPaga: bustaPaga,
-          onTap: () => widget.onOpenDetail(bustaPaga),
-        ),
-      ),
+      playId: bustaPaga.id,
+      playedIds: _idGiaAnimati,
+      child: riga,
     );
   }
 
@@ -532,6 +586,8 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
   @override
   Widget build(BuildContext context) {
     final buste = ref.watch(busteRepositoryProvider);
+    final caricamentoCompletato =
+        ref.watch(busteCaricamentoCompletatoProvider);
     final ultima = ref.watch(ultimaBustaPagaProvider);
     final sorted = [...buste]..sort((a, b) => b.periodo.compareTo(a.periodo));
     final filtered =
@@ -542,7 +598,10 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
         widget.query.trim().isNotEmpty &&
         filtered.isEmpty;
     final mostraHero = !widget.searchActive && ultima != null;
-    _computeGlobalRowIndex(anni, byYear);
+    // Le righe elenco proseguono la cascata subito dopo i due elementi
+    // dell'header (hero=indice 0, tessere=indice 1) quando l'header è
+    // mostrato — vedi doc di [_computeGlobalRowIndex].
+    _computeGlobalRowIndex(anni, byYear, mostraHero ? 2 : 0);
 
     // Ricontrolla dopo ogni layout (non solo sullo scroll dell'utente): il
     // contenuto della lista cambia (import/eliminazione, ricerca) e con
@@ -559,14 +618,24 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
               AppSpacing.screenHorizontal,
               0,
             ),
-            child: Dismissible(
-              key: ValueKey('hero-${ultima.id}'),
-              direction: DismissDirection.endToStart,
-              confirmDismiss: (_) => _confermaEElimina(context, ref, ultima),
-              background: const SwipeDeleteBackground(radius: AppRadius.pulse),
-              child: BustaPagaSummaryHero(
-                bustaPaga: ultima,
-                onTap: () => widget.onOpenDetail(ultima),
+            // Primo elemento della cascata (indice 0): compare prima delle
+            // righe elenco, vedi doc di [_headerHeroPlayId]/
+            // [_computeGlobalRowIndex].
+            child: StaggeredFadeSlideIn(
+              key: const ValueKey('stagger-$_headerHeroPlayId'),
+              index: 0,
+              playId: _headerHeroPlayId,
+              playedIds: _idGiaAnimati,
+              child: Dismissible(
+                key: ValueKey('hero-${ultima.id}'),
+                direction: DismissDirection.endToStart,
+                confirmDismiss: (_) => _confermaEElimina(context, ref, ultima),
+                background:
+                    const SwipeDeleteBackground(radius: AppRadius.pulse),
+                child: BustaPagaSummaryHero(
+                  bustaPaga: ultima,
+                  onTap: () => widget.onOpenDetail(ultima),
+                ),
               ),
             ),
           ),
@@ -575,7 +644,16 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.screenHorizontal,
             ),
-            child: _MaturazioniRingsRow(bustaPaga: ultima),
+            // Secondo elemento della cascata (indice 1): subito dopo l'hero,
+            // prima dell'elenco (che riparte dall'indice 2, vedi
+            // [_computeGlobalRowIndex]).
+            child: StaggeredFadeSlideIn(
+              key: const ValueKey('stagger-$_headerRingsPlayId'),
+              index: 1,
+              playId: _headerRingsPlayId,
+              playedIds: _idGiaAnimati,
+              child: _MaturazioniRingsRow(bustaPaga: ultima),
+            ),
           ),
           const SizedBox(height: AppSpacing.lg),
         ],
@@ -603,7 +681,15 @@ class _BustePagaArchivioViewState extends ConsumerState<BustePagaArchivioView> {
                   const SliverToBoxAdapter(
                     child: SizedBox(height: AppSpacing.sm),
                   ),
-                if (sorted.isEmpty)
+                if (sorted.isEmpty && !caricamentoCompletato)
+                  // Caricamento iniziale dal DB ancora in corso (vedi
+                  // `busteCaricamentoCompletatoProvider`): uno stato vuoto è
+                  // ancora indistinguibile da "nessuna busta paga mai
+                  // importata", ma qui sappiamo che non è (ancora) certo —
+                  // non mostrare l'invito ad aggiungere, che sarebbe
+                  // fuorviante se sparisse una frazione di secondo dopo.
+                  const SliverToBoxAdapter(child: SizedBox.shrink())
+                else if (sorted.isEmpty)
                   SliverPadding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.screenHorizontal,

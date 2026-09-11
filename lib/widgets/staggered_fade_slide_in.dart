@@ -16,14 +16,35 @@ import 'package:flutter/cupertino.dart';
 /// ricreare lo State ad ogni rebuild/scroll (per via del riordino/rimozione
 /// di elementi) e l'animazione ripartirebbe da capo invece di restare
 /// "giocata" solo al primo ingresso in vista.
+///
+/// [playId]/[playedIds] sono opzionali e servono a giocare l'animazione una
+/// sola volta per dato, non una volta per ogni ricreazione dello `State`
+/// dell'elemento: in una lista lazy (`SliverList`/`itemBuilder`), quando una
+/// riga esce dal viewport durante lo scroll e vi rientra, Flutter distrugge
+/// e ricrea lo `State` di questo widget (una `Key` stabile protegge solo dal
+/// riordino/dalla rimozione nello stesso frame, non dalla ricostruzione lazy
+/// legata al viewport) — senza questo meccanismo l'animazione ripartirebbe
+/// da capo ad ogni rientro. Se [playId] è già presente in [playedIds]
+/// all'`initState`, l'animazione non parte: il widget si mostra subito
+/// nella sua posizione/opacità finale. Il controllo/inserimento avviene
+/// **in `initState`**, non nel `build` di chi istanzia questo widget: un
+/// `itemBuilder` di sliver può essere invocato più volte per la stessa riga
+/// durante un singolo ciclo di layout/misurazione senza che questo crei una
+/// nuova `Element`/`State` — `initState` gira invece esattamente una volta
+/// per ogni vera istanza dello `State`, che è la granularità corretta per
+/// questo tracking.
 class StaggeredFadeSlideIn extends StatefulWidget {
   final int index;
   final Widget child;
+  final String? playId;
+  final Set<String>? playedIds;
 
   const StaggeredFadeSlideIn({
     super.key,
     required this.index,
     required this.child,
+    this.playId,
+    this.playedIds,
   });
 
   static const _maxDelayIndex = 12;
@@ -56,6 +77,20 @@ class _StaggeredFadeSlideInState extends State<StaggeredFadeSlideIn>
       begin: const Offset(0, 0.08),
       end: Offset.zero,
     ).animate(curved);
+
+    final playId = widget.playId;
+    final playedIds = widget.playedIds;
+    final giaGiocata =
+        playId != null && playedIds != null && playedIds.contains(playId);
+
+    if (giaGiocata) {
+      // Già mostrata in una build precedente (vedi doc di classe): nessuna
+      // animazione, si parte già nello stato finale.
+      _controller.value = 1.0;
+      return;
+    }
+
+    playedIds?.add(playId!);
 
     final cappedIndex = widget.index > StaggeredFadeSlideIn._maxDelayIndex
         ? StaggeredFadeSlideIn._maxDelayIndex
